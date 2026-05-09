@@ -1,0 +1,546 @@
+--[[
+    Rayfield UI para PolyZ Zombie
+    Compatível com a versão mais recente do jogo
+    Interface completa com ESP, Aimbot, e recursos de Farm
+]]
+
+-- Carregar a biblioteca Rayfield
+local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
+
+-- Criar a janela principal
+local Window = Rayfield:CreateWindow({
+    Name = "PolyZ Zombie Hub",
+    Icon = 0,
+    LoadingTitle = "Carregando PolyZ Hub",
+    LoadingSubtitle = "By ScriptMaster",
+    Theme = "Dark",
+    ToggleUIKeybind = Enum.KeyCode.RightShift,
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "PolyZ_Hub",
+        FileName = "Config_V1"
+    },
+    KeySystem = false
+})
+
+-- Função de notificação simplificada
+local function Notify(Title, Content, Duration)
+    Rayfield:Notify({
+        Title = Title,
+        Content = Content,
+        Duration = Duration or 3
+    })
+end
+
+Notify("PolyZ Hub", "Script carregado com sucesso!", 3)
+
+-- ============================================
+-- SERVIÇOS E VARIÁVEIS GLOBAIS
+-- ============================================
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Camera = workspace.CurrentCamera
+
+-- Variáveis de estado
+local ESPEnabled = false
+local AimbotEnabled = false
+local AutoFarmEnabled = false
+local SilentAimEnabled = false
+local ShowTeam = false
+local ZombieESPColor = Color3.fromRGB(255, 50, 50)
+local ItemESPColor = Color3.fromRGB(50, 255, 50)
+local PlayerESPColor = Color3.fromRGB(50, 150, 255)
+
+local espObjects = {}
+local aimbotFOV = 150
+local aimbotSmoothness = 0.3
+
+-- ============================================
+-- FUNÇÕES DE UTILIDADE
+-- ============================================
+local function GetZombies()
+    local zombies = {}
+    for _, v in ipairs(workspace:GetChildren()) do
+        if v:FindFirstChild("Humanoid") and v:FindFirstChild("Head") then
+            if v.Name:lower():find("zombie") or v:FindFirstChild("Zombie") then
+                table.insert(zombies, v)
+            end
+        end
+    end
+    return zombies
+end
+
+local function GetItems()
+    local items = {}
+    for _, v in ipairs(workspace:GetChildren()) do
+        if v:IsA("Model") and (v:FindFirstChild("Handle") or v:FindFirstChild("Part")) then
+            if v.Name:lower():find("ammo") or v.Name:lower():find("weapon") or v.Name:lower():find("med") then
+                table.insert(items, v)
+            end
+        end
+    end
+    return items
+end
+
+local function GetNearestZombie()
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
+    
+    local rootPart = character.HumanoidRootPart
+    local nearest = nil
+    local shortestDistance = aimbotFOV
+    
+    for _, zombie in ipairs(GetZombies()) do
+        if zombie and zombie:FindFirstChild("Head") and zombie:FindFirstChild("Humanoid") and zombie.Humanoid.Health > 0 then
+            local headPos = Camera:WorldToViewportPoint(zombie.Head.Position)
+            local screenDistance = (Vector2.new(headPos.X, headPos.Y) - UserInputService:GetMouseLocation()).magnitude
+            
+            if screenDistance < shortestDistance then
+                shortestDistance = screenDistance
+                nearest = zombie
+            end
+        end
+    end
+    
+    return nearest
+end
+
+-- ============================================
+-- SISTEMA DE ESP
+-- ============================================
+local function CreateESP(instance, color, name)
+    if not instance or not instance:FindFirstChild("HumanoidRootPart") then return nil end
+    
+    -- Highlight para contorno
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ESP_Highlight"
+    highlight.FillColor = color
+    highlight.FillTransparency = 0.6
+    highlight.OutlineColor = color
+    highlight.OutlineTransparency = 0.2
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Adornee = instance
+    highlight.Parent = instance
+    
+    -- BillboardGui para nome
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ESP_Name"
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = instance
+    
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = name
+    textLabel.TextColor3 = color
+    textLabel.TextStrokeTransparency = 0
+    textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+    textLabel.TextScaled = true
+    textLabel.Font = Enum.Font.GothomBold
+    textLabel.Parent = billboard
+    
+    return {highlight = highlight, billboard = billboard}
+end
+
+local function RemoveESP(instance)
+    if instance and instance:FindFirstChild("ESP_Highlight") then
+        instance.ESP_Highlight:Destroy()
+    end
+    if instance and instance:FindFirstChild("ESP_Name") then
+        instance.ESP_Name:Destroy()
+    end
+end
+
+local function UpdateESP()
+    if not ESPEnabled then
+        for _, obj in pairs(espObjects) do
+            RemoveESP(obj)
+        end
+        espObjects = {}
+        return
+    end
+    
+    -- ESP para Zombies
+    for _, zombie in ipairs(GetZombies()) do
+        if not espObjects[zombie] then
+            local distance = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and 
+                             (zombie:FindFirstChild("HumanoidRootPart") and (LocalPlayer.Character.HumanoidRootPart.Position - zombie.HumanoidRootPart.Position).magnitude or 999)) or 999
+            local health = zombie:FindFirstChild("Humanoid") and math.floor(zombie.Humanoid.Health) or 0
+            espObjects[zombie] = CreateESP(zombie, ZombieESPColor, "🧟 " .. zombie.Name .. " | " .. health .. "❤️ | " .. math.floor(distance) .. "m")
+        end
+    end
+    
+    -- ESP para Itens
+    if ShowTeam then
+        for _, item in ipairs(GetItems()) do
+            if not espObjects[item] then
+                espObjects[item] = CreateESP(item, ItemESPColor, "📦 " .. item.Name)
+            end
+        end
+    end
+end
+
+-- Loop do ESP
+RunService.RenderStepped:Connect(function()
+    if ESPEnabled then
+        UpdateESP()
+    end
+end)
+
+-- ============================================
+-- SISTEMA DE AIMBOT
+-- ============================================
+local function AimAt(position)
+    if not AimbotEnabled then return end
+    
+    local tweenInfo = TweenInfo.new(aimbotSmoothness, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+    local tween = TweenService:Create(Camera, tweenInfo, {CFrame = CFrame.new(Camera.CFrame.Position, position)})
+    tween:Play()
+end
+
+local function SilentAim(targetPosition)
+    if not SilentAimEnabled then return end
+    
+    -- Calcula o ângulo de visualização para o alvo
+    local cameraCF = Camera.CFrame
+    local direction = (targetPosition - cameraCF.Position).unit
+    local newCF = CFrame.new(cameraCF.Position, cameraCF.Position + direction)
+    
+    -- Aplica silenciosamente (invisível para outros jogadores)
+    Camera.CFrame = newCF
+end
+
+-- Aimbot automático
+RunService.RenderStepped:Connect(function()
+    if not AimbotEnabled then return end
+    
+    local nearestZombie = GetNearestZombie()
+    if nearestZombie and nearestZombie:FindFirstChild("Head") then
+        local headPos = nearestZombie.Head.Position
+        if SilentAimEnabled then
+            SilentAim(headPos)
+        else
+            AimAt(headPos)
+        end
+    end
+end)
+
+-- ============================================
+-- SISTEMA DE AUTO FARM
+-- ============================================
+local function AutoFarm()
+    while AutoFarmEnabled and RunService.RenderStepped do
+        local nearestZombie = GetNearestZombie()
+        if nearestZombie and nearestZombie:FindFirstChild("HumanoidRootPart") then
+            local character = LocalPlayer.Character
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                -- Movimento automático em direção ao zumbi
+                local hrp = character.HumanoidRootPart
+                local zombiePos = nearestZombie.HumanoidRootPart.Position
+                local direction = (zombiePos - hrp.Position).unit
+                local newPos = hrp.Position + direction * 16
+                
+                hrp.CFrame = CFrame.new(newPos, zombiePos)
+                
+                -- Disparo automático (simula clique do mouse)
+                local args = {
+                    [1] = nearestZombie:FindFirstChild("Head") or nearestZombie:FindFirstChild("HumanoidRootPart")
+                }
+                game:GetService("ReplicatedStorage"):FindFirstChild("Damage") and 
+                game:GetService("ReplicatedStorage").Damage:FireServer(unpack(args))
+            end
+        end
+        wait(0.1)
+    end
+end
+
+-- ============================================
+-- RECURSOS DE JOGABILIDADE
+-- ============================================
+local function InfiniteAmmo()
+    local backpack = LocalPlayer.Backpack
+    local character = LocalPlayer.Character
+    
+    for _, tool in ipairs(backpack:GetChildren()) do
+        if tool:IsA("Tool") and tool:FindFirstChild("Ammo") then
+            tool.Ammo.Value = 999
+        end
+    end
+    
+    if character then
+        for _, tool in ipairs(character:GetChildren()) do
+            if tool:IsA("Tool") and tool:FindFirstChild("Ammo") then
+                tool.Ammo.Value = 999
+            end
+        end
+    end
+end
+
+local function NoRecoil()
+    local character = LocalPlayer.Character
+    if character then
+        for _, tool in ipairs(character:GetChildren()) do
+            if tool:IsA("Tool") and tool:FindFirstChild("Recoil") then
+                tool.Recoil.Value = 0
+            end
+        end
+    end
+end
+
+local function SpeedHack(speed)
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("Humanoid") then
+        character.Humanoid.WalkSpeed = speed
+    end
+end
+
+local function JumpPower(power)
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("Humanoid") then
+        character.Humanoid.JumpPower = power
+    end
+end
+
+-- Loops para recursos contínuos
+game:GetService("LoopRun").RenderStepped:Connect(function()
+    if InfiniteAmmo then
+        InfiniteAmmo()
+    end
+    if NoRecoil then
+        NoRecoil()
+    end
+end)
+
+-- ============================================
+-- CRIAÇÃO DAS ABAS E GUI
+-- ============================================
+
+-- ABA: COMBATE
+local CombatTab = Window:CreateTab("⚔️ Combate", nil)
+
+CombatTab:CreateToggle({
+    Name = "🔫 Mira Automática (Aimbot)",
+    CurrentValue = false,
+    Callback = function(Value)
+        AimbotEnabled = Value
+        Notify("Aimbot", Value and "Ativado" or "Desativado", 2)
+    end
+})
+
+CombatTab:CreateToggle({
+    Name = "🎯 Mira Silenciosa",
+    CurrentValue = false,
+    Callback = function(Value)
+        SilentAimEnabled = Value
+        Notify("Mira Silenciosa", Value and "Ativada" : "Desativada", 2)
+    end
+})
+
+CombatTab:CreateSlider({
+    Name = "📏 Alcance do Aimbot",
+    Range = {50, 500},
+    Increment = 10,
+    Suffix = "estudos",
+    CurrentValue = 150,
+    Callback = function(Value)
+        aimbotFOV = Value
+    end
+})
+
+CombatTab:CreateSlider({
+    Name = "⚡ Suavidade da Mira",
+    Range = {0.1, 1},
+    Increment = 0.05,
+    Suffix = "seg",
+    CurrentValue = 0.3,
+    Callback = function(Value)
+        aimbotSmoothness = Value
+    end
+})
+
+-- ABA: VISUAIS
+local VisualTab = Window:CreateTab("👁️ Visuais", nil)
+
+VisualTab:CreateToggle({
+    Name = "👤 ESP (Wallhack)",
+    CurrentValue = false,
+    Callback = function(Value)
+        ESPEnabled = Value
+        if not Value then
+            for _, obj in pairs(espObjects) do
+                RemoveESP(obj)
+            end
+            espObjects = {}
+        end
+        Notify("ESP", Value and "Ativado" or "Desativado", 2)
+    end
+})
+
+VisualTab:CreateColorPicker({
+    Name = "🎨 Cor dos Zumbis no ESP",
+    CurrentValue = ZombieESPColor,
+    Callback = function(Value)
+        ZombieESPColor = Value
+        if ESPEnabled then
+            for _, zombie in ipairs(GetZombies()) do
+                if espObjects[zombie] and espObjects[zombie].highlight then
+                    espObjects[zombie].highlight.FillColor = Value
+                    espObjects[zombie].highlight.OutlineColor = Value
+                end
+                if espObjects[zombie] and espObjects[zombie].billboard then
+                    local textLabel = espObjects[zombie].billboard.TextLabel
+                    if textLabel then
+                        textLabel.TextColor3 = Value
+                    end
+                end
+            end
+        end
+    end
+})
+
+VisualTab:CreateToggle({
+    Name = "📦 Mostrar Itens no ESP",
+    CurrentValue = false,
+    Callback = function(Value)
+        ShowTeam = Value
+        if ESPEnabled then
+            UpdateESP()
+        end
+    end
+})
+
+-- ABA: JOGABILIDADE
+local GameplayTab = Window:CreateTab("🎮 Jogabilidade", nil)
+
+GameplayTab:CreateToggle({
+    Name = "🤖 Auto Farm",
+    CurrentValue = false,
+    Callback = function(Value)
+        AutoFarmEnabled = Value
+        if Value then
+            coroutine.wrap(AutoFarm)()
+        end
+        Notify("Auto Farm", Value and "Ativado" or "Desativado", 2)
+    end
+})
+
+GameplayTab:CreateButton({
+    Name = "💀 Insta Kill (Clique para ativar)",
+    Callback = function()
+        for _, zombie in ipairs(GetZombies()) do
+            if zombie:FindFirstChild("Humanoid") then
+                zombie.Humanoid.Health = 0
+            end
+        end
+        Notify("Insta Kill", "Todos os zumbis foram eliminados!", 2)
+    end
+})
+
+GameplayTab:CreateSlider({
+    Name = "🏃 Velocidade do Personagem",
+    Range = {16, 200},
+    Increment = 1,
+    Suffix = "studs/s",
+    CurrentValue = 16,
+    Callback = function(Value)
+        SpeedHack(Value)
+    end
+})
+
+GameplayTab:CreateSlider({
+    Name = "🦿 Altura do Pulo",
+    Range = {50, 200},
+    Increment = 5,
+    Suffix = "power",
+    CurrentValue = 50,
+    Callback = function(Value)
+        JumpPower(Value)
+    end
+})
+
+GameplayTab:CreateToggle({
+    Name = "🔫 Munição Infinita",
+    CurrentValue = false,
+    Callback = function(Value)
+        if Value then
+            InfiniteAmmo()
+        end
+    end
+})
+
+GameplayTab:CreateToggle({
+    Name = "🎯 Sem Recuo",
+    CurrentValue = false,
+    Callback = function(Value)
+        if Value then
+            NoRecoil()
+        end
+    end
+})
+
+-- ABA: UTILIDADES
+local UtilitiesTab = Window:CreateTab("🔧 Utilidades", nil)
+
+UtilitiesTab:CreateButton({
+    Name = "❤️ Curar Personagem",
+    Callback = function()
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChild("Humanoid") then
+            character.Humanoid.Health = character.Humanoid.MaxHealth
+            Notify("Curado", "Vida restaurada ao máximo!", 2)
+        end
+    end
+})
+
+UtilitiesTab:CreateButton({
+    Name = "💰 Pegar Todos os Itens Próximos",
+    Callback = function()
+        local character = LocalPlayer.Character
+        if not character then return end
+        
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        
+        for _, item in ipairs(GetItems()) do
+            if item:FindFirstChild("Handle") then
+                local distance = (hrp.Position - (item:FindFirstChild("Handle") and item.Handle.Position or item.PrimaryPart.Position)).magnitude
+                if distance < 30 then
+                    -- Simula coleta do item
+                    local firePosition = item:FindFirstChild("Handle") and item.Handle or item.PrimaryPart
+                    if firePosition then
+                        game:GetService("ReplicatedStorage").Pickup:FireServer(firePosition)
+                    end
+                end
+            end
+        end
+        Notify("Itens", "Itens próximos coletados!", 2)
+    end
+})
+
+UtilitiesTab:CreateButton({
+    Name = "🚀 Teletransportar para Safe Zone",
+    Callback = function()
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            -- Encontra a safe zone no mapa
+            for _, v in ipairs(workspace:GetChildren()) do
+                if v.Name:lower():find("safe") or v.Name:lower():find("zone") then
+                    if v:IsA("Part") or v:IsA("Model") then
+                        local position = v:IsA("Part") and v.Position or (v:FindFirstChild("Part") and v.Part.Position) or Vector3.new(0, 5, 0)
+                        character.HumanoidRootPart.CFrame = CFrame.new(position)
+                        Notify("Teleporte", "Teletransportado para a Safe Zone!", 2)
+                        break
+                    end
+                end
+            end
+        end
+    end
+})
+
+-- Notificação final
+Notify("PolyZ Hub", "Interface carregada com sucesso! Pressione RightShift para abrir/fechar.", 5)
