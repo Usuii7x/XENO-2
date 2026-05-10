@@ -97,61 +97,6 @@ CombatTab:CreateToggle({
                             if zombie:IsA("Model") then
                                 local head = zombie:FindFirstChild("Head")
                                 if head then
-                                    local args = {zombie, head, head.Position, 0.5, weapon}
-                                    pcall(function() shootRemote:FireServer(unpack(args)) end)
-                                end
-                            end
-                        end
-                    end
-                    task.wait(shootDelay)
-                end
-            end)
-        end
-    end
-})
-
--- ==================== MULTIPLICADOR DE DANO ====================
-local damageMultiplier = 1
-
-CombatTab:CreateSection("💥 Multiplicador de Dano")
-
-CombatTab:CreateSlider({
-    Name = "🔥 Multiplicador de Dano",
-    Range = {1, 100},
-    Increment = 1,
-    Suffix = "x",
-    CurrentValue = 1,
-    Flag = "DamageMultiplier",
-    Callback = function(Value)
-        damageMultiplier = Value
-        Rayfield:Notify({
-            Title = "Damage Multiplier",
-            Content = "Dano multiplicado para " .. Value .. "x",
-            Duration = 3,
-            Image = 4483362458
-        })
-    end
-})
-
--- Atualizar o Auto Headshots para usar o multiplicador
--- Substitua o toggle "Auto Headshots" atual por esta versão melhorada:
-CombatTab:CreateToggle({
-    Name = "🔪 Auto Headshots",
-    CurrentValue = false,
-    Flag = "AutoKillZombies",
-    Callback = function(state)
-        autoKill = state
-        if state then
-            task.spawn(function()
-                while autoKill do
-                    local enemies = workspace:FindFirstChild("Enemies")
-                    local shootRemote = Remotes:FindFirstChild("ShootEnemy")
-                    if enemies and shootRemote then
-                        local weapon = getEquippedWeaponName()
-                        for _, zombie in pairs(enemies:GetChildren()) do
-                            if zombie:IsA("Model") then
-                                local head = zombie:FindFirstChild("Head")
-                                if head then
                                     -- Multiplicador aplicado aqui
                                     local baseDamage = 0.5
                                     local finalDamage = baseDamage * damageMultiplier
@@ -168,6 +113,26 @@ CombatTab:CreateToggle({
                 end
             end)
         end
+    end
+})
+
+local damageMultiplier = 1
+
+CombatTab:CreateSlider({
+    Name = "🔥 Multiplicador de Dano",
+    Range = {1, 100},
+    Increment = 1,
+    Suffix = "x",
+    CurrentValue = 1,
+    Flag = "DamageMultiplier",
+    Callback = function(Value)
+        damageMultiplier = Value
+        Rayfield:Notify({
+            Title = "Damage Multiplier",
+            Content = "Dano multiplicado para " .. Value .. "x",
+            Duration = 3,
+            Image = 4483362458
+        })
     end
 })
 
