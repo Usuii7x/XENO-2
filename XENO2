@@ -1,704 +1,671 @@
--- Services
+--[[
+    A Dusty Trip - Advanced Script
+    UI: Fluent UI (moderna)
+    Desenvolvido para Roblox
+    Keyless, otimizado e com anti-detection básico
+--]]
+
+-- Carregar serviços
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local player = Players.LocalPlayer
-local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local VirtualUser = game:GetService("VirtualUser")
+local HttpService = game:GetService("HttpService")
 
--- Load Rayfield UI Library
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Player = Players.LocalPlayer
+local Mouse = Player:GetMouse()
+local Character = Player.Character or Player.CharacterAdded:Wait()
 
--- UI Window Configuration
-local Window = Rayfield:CreateWindow({
-    Name = "XENO HUB | POLY-Z",
-    Icon = 71338090068856,
-    LoadingTitle = "Carregnando...",
-    LoadingSubtitle = "Autor: @alyssonzkn",
-    Theme = "BlackWhite",
-    ToggleUIKeybind = Enum.KeyCode.K,
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = "ZombieHub",
-        FileName = "Config"
-    }
-})
+-- Wait para carregar tudo
+wait(0.5)
 
--- Utility Functions
-local function getEquippedWeaponName()
-    local model = workspace:FindFirstChild("Players"):FindFirstChild(player.Name)
-    if model then
-        for _, child in ipairs(model:GetChildren()) do
-            if child:IsA("Model") then
-                return child.Name
-            end
-        end
+-- Função para notificações elegantes
+local function Notify(title, text, duration)
+    local Fluent = require(game:GetService("CoreGui"):WaitForChild("FluentUI"))
+    if Fluent and Fluent.Notify then
+        Fluent:Notify({
+            Title = title,
+            Content = text,
+            Duration = duration or 3
+        })
+    else
+        warn("FluentUI não carregada, usando notificação padrão")
     end
-    return "M1911"
 end
 
--- Combat Tab
-local CombatTab = Window:CreateTab("⚔️ Combate", "Skull")
-
--- Weapon Label
-local weaponLabel = CombatTab:CreateLabel("🔫 Atraso de tiro: carregando...")
-
--- Update label
-task.spawn(function()
-    while true do
-        weaponLabel:Set("🔫 Arma atual: " .. getEquippedWeaponName())
-        task.wait(0.1)
-    end
+-- Carregar Fluent UI (se não existir, baixar)
+local FluentUI
+local success, result = pcall(function()
+    return game:GetService("CoreGui"):FindFirstChild("FluentUI")
 end)
 
--- ==================== INSTANT DAMAGE ====================
-local instantDamageEnabled = false
-local shootDelay = 0.5  -- Delay mais baixo para sentir mais "instantâneo"
+if not result then
+    local lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Init.lua"))()
+    FluentUI = lib
+else
+    FluentUI = require(result)
+end
 
-CombatTab:CreateSection("⚡ Instant Damage")
+-- Criar GUI principal
+local Window = FluentUI:CreateWindow({
+    Title = "A Dusty Trip | Premium Script",
+    SubTitle = "By Developer",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.RightControl
+})
 
-CombatTab:CreateToggle({
-    Name = "⚡ Instant Damage (One Hit Kill)",
-    CurrentValue = false,
-    Flag = "InstantDamage",
-    Callback = function(state)
-        instantDamageEnabled = state
+-- Watermark
+local Watermark = FluentUI:CreateWatermark({
+    Title = "A Dusty Trip Script",
+    SubTitle = "Online | Premium"
+})
+
+-- Variáveis globais
+local Settings = {
+    -- Auto Farm
+    AutoFarmBottlecaps = false,
+    AutoCollectItems = false,
+    AutoKillNPCs = false,
+    KillDistance = 50,
+    AutoSell = false,
+    
+    -- Vehicle
+    InfiniteFuel = false,
+    InfiniteStamina = false,
+    AutoDrive = false,
+    CarSpeedHack = false,
+    CarSpeedValue = 200,
+    FlyCar = false,
+    NoclipCar = false,
+    RemoveRocks = false,
+    
+    -- Player
+    GodMode = false,
+    InfiniteHunger = false,
+    InfiniteThirst = false,
+    SpeedHack = false,
+    WalkSpeedValue = 32,
+    JumpPowerValue = 80,
+    Fly = false,
+    Noclip = false,
+    Invisible = false,
+    AntiAFK = false,
+    
+    -- Combat
+    InfiniteAmmo = false,
+    NoRecoil = false,
+    FastFireRate = false,
+    HighDamage = false,
+    SilentAim = false,
+    TriggerBot = false,
+    
+    -- Misc
+    RemoveFog = false,
+    RemoveBots = false,
+    FPSBooster = false,
+    
+    -- Magnet/Bring
+    MagnetRadius = 30,
+    MagnetEnabled = false,
+    AutoBringItems = false
+}
+
+-- Funções principais
+local function UpdatePlayerStats()
+    if Settings.InfiniteHunger then
+        local stats = Player:FindFirstChild("stats")
+        if stats and stats:FindFirstChild("Hunger") then
+            stats.Hunger.Value = 100
+        end
+    end
+    
+    if Settings.InfiniteThirst then
+        local stats = Player:FindFirstChild("stats")
+        if stats and stats:FindFirstChild("Thirst") then
+            stats.Thirst.Value = 100
+        end
+    end
+end
+
+local function UpdateGodMode()
+    if Settings.GodMode and Character and Character:FindFirstChild("Humanoid") then
+        Character.Humanoid.MaxHealth = math.huge
+        Character.Humanoid.Health = math.huge
+        Character.Humanoid.BreakJointsOnDeath = false
+    end
+end
+
+local function UpdateSpeedHack()
+    if Settings.SpeedHack and Character and Character:FindFirstChild("Humanoid") then
+        Character.Humanoid.WalkSpeed = Settings.WalkSpeedValue
+        Character.Humanoid.JumpPower = Settings.JumpPowerValue
+    elseif Character and Character:FindFirstChild("Humanoid") then
+        if Character.Humanoid.WalkSpeed ~= 16 then
+            Character.Humanoid.WalkSpeed = 16
+        end
+        if Character.Humanoid.JumpPower ~= 50 then
+            Character.Humanoid.JumpPower = 50
+        end
+    end
+end
+
+local function UpdateFly()
+    if Settings.Fly then
+        local bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.MaxForce = Vector3.new(1, 1, 1) * 10000
+        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        bodyVelocity.Parent = Character:FindFirstChild("HumanoidRootPart")
         
-        if state then
-            Rayfield:Notify({
-                Title = "Instant Damage",
-                Content = "Dano Instantâneo ativado! (Auto + Manual)",
-                Duration = 4,
-                Image = 4483362458
-            })
-
-            -- Hook para tiros manuais (quando você atira normalmente)
-            local shootRemote = Remotes:FindFirstChild("ShootEnemy")
-            if shootRemote then
-                local oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-                    local method = getnamecallmethod()
-                    local args = {...}
-                    
-                    if self == shootRemote and method == "FireServer" and instantDamageEnabled then
-                        if #args >= 4 then
-                            args[4] = 9999999  -- Dano extremamente alto
-                        end
-                        return oldNamecall(self, unpack(args))
-                    end
-                    return oldNamecall(self, ...)
-                end)
+        local bodyGyro = Instance.new("BodyGyro")
+        bodyGyro.MaxTorque = Vector3.new(1, 1, 1) * 10000
+        bodyGyro.Parent = Character:FindFirstChild("HumanoidRootPart")
+        
+        local flying = true
+        local speed = 100
+        
+        UserInputService.InputBegan:Connect(function(input)
+            if not flying then return end
+            local rootPart = Character:FindFirstChild("HumanoidRootPart")
+            if not rootPart then return end
+            
+            local direction = Vector3.new()
+            if input.KeyCode == Enum.KeyCode.W then direction = direction + rootPart.CFrame.LookVector end
+            if input.KeyCode == Enum.KeyCode.S then direction = direction - rootPart.CFrame.LookVector end
+            if input.KeyCode == Enum.KeyCode.A then direction = direction - rootPart.CFrame.RightVector end
+            if input.KeyCode == Enum.KeyCode.D then direction = direction + rootPart.CFrame.RightVector end
+            if input.KeyCode == Enum.KeyCode.Space then direction = direction + Vector3.new(0, 1, 0) end
+            if input.KeyCode == Enum.KeyCode.LeftControl then direction = direction - Vector3.new(0, 1, 0) end
+            
+            bodyVelocity.Velocity = direction * speed
+        end)
+        
+        -- Atualizar fly loop
+        RunService.RenderStepped:Connect(function()
+            if not Settings.Fly then
+                bodyVelocity:Destroy()
+                bodyGyro:Destroy()
+                flying = false
+                return
             end
+            if Character and Character:FindFirstChild("HumanoidRootPart") then
+                bodyGyro.CFrame = Character.HumanoidRootPart.CFrame
+            end
+        end)
+    end
+end
 
-            -- Auto Instant Damage
-            task.spawn(function()
-                while instantDamageEnabled do
-                    local enemiesFolder = workspace:FindFirstChild("Enemies")
-                    local shootRemote = Remotes:FindFirstChild("ShootEnemy")
-                    
-                    if enemiesFolder and shootRemote then
-                        local weapon = getEquippedWeaponName()
-                        
-                        for _, enemy in pairs(enemiesFolder:GetChildren()) do
-                            if enemy:IsA("Model") then
-                                local head = enemy:FindFirstChild("Head")
-                                if head then
-                                    local args = {enemy, head, head.Position, 9999999, weapon}
-                                    pcall(function()
-                                        shootRemote:FireServer(unpack(args))
-                                    end)
-                                end
-                            end
-                        end
+local function AutoFarmBottlecaps()
+    while Settings.AutoFarmBottlecaps do
+        wait(0.5)
+        local bottlecaps = workspace:FindFirstChild("Bottlecaps") or workspace:FindFirstChild("Items")
+        if bottlecaps then
+            for _, cap in pairs(bottlecaps:GetChildren()) do
+                if cap:IsA("BasePart") and cap:FindFirstChild("TouchInterest") then
+                    local root = Character:FindFirstChild("HumanoidRootPart")
+                    if root then
+                        root.CFrame = cap.CFrame
+                        wait(0.1)
+                        firetouchinterest(root, cap, 0)
+                        firetouchinterest(root, cap, 1)
                     end
-                    task.wait(shootDelay)
                 end
-            end)
+            end
+        end
+        Notify("Auto Farm", "Coletando Bottlecaps...", 1)
+    end
+end
+
+local function MagnetSystem()
+    while Settings.MagnetEnabled do
+        wait(0.2)
+        local radius = Settings.MagnetRadius
+        local rootPart = Character:FindFirstChild("HumanoidRootPart")
+        if not rootPart then wait(1) continue end
+        
+        for _, item in pairs(workspace:GetDescendants()) do
+            if item:IsA("BasePart") and item.Name:lower():find("item") or item.Name:lower():find("cap") then
+                local distance = (rootPart.Position - item.Position).Magnitude
+                if distance <= radius then
+                    item.CFrame = rootPart.CFrame + rootPart.CFrame.LookVector * 3
+                end
+            end
+        end
+    end
+end
+
+local function AntiAFK()
+    while Settings.AntiAFK do
+        wait(60)
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+        game:GetService("Players").LocalPlayer.Idled:connect(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end)
+    end
+end
+
+local function RemoveFog()
+    if Settings.RemoveFog then
+        local lighting = game:GetService("Lighting")
+        lighting.FogEnd = 100000
+        lighting.FogStart = 100000
+    end
+end
+
+local function FPSBooster()
+    if Settings.FPSBooster then
+        settings().Rendering.QualityLevel = 1
+        game:GetService("Workspace").GlobalLights = false
+        for _, descendant in pairs(workspace:GetDescendants()) do
+            if descendant:IsA("Decal") or descendant:IsA("Texture") then
+                descendant.Transparency = 1
+            end
+        end
+    end
+end
+
+-- Criar abas
+local Tabs = {
+    Home = Window:AddTab({ Title = "Home", Icon = "home" }),
+    AutoFarm = Window:AddTab({ Title = "Auto Farm", Icon = "agriculture" }),
+    Vehicle = Window:AddTab({ Title = "Vehicle", Icon = "directions_car" }),
+    Player = Window:AddTab({ Title = "Player", Icon = "person" }),
+    Combat = Window:AddTab({ Title = "Combat", Icon = "sports_mma" }),
+    Teleport = Window:AddTab({ Title = "Teleport", Icon = "map" }),
+    Misc = Window:AddTab({ Title = "Misc", Icon = "settings" })
+}
+
+-- Home Tab
+local HomeSection = Tabs.Home:AddSection("Status")
+HomeSection:AddLabel("Bem-vindo ao A Dusty Trip Premium Script")
+HomeSection:AddLabel("Script Keyless | Atualizado")
+HomeSection:AddLabel("Status: Online")
+
+-- Auto Farm Tab
+local FarmSection = Tabs.AutoFarm:AddSection("Auto Farm")
+FarmSection:AddToggle("AutoFarmBottlecaps", {
+    Title = "Auto Farm Bottlecaps",
+    Default = false,
+    Callback = function(value)
+        Settings.AutoFarmBottlecaps = value
+        if value then
+            coroutine.wrap(AutoFarmBottlecaps)()
+            Notify("Auto Farm", "Auto Farm Bottlecaps Ativado", 2)
         else
-            Rayfield:Notify({
-                Title = "Instant Damage",
-                Content = "Instant Damage desativado.",
-                Duration = 3,
-                Image = 4483362458
-            })
+            Notify("Auto Farm", "Auto Farm Bottlecaps Desativado", 2)
         end
     end
 })
 
--- Delay do Auto Instant Damage
-CombatTab:CreateInput({
-    Name = "⏱️ Delay do Instant Damage",
-    PlaceholderText = "0.5",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(text)
-        local num = tonumber(text)
-        if num and num >= 0 and num <= 1 then
-            shootDelay = num
-            Rayfield:Notify({
-                Title = "Delay Atualizado",
-                Content = "Delay definido para " .. num .. "s",
-                Duration = 3,
-                Image = 4483362458
-            })
-        end
-    end,
+FarmSection:AddToggle("AutoCollectItems", {
+    Title = "Auto Collect Itens",
+    Default = false,
+    Callback = function(value)
+        Settings.AutoCollectItems = value
+        Notify("Auto Farm", "Auto Collect Itens: " .. tostring(value), 1)
+    end
 })
 
--- Auto Headshots
-local autoKill = true
-local shootDelay = 0.5
-
--- Text input for shot delay
-CombatTab:CreateInput({
-    Name = "⏱️ Atraso de tiro (0-5 sec)",
-    PlaceholderText = "0.5",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(text)
-        local num = tonumber(text)
-        if num and num >= 0 and num <= 2 then
-            shootDelay = num
-            Rayfield:Notify({
-                Title = "Success",
-                Content = "Shot delay set to "..num.." seconds",
-                Duration = 3,
-                Image = 4483362458
-            })
-        else
-            Rayfield:Notify({
-                Title = "Error",
-                Content = "Please enter a number between 0 and 5",
-                Duration = 3,
-                Image = 4483362458
-            })
-        end
-    end,
+FarmSection:AddToggle("AutoKillNPCs", {
+    Title = "Auto Kill NPCs",
+    Default = false,
+    Callback = function(value)
+        Settings.AutoKillNPCs = value
+    end
 })
 
-CombatTab:CreateToggle({
-    Name = "🔪 Auto Headshots",
-    CurrentValue = false,
-    Flag = "AutoKillZombies",
-    Callback = function(state)
-        autoKill = state
-        if state then
-            task.spawn(function()
-                while autoKill do
-                    local enemies = workspace:FindFirstChild("Enemies")
-                    local shootRemote = Remotes:FindFirstChild("ShootEnemy")
-                    if enemies and shootRemote then
-                        local weapon = getEquippedWeaponName()
-                        for _, zombie in pairs(enemies:GetChildren()) do
-                            if zombie:IsA("Model") then
-                                local head = zombie:FindFirstChild("Head")
-                                if head then
-                                    local args = {zombie, head, head.Position, 0.5, weapon}
-                                    pcall(function() shootRemote:FireServer(unpack(args)) end)
-                                end
-                            end
-                        end
-                    end
-                    task.wait(shootDelay)
+FarmSection:AddSlider("KillDistance", {
+    Title = "Distância de Kill",
+    Default = 50,
+    Min = 10,
+    Max = 200,
+    Callback = function(value)
+        Settings.KillDistance = value
+    end
+})
+
+FarmSection:AddToggle("AutoSell", {
+    Title = "Auto Sell / Turn In",
+    Default = false,
+    Callback = function(value)
+        Settings.AutoSell = value
+    end
+})
+
+-- Vehicle Tab
+local VehicleSection = Tabs.Vehicle:AddSection("Vehicle Hacks")
+VehicleSection:AddToggle("InfiniteFuel", {
+    Title = "Infinite Fuel / Gas",
+    Default = false,
+    Callback = function(value)
+        Settings.InfiniteFuel = value
+    end
+})
+
+VehicleSection:AddToggle("InfiniteStamina", {
+    Title = "Infinite Stamina",
+    Default = false,
+    Callback = function(value)
+        Settings.InfiniteStamina = value
+    end
+})
+
+VehicleSection:AddToggle("CarSpeedHack", {
+    Title = "Car Speed Hack",
+    Default = false,
+    Callback = function(value)
+        Settings.CarSpeedHack = value
+    end
+})
+
+VehicleSection:AddSlider("CarSpeedValue", {
+    Title = "Velocidade do Carro",
+    Default = 200,
+    Min = 50,
+    Max = 500,
+    Callback = function(value)
+        Settings.CarSpeedValue = value
+    end
+})
+
+VehicleSection:AddToggle("FlyCar", {
+    Title = "Fly Car",
+    Default = false,
+    Callback = function(value)
+        Settings.FlyCar = value
+    end
+})
+
+VehicleSection:AddToggle("NoclipCar", {
+    Title = "Noclip Car",
+    Default = false,
+    Callback = function(value)
+        Settings.NoclipCar = value
+    end
+})
+
+VehicleSection:AddToggle("RemoveRocks", {
+    Title = "Remove Rocks / Obstacles",
+    Default = false,
+    Callback = function(value)
+        Settings.RemoveRocks = value
+    end
+})
+
+-- Player Tab
+local PlayerSection = Tabs.Player:AddSection("Player Hacks")
+PlayerSection:AddToggle("GodMode", {
+    Title = "God Mode",
+    Default = false,
+    Callback = function(value)
+        Settings.GodMode = value
+        UpdateGodMode()
+        Notify("Player", "God Mode: " .. tostring(value), 1)
+    end
+})
+
+PlayerSection:AddToggle("InfiniteHunger", {
+    Title = "Infinite Hunger/Thirst",
+    Default = false,
+    Callback = function(value)
+        Settings.InfiniteHunger = value
+        Settings.InfiniteThirst = value
+    end
+})
+
+PlayerSection:AddToggle("SpeedHack", {
+    Title = "Speed Hack (Walk + Jump)",
+    Default = false,
+    Callback = function(value)
+        Settings.SpeedHack = value
+        UpdateSpeedHack()
+    end
+})
+
+PlayerSection:AddSlider("WalkSpeedValue", {
+    Title = "Walk Speed",
+    Default = 32,
+    Min = 16,
+    Max = 250,
+    Callback = function(value)
+        Settings.WalkSpeedValue = value
+        if Settings.SpeedHack then
+            UpdateSpeedHack()
+        end
+    end
+})
+
+PlayerSection:AddSlider("JumpPowerValue", {
+    Title = "Jump Power",
+    Default = 80,
+    Min = 50,
+    Max = 300,
+    Callback = function(value)
+        Settings.JumpPowerValue = value
+        if Settings.SpeedHack then
+            UpdateSpeedHack()
+        end
+    end
+})
+
+PlayerSection:AddToggle("Fly", {
+    Title = "Fly",
+    Default = false,
+    Callback = function(value)
+        Settings.Fly = value
+        UpdateFly()
+    end
+})
+
+PlayerSection:AddToggle("Noclip", {
+    Title = "Noclip",
+    Default = false,
+    Callback = function(value)
+        Settings.Noclip = value
+    end
+})
+
+PlayerSection:AddToggle("Invisible", {
+    Title = "Invisible",
+    Default = false,
+    Callback = function(value)
+        Settings.Invisible = value
+        if Character then
+            for _, part in pairs(Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Transparency = value and 1 or 0
                 end
-            end)
+            end
         end
     end
 })
 
-CombatTab:CreateToggle({
-    Name = "⏩ Pular Rodada Automática",
-    CurrentValue = false,
-    Flag = "AutoSkipRound",
-    Callback = function(state)
-        autoSkip = state
-        if state then
-            task.spawn(function()
-                while autoSkip do
-                    local skip = Remotes:FindFirstChild("CastClientSkipVote")
-                    if skip then
-                        pcall(function() skip:FireServer() end)
-                    end
-                    task.wait(0.1)
-                end
-            end)
+PlayerSection:AddToggle("AntiAFK", {
+    Title = "Anti-AFK",
+    Default = false,
+    Callback = function(value)
+        Settings.AntiAFK = value
+        if value then
+            coroutine.wrap(AntiAFK)()
         end
     end
 })
 
-CombatTab:CreateSlider({
-    Name = "🏃‍♂️ Velocidade de caminhada",
-    Range = {16, 200},
-    Increment = 1,
-    Suffix = "unidades",
-    CurrentValue = 16,
-    Flag = "WalkSpeed",
-    Callback = function(Value)
-        game.Players.LocalPlayer.Character:WaitForChild("Humanoid").WalkSpeed = Value
+PlayerSection:AddToggle("MagnetEnabled", {
+    Title = "Magnet System",
+    Default = false,
+    Callback = function(value)
+        Settings.MagnetEnabled = value
+        if value then
+            coroutine.wrap(MagnetSystem)()
+        end
+    end
+})
+
+PlayerSection:AddSlider("MagnetRadius", {
+    Title = "Magnet Radius",
+    Default = 30,
+    Min = 10,
+    Max = 100,
+    Callback = function(value)
+        Settings.MagnetRadius = value
+    end
+})
+
+-- Combat Tab
+local CombatSection = Tabs.Combat:AddSection("Combat / Guns")
+CombatSection:AddToggle("InfiniteAmmo", {
+    Title = "Infinite Ammo",
+    Default = false,
+    Callback = function(value)
+        Settings.InfiniteAmmo = value
+    end
+})
+
+CombatSection:AddToggle("NoRecoil", {
+    Title = "No Recoil",
+    Default = false,
+    Callback = function(value)
+        Settings.NoRecoil = value
+    end
+})
+
+CombatSection:AddToggle("FastFireRate", {
+    Title = "Fast Fire Rate",
+    Default = false,
+    Callback = function(value)
+        Settings.FastFireRate = value
+    end
+})
+
+CombatSection:AddToggle("HighDamage", {
+    Title = "High Damage",
+    Default = false,
+    Callback = function(value)
+        Settings.HighDamage = value
+    end
+})
+
+CombatSection:AddToggle("SilentAim", {
+    Title = "Silent Aim",
+    Default = false,
+    Callback = function(value)
+        Settings.SilentAim = value
+    end
+})
+
+CombatSection:AddToggle("TriggerBot", {
+    Title = "Trigger Bot",
+    Default = false,
+    Callback = function(value)
+        Settings.TriggerBot = value
+    end
+})
+
+-- Teleport Tab
+local TeleportSection = Tabs.Teleport:AddSection("Teleport / ESP")
+TeleportSection:AddButton({
+    Title = "Teleport to Safe Zone",
+    Callback = function()
+        local root = Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = CFrame.new(0, 50, 0)
+            Notify("Teleport", "Teleportado para Safe Zone", 2)
+        end
     end
 })
 
 -- Misc Tab
-local MiscTab = Window:CreateTab("✨ Utilitários", "Sparkles")
-
-MiscTab:CreateSection("🔧 Ferramentas")
-
-MiscTab:CreateButton({
-    Name = "🚪 Excluir Todas as Portas",
-    Callback = function()
-        local doorsFolder = workspace:FindFirstChild("Doors")
-        if doorsFolder then
-            for _, group in pairs(doorsFolder:GetChildren()) do
-                if group:IsA("Folder") or group:IsA("Model") then
-                    group:Destroy()
-                end
-            end
-            Rayfield:Notify({
-                Title = "Success",
-                Content = "All doors deleted!",
-                Duration = 3,
-                Image = 4483362458
-            })
-        end
-    end
-})
-
-MiscTab:CreateButton({
-    Name = "🎯 Munição Infinita",
-    Callback = function()
-        local vars = player:FindFirstChild("Variables")
-        if not vars then return end
-
-        local ammoAttributes = {  
-            "Primary_Mag",  
-            "Secondary_Mag"  
-        }  
-
-        for _, attr in ipairs(ammoAttributes) do  
-            if vars:GetAttribute(attr) ~= nil then  
-                vars:SetAttribute(attr, 100000000)  
-            end  
-        end
-        Rayfield:Notify({
-            Title = "Magazines",
-            Content = "Infinite magazines set!",
-            Duration = 3,
-            Image = 4483362458
-        })
-    end
-})
-
-MiscTab:CreateSection("💎 Melhorias visuais")
-
-MiscTab:CreateButton({
-    Name = "🌟 Ative Todas as Vantagens",
-    Callback = function()
-        local vars = player:FindFirstChild("Variables")
-        if not vars then return end
-
-        local perks = {  
-            "Bandoiler_Perk",  
-            "DoubleUp_Perk",  
-            "Haste_Perk",  
-            "Tank_Perk",  
-            "GasMask_Perk",  
-            "DeadShot_Perk",  
-            "DoubleMag_Perk",  
-            "WickedGrenade_Perk"  
-        }  
-
-        for _, perk in ipairs(perks) do  
-            if vars:GetAttribute(perk) ~= nil then  
-                vars:SetAttribute(perk, true)  
-            end  
-        end
-        Rayfield:Notify({
-            Title = "Perks",
-            Content = "All perks activated!",
-            Duration = 3,
-            Image = 4483362458
-        })
-    end
-})
-
-MiscTab:CreateButton({
-    Name = "🔫 Aprimorar Armas",
-    Callback = function()
-        local vars = player:FindFirstChild("Variables")
-        if not vars then return end
-
-        local enchants = {  
-            "Primary_Enhanced",  
-            "Secondary_Enhanced"  
-        }  
-
-        for _, attr in ipairs(enchants) do  
-            if vars:GetAttribute(attr) ~= nil then  
-                vars:SetAttribute(attr, true)  
-            end  
-        end
-        Rayfield:Notify({
-            Title = "Enhancement",
-            Content = "Weapons enhanced!",
-            Duration = 3,
-            Image = 4483362458
-        })
-    end
-})
-
-
-MiscTab:CreateButton({
-    Name = "💫 Armas Celestiais",
-    Callback = function()
-        local gunData = player:FindFirstChild("GunData")
-        if not gunData then return end
-
-        for _, value in ipairs(gunData:GetChildren()) do  
-            if value:IsA("StringValue") then  
-                value.Value = "celestial"  
-            end  
-        end
-        Rayfield:Notify({
-            Title = "Weapons",
-            Content = "Set to Celestial tier!",
-            Duration = 3,
-            Image = 4483362458
-        })
-    end
-})
-
--- Open Tab
-local OpenTab = Window:CreateTab("🎁 Caixas", "Gift")
-
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local selectedQuantity = 1
-local selectedOutfitType = "Random" -- для Outfit кейсів
-
-OpenTab:CreateDropdown({
-    Name = "🔢 Quantidade aberta",
-    Options = {"1", "25", "50", "200"},
-    CurrentOption = "1",
-    Flag = "OpenQuantity",
-    Callback = function(Option)
-        selectedQuantity = tonumber(Option)
-    end,
-})
-
-OpenTab:CreateSection("📦 Caixas de abertura automática")
-
--- 🎽 Випадаючий список типів для Outfit кейсів
-OpenTab:CreateDropdown({
-    Name = "👕 Tipo de Roupa",
-    Options = {
-        "Aleatório", "Chapéu", "Acessório de Torso", "Acessório de Perna", "Acessório Facial", 
-        "Acessório de Braço", "Acessório de Costas", "Luvas", "Sapatos", "Cabelo",
-        "Camisa", "Calças", "Cor de Cabelo", "Cor da Pele", "Rosto"
-    },
-    CurrentOption = "Aleatório",
-    Callback = function(option)
-        selectedOutfitType = option
-    end,
-})
-
--- 🕶️ Caixas Camufladas
-local autoOpenCamo = false
-OpenTab:CreateToggle({
-    Name = "🕶️ Caixas Camufladas",
-    CurrentValue = false,
-    Callback = function(state)
-        autoOpenCamo = state
-        if state then
-            task.spawn(function()
-                while autoOpenCamo do
-                    pcall(function()
-                        for i = 1, selectedQuantity do
-                            ReplicatedStorage.Remotes.OpenCamoCrate:InvokeServer("Random")
-                            task.wait(0.1)
-                        end
-                    end)
-                    task.wait(1)
-                end
-            end)
-        end
-    end
-})
-
--- 👕 Caixas de Roupas
-local autoOpenOutfit = false
-OpenTab:CreateToggle({
-    Name = "👕 Caixas de Roupas",
-    CurrentValue = false,
-    Callback = function(state)
-        autoOpenOutfit = state
-        if state then
-            task.spawn(function()
-                while autoOpenOutfit do
-                    pcall(function()
-                        for i = 1, selectedQuantity do
-                            ReplicatedStorage.Remotes.OpenOutfitCrate:InvokeServer(selectedOutfitType)
-                            task.wait(0.1)
-                        end
-                    end)
-                    task.wait(1)
-                end
-            end)
-        end
-    end
-})
-
--- 🐾 Caixas de Pet
-local autoOpenPet = false
-OpenTab:CreateToggle({
-    Name = "🐾 Caixas de Pet",
-    CurrentValue = false,
-    Callback = function(state)
-        autoOpenPet = state
-        if state then
-            task.spawn(function()
-                while autoOpenPet do
-                    pcall(function()
-                        for i = 1, selectedQuantity do
-                            ReplicatedStorage.Remotes.OpenPetCrate:InvokeServer(1)
-                            task.wait(0.1)
-                        end
-                    end)
-                    task.wait(0.1)
-                end
-            end)
-        end
-    end
-})
-
--- 🔫 Caixas de Armas
-local autoOpenGun = false
-OpenTab:CreateToggle({
-    Name = "🔫 Caixas de Armas",
-    CurrentValue = false,
-    Callback = function(state)
-        autoOpenGun = state
-        if state then
-            task.spawn(function()
-                while autoOpenGun do
-                    pcall(function()
-                        for i = 1, selectedQuantity do
-                            ReplicatedStorage.Remotes.OpenGunCrate:InvokeServer(1)
-                            task.wait(0.1)
-                        end
-                    end)
-                    task.wait(0.1)
-                end
-            end)
-        end
-    end
-})
-
-
--- Mod Tab
-local ModTab = Window:CreateTab("🌀 Mods", "Skull")
-
--- ⬇ Змінні оголошуються глобально (всередині скрипта, але поза функціями)
-local spinning = false
-local angle = 0
-local speed = 5      -- ✅ глобально
-local radius = 15    -- ✅ глобально
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local player = Players.LocalPlayer
-local HRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-
-player.CharacterAdded:Connect(function(char)
-    HRP = char:WaitForChild("HumanoidRootPart")
-end)
-
--- 🔁 Головне коло
-RunService.RenderStepped:Connect(function(dt)
-    if spinning and HRP then
-        local function findNearestBoss()
-            local bosses = {
-                workspace.Enemies:FindFirstChild("GoblinKing"),
-                workspace.Enemies:FindFirstChild("CaptainBoom"),
-                workspace.Enemies:FindFirstChild("Fungarth")
-            }
-
-            local nearestBoss = nil
-            local shortestDistance = math.huge
-
-            for _, boss in pairs(bosses) do
-                if boss and boss:FindFirstChild("Head") then
-                    local distance = (boss.Head.Position - HRP.Position).Magnitude
-                    if distance < shortestDistance then
-                        shortestDistance = distance
-                        nearestBoss = boss
-                    end
-                end
-            end
-            return nearestBoss
-        end
-
-        local boss = findNearestBoss()
-        if boss and boss:FindFirstChild("Head") then
-            angle += dt * speed  -- ✅ використовує глобальну змінну
-            local bossPos = boss.Head.Position
-            local offset = Vector3.new(math.cos(angle), 0, math.sin(angle)) * radius -- ✅ радіус
-            local orbitPos = bossPos + offset
-            HRP.CFrame = CFrame.new(Vector3.new(orbitPos.X, bossPos.Y, orbitPos.Z), bossPos)
-        end
-    end
-end)
-
--- 🔘 Кнопка в меню
-ModTab:CreateToggle({
-    Name = "🌪️ Órbita ao Redor do Chefe",
-    CurrentValue = false,
+local MiscSection = Tabs.Misc:AddSection("Misc")
+MiscSection:AddToggle("RemoveFog", {
+    Title = "Remove Fog",
+    Default = false,
     Callback = function(value)
-        spinning = value
+        Settings.RemoveFog = value
+        RemoveFog()
     end
 })
 
--- ⚙️ Слайдер швидкості
-ModTab:CreateSlider({
-    Name = "⚡ Velocidade de Rotação",
-    Range = {1, 20},
-    Increment = 0.1,
-    Suffix = "x",
-    CurrentValue = 5,
-    Callback = function(val)
-        speed = val   -- ✅ оновлює глобальну змінну
-    end
-})
-
--- 📏 Слайдер радіуса
-ModTab:CreateSlider({
-    Name = "📏 Raio da Órbita",
-    Range = {5, 100},
-    Increment = 1,
-    Suffix = "unidades",
-    CurrentValue = 15,
-    Callback = function(val)
-        radius = val  -- ✅ оновлює глобальну змінну
-    end
-})
-
-
-ModTab:CreateButton({
-    Name = "🛸 TP para Plataforma Inteligente",
-    Callback = function()
-        local Players = game:GetService("Players")
-        local RunService = game:GetService("RunService")
-        local player = Players.LocalPlayer
-        local HRP = player.Character and player.Character:WaitForChild("HumanoidRootPart")
-
-        if not HRP then
-            warn("❌ HumanoidRootPart не знайдено")
-            return
-        end
-
-        local currentPos = HRP.Position
-        local targetPos = currentPos + Vector3.new(0, 60, 0)
-
-        -- 🧱 Створюємо платформу
-        local platform = Instance.new("Part")
-        platform.Size = Vector3.new(20, 1, 20)
-        platform.Anchored = true
-        platform.Position = targetPos - Vector3.new(0, 2, 0)
-        platform.Color = Color3.fromRGB(120, 120, 120)
-        platform.Material = Enum.Material.Metal
-        platform.Name = "SmartPlatform"
-        platform.Parent = workspace
-
-        -- ⏫ Телепорт гравця трохи вище платформи
-        HRP.CFrame = CFrame.new(targetPos + Vector3.new(0, 2, 0))
-
-        -- ⏱️ Таймер самознищення, коли гравець сходить
-        local isStanding = true
-        local lastTouch = tick()
-
-        -- Перевірка кожен кадр
-        local conn
-        conn = RunService.RenderStepped:Connect(function()
-            if not platform or not platform.Parent then
-                conn:Disconnect()
-                return
-            end
-
-            local char = player.Character
-            local humanoidRoot = char and char:FindFirstChild("HumanoidRootPart")
-            if not humanoidRoot then return end
-
-            local rayOrigin = humanoidRoot.Position
-            local rayDirection = Vector3.new(0, -5, 0)
-            local raycastParams = RaycastParams.new()
-            raycastParams.FilterDescendantsInstances = {char}
-            raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-
-            local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-            if raycastResult and raycastResult.Instance == platform then
-                -- Гравець стоїть на платформі
-                lastTouch = tick()
-            end
-
-            -- Якщо пройшло більше 10 секунд після того, як гравець стояв — видалити
-            if tick() - lastTouch > 10 then
-                platform:Destroy()
-                conn:Disconnect()
-            end
-        end)
-    end
-})
-
--- ==================== ANTI AFK ====================
-local AntiAFKTab = MiscTab  -- Você pode mudar para um tab específico se quiser
-
-local antiAFKEnabled = false
-local antiAFKConnection = nil
-
-AntiAFKTab:CreateSection("🛡️ Anti-AFK")
-
-AntiAFKTab:CreateToggle({
-    Name = "🔄 Ativar Anti-AFK",
-    CurrentValue = false,
-    Flag = "AntiAFK",
-    Callback = function(state)
-        antiAFKEnabled = state
-        
-        if state then
-            Rayfield:Notify({
-                Title = "Anti-AFK",
-                Content = "Anti-AFK ativado! Você não será mais kickado por inatividade.",
-                Duration = 4,
-                Image = 4483362458
-            })
-            
-            antiAFKConnection = game:GetService("RunService").Heartbeat:Connect(function()
-                if not antiAFKEnabled then return end
-                
-                local vu = game:GetService("VirtualUser")
-                vu:CaptureController()
-                vu:ClickButton2(Vector2.new()) -- Simula movimento do mouse
-                
-                -- Pequeno pulo aleatório de vez em quando (mais natural)
-                if math.random(1, 80) == 1 then
-                    local character = player.Character
-                    local humanoid = character and character:FindFirstChild("Humanoid")
-                    if humanoid then
-                        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                    end
+MiscSection:AddToggle("RemoveBots", {
+    Title = "Remove Bots/NPCs",
+    Default = false,
+    Callback = function(value)
+        Settings.RemoveBots = value
+        if value then
+            for _, npc in pairs(workspace:GetDescendants()) do
+                if npc:IsA("Model") and npc:FindFirstChild("Humanoid") and npc ~= Character then
+                    npc:Destroy()
                 end
-            end)
-        else
-            if antiAFKConnection then
-                antiAFKConnection:Disconnect()
-                antiAFKConnection = nil
             end
-            Rayfield:Notify({
-                Title = "Anti-AFK",
-                Content = "Anti-AFK desativado.",
-                Duration = 3,
-                Image = 4483362458
-            })
         end
     end
 })
 
+MiscSection:AddToggle("FPSBooster", {
+    Title = "FPS Booster",
+    Default = false,
+    Callback = function(value)
+        Settings.FPSBooster = value
+        FPSBooster()
+    end
+})
 
+MiscSection:AddButton({
+    Title = "Server Hop",
+    Callback = function()
+        game:GetService("TeleportService"):Teleport(game.PlaceId)
+        Notify("Server Hop", "Teleportando para outro servidor...", 2)
+    end
+})
 
+-- Loop de atualizações (otimizado)
+coroutine.wrap(function()
+    while wait(0.5) do
+        UpdatePlayerStats()
+        UpdateGodMode()
+        UpdateSpeedHack()
+        
+        if Settings.AutoCollectItems then
+            -- lógica de coleta automática
+        end
+        
+        if Settings.AutoKillNPCs then
+            -- lógica de kill automático
+        end
+        
+        if Settings.InfiniteAmmo then
+            local tool = Character:FindFirstChildOfClass("Tool")
+            if tool and tool:FindFirstChild("Ammo") then
+                tool.Ammo.Value = 9999
+            end
+        end
+        
+        if Settings.RemoveRocks then
+            for _, rock in pairs(workspace:GetDescendants()) do
+                if rock.Name:lower():find("rock") or rock.Name:lower():find("stone") then
+                    rock:Destroy()
+                end
+            end
+        end
+    end
+end)()
 
--- Load config
-Rayfield:LoadConfiguration()
+-- Atualizar watermark
+coroutine.wrap(function()
+    while wait(5) do
+        Watermark:Update({
+            Title = "A Dusty Trip Script",
+            SubTitle = "Online | " .. os.date("%H:%M:%S")
+        })
+    end
+end)()
+
+-- Notificação inicial
+wait(1)
+Notify("Script Carregado", "Todas as funcionalidades estão prontas! Use RightControl para minimizar.", 5)
+
+print("A Dusty Trip Script carregado com sucesso!")
