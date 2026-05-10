@@ -97,7 +97,7 @@ CombatTab:CreateToggle({
                             if zombie:IsA("Model") then
                                 local head = zombie:FindFirstChild("Head")
                                 if head then
-                                    local args = {zombie, head, head.Position, 0,01, weapon}
+                                    local args = {zombie, head, head.Position, 99999, weapon}
                                     pcall(function() shootRemote:FireServer(unpack(args)) end)
                                 end
                             end
@@ -108,67 +108,6 @@ CombatTab:CreateToggle({
             end)
         end
     end
-})
-
--- ==================== ONE SHOT KILL ====================
-local autoKill = false
-local oneShotEnabled = false
-local shootDelay = 0.5
-
-CombatTab:CreateSection("💀 One Shot Kill")
-
-CombatTab:CreateToggle({
-    Name = "☠️ One Shot Kill (Auto Headshots)",
-    CurrentValue = false,
-    Flag = "OneShotKill",
-    Callback = function(state)
-        oneShotEnabled = state
-        if state then
-            task.spawn(function()
-                while oneShotEnabled do
-                    local enemies = workspace:FindFirstChild("Enemies")
-                    local shootRemote = Remotes:FindFirstChild("ShootEnemy")
-                    
-                    if enemies and shootRemote then
-                        local weapon = getEquippedWeaponName()
-                        
-                        for _, zombie in pairs(enemies:GetChildren()) do
-                            if zombie:IsA("Model") then
-                                local head = zombie:FindFirstChild("Head")
-                                if head then
-                                    -- One Shot Damage
-                                    local args = {zombie, head, head.Position, 99999, weapon}
-                                    pcall(function() 
-                                        shootRemote:FireServer(unpack(args)) 
-                                    end)
-                                end
-                            end
-                        end
-                    end
-                    task.wait(shootDelay)
-                end
-            end)
-        end
-    end
-})
-
--- Input para ajustar o delay (mantém o controle)
-CombatTab:CreateInput({
-    Name = "⏱️ Atraso de tiro (One Shot)",
-    PlaceholderText = "0.5",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(text)
-        local num = tonumber(text)
-        if num and num >= 0 and num <= 2 then
-            shootDelay = num
-            Rayfield:Notify({
-                Title = "Success",
-                Content = "Delay alterado para " .. num .. "s",
-                Duration = 3,
-                Image = 4483362458
-            })
-        end
-    end,
 })
 
 CombatTab:CreateToggle({
