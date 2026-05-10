@@ -276,7 +276,7 @@ local OpenTab = Window:CreateTab("🎁 Caixas", "Gift")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local selectedQuantity = 1
-local selectedOutfitType = "Random" -- para Outfit cases
+local selectedOutfitType = "Random" -- для Outfit кейсів
 
 OpenTab:CreateDropdown({
     Name = "🔢 Quantidade aberta",
@@ -290,7 +290,7 @@ OpenTab:CreateDropdown({
 
 OpenTab:CreateSection("📦 Caixas de abertura automática")
 
--- Dropdown para tipos de Outfit
+-- 🎽 Випадаючий список типів для Outfit кейсів
 OpenTab:CreateDropdown({
     Name = "👕 Tipo de Roupa",
     Options = {
@@ -304,7 +304,7 @@ OpenTab:CreateDropdown({
     end,
 })
 
--- Caixas Camufladas
+-- 🕶️ Caixas Camufladas
 local autoOpenCamo = false
 OpenTab:CreateToggle({
     Name = "🕶️ Caixas Camufladas",
@@ -327,7 +327,7 @@ OpenTab:CreateToggle({
     end
 })
 
--- Caixas de Roupas
+-- 👕 Caixas de Roupas
 local autoOpenOutfit = false
 OpenTab:CreateToggle({
     Name = "👕 Caixas de Roupas",
@@ -350,7 +350,7 @@ OpenTab:CreateToggle({
     end
 })
 
--- Caixas de Pet
+-- 🐾 Caixas de Pet
 local autoOpenPet = false
 OpenTab:CreateToggle({
     Name = "🐾 Caixas de Pet",
@@ -373,7 +373,7 @@ OpenTab:CreateToggle({
     end
 })
 
--- Caixas de Armas
+-- 🔫 Caixas de Armas
 local autoOpenGun = false
 OpenTab:CreateToggle({
     Name = "🔫 Caixas de Armas",
@@ -396,14 +396,15 @@ OpenTab:CreateToggle({
     end
 })
 
+
 -- Mod Tab
 local ModTab = Window:CreateTab("🌀 Mods", "Skull")
 
--- Variáveis do Mod de Órbita
+-- ⬇ Змінні оголошуються глобально (всередині скрипта, але поза функціями)
 local spinning = false
 local angle = 0
-local speed = 5
-local radius = 15
+local speed = 5      -- ✅ глобально
+local radius = 15    -- ✅ глобально
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -414,7 +415,7 @@ player.CharacterAdded:Connect(function(char)
     HRP = char:WaitForChild("HumanoidRootPart")
 end)
 
--- Loop principal da órbita
+-- 🔁 Головне коло
 RunService.RenderStepped:Connect(function(dt)
     if spinning and HRP then
         local function findNearestBoss()
@@ -441,16 +442,16 @@ RunService.RenderStepped:Connect(function(dt)
 
         local boss = findNearestBoss()
         if boss and boss:FindFirstChild("Head") then
-            angle = angle + dt * speed
+            angle += dt * speed  -- ✅ використовує глобальну змінну
             local bossPos = boss.Head.Position
-            local offset = Vector3.new(math.cos(angle), 0, math.sin(angle)) * radius
+            local offset = Vector3.new(math.cos(angle), 0, math.sin(angle)) * radius -- ✅ радіус
             local orbitPos = bossPos + offset
             HRP.CFrame = CFrame.new(Vector3.new(orbitPos.X, bossPos.Y, orbitPos.Z), bossPos)
         end
     end
 end)
 
--- Botão de órbita
+-- 🔘 Кнопка в меню
 ModTab:CreateToggle({
     Name = "🌪️ Órbita ao Redor do Chefe",
     CurrentValue = false,
@@ -459,7 +460,7 @@ ModTab:CreateToggle({
     end
 })
 
--- Slider de velocidade
+-- ⚙️ Слайдер швидкості
 ModTab:CreateSlider({
     Name = "⚡ Velocidade de Rotação",
     Range = {1, 20},
@@ -467,11 +468,11 @@ ModTab:CreateSlider({
     Suffix = "x",
     CurrentValue = 5,
     Callback = function(val)
-        speed = val
+        speed = val   -- ✅ оновлює глобальну змінну
     end
 })
 
--- Slider de raio
+-- 📏 Слайдер радіуса
 ModTab:CreateSlider({
     Name = "📏 Raio da Órbita",
     Range = {5, 100},
@@ -479,9 +480,10 @@ ModTab:CreateSlider({
     Suffix = "unidades",
     CurrentValue = 15,
     Callback = function(val)
-        radius = val
+        radius = val  -- ✅ оновлює глобальну змінну
     end
 })
+
 
 ModTab:CreateButton({
     Name = "🛸 TP para Plataforma Inteligente",
@@ -492,14 +494,14 @@ ModTab:CreateButton({
         local HRP = player.Character and player.Character:WaitForChild("HumanoidRootPart")
 
         if not HRP then
-            warn("❌ HumanoidRootPart não encontrado")
+            warn("❌ HumanoidRootPart не знайдено")
             return
         end
 
         local currentPos = HRP.Position
         local targetPos = currentPos + Vector3.new(0, 60, 0)
 
-        -- Criar plataforma
+        -- 🧱 Створюємо платформу
         local platform = Instance.new("Part")
         platform.Size = Vector3.new(20, 1, 20)
         platform.Anchored = true
@@ -509,13 +511,14 @@ ModTab:CreateButton({
         platform.Name = "SmartPlatform"
         platform.Parent = workspace
 
-        -- Teleportar jogador
+        -- ⏫ Телепорт гравця трохи вище платформи
         HRP.CFrame = CFrame.new(targetPos + Vector3.new(0, 2, 0))
 
-        -- Timer de auto-destruição
+        -- ⏱️ Таймер самознищення, коли гравець сходить
         local isStanding = true
         local lastTouch = tick()
 
+        -- Перевірка кожен кадр
         local conn
         conn = RunService.RenderStepped:Connect(function()
             if not platform or not platform.Parent then
@@ -535,9 +538,11 @@ ModTab:CreateButton({
 
             local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
             if raycastResult and raycastResult.Instance == platform then
+                -- Гравець стоїть на платформі
                 lastTouch = tick()
             end
 
+            -- Якщо пройшло більше 10 секунд після того, як гравець стояв — видалити
             if tick() - lastTouch > 10 then
                 platform:Destroy()
                 conn:Disconnect()
@@ -546,297 +551,62 @@ ModTab:CreateButton({
     end
 })
 
--- ============================================
---          ANTI-AFK SCRIPT
--- ============================================
-local AntiAFKTab = Window:CreateTab("🚫 Anti-AFK", "Clock")
+-- ==================== ANTI AFK ====================
+local AntiAFKTab = MiscTab  -- Você pode mudar para um tab específico se quiser
 
--- Variáveis do Anti-AFK
-local antiAfkActive = false
-local movementActive = true
-local mouseActive = true
-local interval = 30
-local mode = "Médio"
-local notifications = false
-local runningTasks = {}
-local lastActionTime = 0
+local antiAFKEnabled = false
+local antiAFKConnection = nil
 
--- Configurações por modo
-local modeSettings = {
-    Leve = {
-        movementChance = 0.3,
-        mouseMovement = 2,
-        variance = 0.2,
-        keys = {"W", "A", "S", "D"}
-    },
-    Médio = {
-        movementChance = 0.6,
-        mouseMovement = 5,
-        variance = 0.5,
-        keys = {"W", "A", "S", "D"}
-    },
-    Agressivo = {
-        movementChance = 0.9,
-        mouseMovement = 10,
-        variance = 0.8,
-        keys = {"W", "A", "S", "D", "Space"}
-    }
-}
+AntiAFKTab:CreateSection("🛡️ Anti-AFK")
 
--- Função para randomizar intervalo
-local function getRandomizedInterval()
-    local variance = modeSettings[mode].variance
-    local minTime = interval * (1 - variance)
-    local maxTime = interval * (1 + variance)
-    return math.random(minTime * 10, maxTime * 10) / 10
-end
-
--- Função para simular tecla
-local function simulateKeyPress(key)
-    local VirtualUser = game:GetService("VirtualUser")
-    
-    if key == "Space" then
-        pcall(function()
-            game:GetService("Players").LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-        end)
-    else
-        pcall(function()
-            VirtualUser:CaptureController()
-            VirtualUser:SetKeyDown(key)
-            task.wait(0.1)
-            VirtualUser:SetKeyUp(key)
-        end)
-    end
-    
-    if notifications then
-        Rayfield:Notify({
-            Title = "Anti-AFK",
-            Content = "Tecla pressionada: " .. key,
-            Duration = 2
-        })
-    end
-end
-
--- Função para simular mouse
-local function simulateMouseMovement()
-    local mouse = game:GetService("Players").LocalPlayer:GetMouse()
-    local movement = modeSettings[mode].mouseMovement
-    local offsetX = math.random(-movement, movement)
-    local offsetY = math.random(-movement, movement)
-    
-    pcall(function()
-        mouse.Move(Vector2.new(mouse.X + offsetX, mouse.Y + offsetY))
+AntiAFKTab:CreateToggle({
+    Name = "🔄 Ativar Anti-AFK",
+    CurrentValue = false,
+    Flag = "AntiAFK",
+    Callback = function(state)
+        antiAFKEnabled = state
         
-        if notifications then
+        if state then
             Rayfield:Notify({
                 Title = "Anti-AFK",
-                Content = "Mouse movido",
-                Duration = 2
+                Content = "Anti-AFK ativado! Você não será mais kickado por inatividade.",
+                Duration = 4,
+                Image = 4483362458
+            })
+            
+            antiAFKConnection = game:GetService("RunService").Heartbeat:Connect(function()
+                if not antiAFKEnabled then return end
+                
+                local vu = game:GetService("VirtualUser")
+                vu:CaptureController()
+                vu:ClickButton2(Vector2.new()) -- Simula movimento do mouse
+                
+                -- Pequeno pulo aleatório de vez em quando (mais natural)
+                if math.random(1, 80) == 1 then
+                    local character = player.Character
+                    local humanoid = character and character:FindFirstChild("Humanoid")
+                    if humanoid then
+                        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                    end
+                end
+            end)
+        else
+            if antiAFKConnection then
+                antiAFKConnection:Disconnect()
+                antiAFKConnection = nil
+            end
+            Rayfield:Notify({
+                Title = "Anti-AFK",
+                Content = "Anti-AFK desativado.",
+                Duration = 3,
+                Image = 4483362458
             })
         end
-    end)
-end
-
--- Função para executar ação
-local function performAction()
-    if not antiAfkActive then return end
-    
-    local shouldMove = movementActive and math.random() <= modeSettings[mode].movementChance
-    local shouldMouse = mouseActive and math.random() <= modeSettings[mode].movementChance
-    
-    if shouldMove then
-        local keys = modeSettings[mode].keys
-        local selectedKey = keys[math.random(#keys)]
-        simulateKeyPress(selectedKey)
-    end
-    
-    if shouldMouse then
-        simulateMouseMovement()
-    end
-    
-    if not shouldMove and not shouldMouse and movementActive then
-        simulateKeyPress("W")
-        task.wait(0.05)
-        simulateKeyPress("S")
-    end
-end
-
--- Loop principal
-local function antiAfkLoop()
-    while antiAfkActive do
-        local currentTime = tick()
-        local timeSinceLast = currentTime - lastActionTime
-        
-        if timeSinceLast >= getRandomizedInterval() then
-            performAction()
-            lastActionTime = currentTime
-        end
-        
-        task.wait(1)
-    end
-end
-
--- Funções de controle
-local function startAntiAfk()
-    if runningTasks.mainLoop then
-        task.cancel(runningTasks.mainLoop)
-    end
-    
-    runningTasks.mainLoop = task.spawn(antiAfkLoop)
-    
-    if notifications then
-        Rayfield:Notify({
-            Title = "Anti-AFK",
-            Content = "Anti-AFK ativado!",
-            Duration = 3
-        })
-    end
-end
-
-local function stopAntiAfk()
-    if runningTasks.mainLoop then
-        task.cancel(runningTasks.mainLoop)
-        runningTasks.mainLoop = nil
-    end
-    
-    if notifications then
-        Rayfield:Notify({
-            Title = "Anti-AFK",
-            Content = "Anti-AFK desativado!",
-            Duration = 3
-        })
-    end
-end
-
--- Criar seção principal
-local AntiAFKSection = AntiAFKTab:CreateSection("Controle Principal")
-
--- Toggle principal
-AntiAFKTab:CreateToggle({
-    Name = "Ativar Anti-AFK",
-    CurrentValue = false,
-    Flag = "AntiAFKMain",
-    Callback = function(Value)
-        antiAfkActive = Value
-        if Value then
-            startAntiAfk()
-        else
-            stopAntiAfk()
-        end
     end
 })
 
--- Seção de tipos de ação
-local ActionSection = AntiAFKTab:CreateSection("Tipos de Ação")
 
--- Toggle movimento
-AntiAFKTab:CreateToggle({
-    Name = "Anti-AFK por Movimento",
-    CurrentValue = true,
-    Flag = "MovementAntiAFK",
-    Callback = function(Value)
-        movementActive = Value
-    end
-})
 
--- Toggle mouse
-AntiAFKTab:CreateToggle({
-    Name = "Anti-AFK por Mouse",
-    CurrentValue = true,
-    Flag = "MouseAntiAFK",
-    Callback = function(Value)
-        mouseActive = Value
-    end
-})
 
--- Seção de configurações
-local ConfigSection = AntiAFKTab:CreateSection("Configurações Avançadas")
-
--- Slider de intervalo
-AntiAFKTab:CreateSlider({
-    Name = "Intervalo de Ação (segundos)",
-    Range = {5, 60},
-    Increment = 1,
-    Suffix = "s",
-    CurrentValue = 30,
-    Flag = "ActionInterval",
-    Callback = function(Value)
-        interval = Value
-    end
-})
-
--- Dropdown de modo
-AntiAFKTab:CreateDropdown({
-    Name = "Modo de Simulação",
-    Options = {"Leve", "Médio", "Agressivo"},
-    CurrentOption = "Médio",
-    Flag = "SimulationMode",
-    Callback = function(Option)
-        mode = Option
-    end
-})
-
--- Toggle notificações
-AntiAFKTab:CreateToggle({
-    Name = "Notificações",
-    CurrentValue = false,
-    Flag = "Notifications",
-    Callback = function(Value)
-        notifications = Value
-    end
-})
-
--- Seção de comandos
-local CommandsSection = AntiAFKTab:CreateSection("Comandos Rápidos")
-
--- Botão de teste
-AntiAFKTab:CreateButton({
-    Name = "Testar Agora",
-    Callback = function()
-        local wasActive = antiAfkActive
-        local wasMovement = movementActive
-        local wasMouse = mouseActive
-        
-        antiAfkActive = true
-        movementActive = true
-        mouseActive = true
-        
-        Rayfield:Notify({
-            Title = "Teste Anti-AFK",
-            Content = "Executando ação de teste...",
-            Duration = 2
-        })
-        
-        performAction()
-        
-        antiAfkActive = wasActive
-        movementActive = wasMovement
-        mouseActive = wasMouse
-    end
-})
-
--- Botão de destruição da UI (adicionado também na aba Anti-AFK)
-AntiAFKTab:CreateButton({
-    Name = "Destruir Interface",
-    Callback = function()
-        if runningTasks.mainLoop then
-            task.cancel(runningTasks.mainLoop)
-        end
-        Rayfield:Destroy()
-    end
-})
-
--- Label informativo
-local InfoSectionAFK = AntiAFKTab:CreateSection("Informações")
-AntiAFKTab:CreateLabel(
-    "Anti-AFK integrado\n" ..
-    "• Movimento aleatório\n" ..
-    "• Mouse randomizado\n" ..
-    "• 3 modos de intensidade\n" ..
-    "• Proteção anti-detecção"
-)
-
--- ============================================
---          CARREGAR CONFIGURAÇÃO
--- ============================================
+-- Load config
 Rayfield:LoadConfiguration()
