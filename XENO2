@@ -50,6 +50,98 @@ task.spawn(function()
     end
 end)
 
+-- ==================== INSTANT DAMAGE ====================
+local instantDamageEnabled = false
+local shootDelay = 0.3  -- Delay mais baixo para sentir mais "instantâneo"
+
+CombatTab:CreateSection("⚡ Instant Damage")
+
+CombatTab:CreateToggle({
+    Name = "⚡ Instant Damage (One Hit Kill)",
+    CurrentValue = false,
+    Flag = "InstantDamage",
+    Callback = function(state)
+        instantDamageEnabled = state
+        
+        if state then
+            Rayfield:Notify({
+                Title = "Instant Damage",
+                Content = "Dano Instantâneo ativado! (Auto + Manual)",
+                Duration = 4,
+                Image = 4483362458
+            })
+
+            -- Hook para tiros manuais (quando você atira normalmente)
+            local shootRemote = Remotes:FindFirstChild("ShootEnemy")
+            if shootRemote then
+                local oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+                    local method = getnamecallmethod()
+                    local args = {...}
+                    
+                    if self == shootRemote and method == "FireServer" and instantDamageEnabled then
+                        if #args >= 4 then
+                            args[4] = 9999999  -- Dano extremamente alto
+                        end
+                        return oldNamecall(self, unpack(args))
+                    end
+                    return oldNamecall(self, ...)
+                end)
+            end
+
+            -- Auto Instant Damage
+            task.spawn(function()
+                while instantDamageEnabled do
+                    local enemiesFolder = workspace:FindFirstChild("Enemies")
+                    local shootRemote = Remotes:FindFirstChild("ShootEnemy")
+                    
+                    if enemiesFolder and shootRemote then
+                        local weapon = getEquippedWeaponName()
+                        
+                        for _, enemy in pairs(enemiesFolder:GetChildren()) do
+                            if enemy:IsA("Model") then
+                                local head = enemy:FindFirstChild("Head")
+                                if head then
+                                    local args = {enemy, head, head.Position, 9999999, weapon}
+                                    pcall(function()
+                                        shootRemote:FireServer(unpack(args))
+                                    end)
+                                end
+                            end
+                        end
+                    end
+                    task.wait(shootDelay)
+                end
+            end)
+        else
+            Rayfield:Notify({
+                Title = "Instant Damage",
+                Content = "Instant Damage desativado.",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    end
+})
+
+-- Delay do Auto Instant Damage
+CombatTab:CreateInput({
+    Name = "⏱️ Delay do Instant Damage",
+    PlaceholderText = "0.3",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(text)
+        local num = tonumber(text)
+        if num and num >= 0 and num <= 1 then
+            shootDelay = num
+            Rayfield:Notify({
+                Title = "Delay Atualizado",
+                Content = "Delay definido para " .. num .. "s",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    end,
+})
+
 -- Auto Headshots
 local autoKill = true
 local shootDelay = 0.5
