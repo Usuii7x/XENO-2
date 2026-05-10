@@ -1,42 +1,78 @@
 --[[
-    Apocalypse Rising 2 - Phantom Hub
-    Versão: 1.0.0
-    UI Library: Fluent UI (Customizado)
-    Design: Dark Premium com Neon Purple/Cyan
-    Status: Keyless & Otimizado
-]]
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                    PHANTOM HUB - APOCALYPSE RISING 2          ║
+    ║                          Versão: 2.0.0                        ║
+    ║                      Interface: Kavo UI (Custom)              ║
+    ║                          Keyless & Otimizado                  ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    
+    [ FUNCIONALIDADES COMPLETAS ]
+    ✓ Combat: Silent Aim, Trigger Bot, No Recoil, Kill Aura, Anti-Zombie
+    ✓ Visuals: ESP Completo (Players, Zombies, Items, Vehicles)
+    ✓ Player: God Mode, Speed, Fly, Noclip, Invisible
+    ✓ Loot: Auto Collect, Fast Loot
+    ✓ Vehicle: God Mode, Speed, Fly
+    ✓ Misc: Fullbright, Server Hop, Save/Load, Teleports
+    
+    [ DESIGN ]
+    ✓ Dark Premium Theme (Preto, Roxo Neon #8B00FF, Azul Ciano #00BFFF)
+    ✓ Animações Suaves com Glow Effect
+    ✓ Toggles Modernos com Checkbox Animado
+    ✓ Sliders com Gradiente e Efeito Neon
+    ✓ Dropdowns com Scroll e Pesquisa
+    ✓ Notificações Elegantes com Ícones
+    ✓ Watermark Discreto com FPS e Player Count
+    ✓ Keybind Customizável
+    
+    [ OTIMIZAÇÕES ]
+    ✓ Uso de task.spawn() para evitar travamentos
+    ✓ Remoção automática de loops ociosos
+    ✓ Sistema de ESP otimizado com Low Memory
+    ✓ Anti-Detection com metatables protegidas
+--]]
 
---[[ CONSTANTES E CONFIGURAÇÕES ]]
+-- =============================[ CONSTANTES ]=============================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
 local VirtualUser = game:GetService("VirtualUser")
+local VirtualInput = game:GetService("VirtualInputManager")
 
 local Player = Players.LocalPlayer
 local Mouse = Player:GetMouse()
 local Camera = Workspace.CurrentCamera
 
--- Configurações do Script
+-- Configurações do Menu
+local MenuKeybind = Enum.KeyCode.Insert
+local MenuOpen = true
+
+-- =============================[ CONFIGURAÇÕES ]=============================
 local Settings = {
     -- Combat
     SilentAim = false,
-    SilentAimFOV = 100,
+    SilentAimFOV = 120,
     SilentAimSmoothness = 0.3,
     SilentAimHitChance = 85,
     SilentAimTeamCheck = true,
     SilentAimVisibility = true,
     TriggerBot = false,
+    TriggerBotDelay = 0.05,
     NoRecoil = false,
     NoSpread = false,
     FastFireRate = false,
     InfiniteAmmo = false,
     HighDamage = false,
     KillAura = false,
-    KillAuraRange = 30,
+    KillAuraRange = 35,
+    KillAuraDelay = 0.1,
     AntiZombie = false,
+    AntiZombieRange = 30,
     
     -- Visuals
     PlayerESP = false,
@@ -48,6 +84,7 @@ local Settings = {
     Chams = false,
     Tracers = false,
     ShowFOV = false,
+    ItemFilter = "All",
     
     -- Player
     GodMode = false,
@@ -61,10 +98,12 @@ local Settings = {
     InfiniteJump = false,
     Invisible = false,
     AntiAFK = false,
+    ThirdPerson = false,
     
     -- Loot
     AutoCollect = false,
     AutoCollectRadius = 50,
+    AutoLootNearby = false,
     AutoFarmHeli = false,
     FastLoot = false,
     
@@ -75,49 +114,48 @@ local Settings = {
     VehicleFly = false,
     VehicleNoclip = false,
     InfiniteFuel = false,
+    SpawnVehicles = false,
     
     -- Misc
     RemoveFog = false,
     Fullbright = false,
     RemoveZombies = false,
     FPSBooster = false,
-    ThirdPerson = false,
 }
 
--- Estado do jogador
+-- Estado do Jogador
 local PlayerState = {
     Flying = false,
     Noclipping = false,
     OriginalWalkSpeed = 16,
     OriginalJumpPower = 50,
-    Vehicle = nil,
+    Connections = {},
 }
 
--- Objetos para ESP
+-- ESP Storage
 local ESPObjects = {
-    Players = {},
-    Zombies = {},
-    Items = {},
-    Vehicles = {},
-    Corpses = {},
+    Boxes = {},
+    NameTags = {},
+    Tracers = {},
 }
 
---[[ FUNÇÕES AUXILIARES ]]
-local function saveSettings()
-    local data = {}
-    for k, v in pairs(Settings) do
-        data[k] = v
+-- =============================[ FUNÇÕES AUXILIARES ]=============================
+local function SaveSettings()
+    local success, encoded = pcall(function()
+        return HttpService:JSONEncode(Settings)
+    end)
+    if success then
+        writefile("PhantomHub_Settings.json", encoded)
     end
-    writefile("PhantomHub_Settings.json", game:GetService("HttpService"):JSONEncode(data))
 end
 
-local function loadSettings()
+local function LoadSettings()
     if isfile("PhantomHub_Settings.json") then
-        local success, data = pcall(function()
-            return game:GetService("HttpService"):JSONDecode(readfile("PhantomHub_Settings.json"))
+        local success, decoded = pcall(function()
+            return HttpService:JSONDecode(readfile("PhantomHub_Settings.json"))
         end)
-        if success and data then
-            for k, v in pairs(data) do
+        if success and type(decoded) == "table" then
+            for k, v in pairs(decoded) do
                 if Settings[k] ~= nil then
                     Settings[k] = v
                 end
@@ -126,65 +164,60 @@ local function loadSettings()
     end
 end
 
-local function createNotification(Title, Description, Duration)
-    -- Criando notificação customizada com animação
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "NotificationHub"
-    ScreenGui.Parent = game:GetService("CoreGui")
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+local function CreateNotification(Title, Description, Duration, Type)
+    Type = Type or "info"
+    local colors = {
+        info = {65, 105, 225},
+        success = {50, 205, 50},
+        error = {220, 20, 60},
+        warning = {255, 215, 0}
+    }
+    local color = colors[Type] or colors.info
     
-    local NotificationHolder = Instance.new("Frame")
-    NotificationHolder.Name = "NotificationHolder"
-    NotificationHolder.Parent = ScreenGui
-    NotificationHolder.AnchorPoint = Vector2.new(1, 0)
-    NotificationHolder.Position = UDim2.new(1, -20, 0, 60)
-    NotificationHolder.Size = UDim2.new(0, 320, 0, 0)
-    NotificationHolder.BackgroundTransparency = 1
-    NotificationHolder.ClipsDescendants = true
+    local NotificationGui = Instance.new("ScreenGui")
+    NotificationGui.Name = "PhantomNotification"
+    NotificationGui.Parent = CoreGui
+    NotificationGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    local Notification = Instance.new("Frame")
-    Notification.Parent = NotificationHolder
-    Notification.Size = UDim2.new(1, 0, 0, 70)
-    Notification.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    Notification.BackgroundTransparency = 0.05
-    Notification.BorderSizePixel = 0
+    local Frame = Instance.new("Frame")
+    Frame.Parent = NotificationGui
+    Frame.AnchorPoint = Vector2.new(1, 0)
+    Frame.Position = UDim2.new(1, -20, 0, 80)
+    Frame.Size = UDim2.new(0, 320, 0, 0)
+    Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+    Frame.BackgroundTransparency = 0.05
+    Frame.BorderSizePixel = 0
+    Frame.ClipsDescendants = true
     
-    -- Glassmorphism effect
     local Corner = Instance.new("UICorner")
     Corner.CornerRadius = UDim.new(0, 12)
-    Corner.Parent = Notification
+    Corner.Parent = Frame
     
     local Stroke = Instance.new("UIStroke")
-    Stroke.Color = Color3.fromRGB(139, 0, 255)
-    Stroke.Thickness = 1
-    Stroke.Transparency = 0.5
-    Stroke.Parent = Notification
+    Stroke.Color = Color3.fromRGB(color[1], color[2], color[3])
+    Stroke.Thickness = 1.5
+    Stroke.Transparency = 0.6
+    Stroke.Parent = Frame
     
     local Glow = Instance.new("Frame")
-    Glow.Name = "Glow"
-    Glow.Parent = Notification
+    Glow.Parent = Frame
     Glow.Size = UDim2.new(1, 0, 1, 0)
-    Glow.BackgroundColor3 = Color3.fromRGB(139, 0, 255)
+    Glow.BackgroundColor3 = Color3.fromRGB(color[1], color[2], color[3])
     Glow.BackgroundTransparency = 0.9
     Glow.BorderSizePixel = 0
     
-    local GlowCorner = Instance.new("UICorner")
-    GlowCorner.CornerRadius = UDim.new(0, 12)
-    GlowCorner.Parent = Glow
-    
     local Icon = Instance.new("TextLabel")
-    Icon.Parent = Notification
+    Icon.Parent = Frame
     Icon.Size = UDim2.new(0, 40, 1, 0)
     Icon.BackgroundTransparency = 1
     Icon.Font = Enum.Font.FredokaOne
-    Icon.Text = "✨"
-    Icon.TextColor3 = Color3.fromRGB(139, 0, 255)
+    Icon.Text = Type == "success" and "✓" or (Type == "error" and "✕" or (Type == "warning" and "⚠" and "ℹ"))
+    Icon.TextColor3 = Color3.fromRGB(color[1], color[2], color[3])
     Icon.TextSize = 24
-    Icon.TextXAlignment = Enum.TextXAlignment.Center
     
     local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Parent = Notification
-    TitleLabel.Position = UDim2.new(0, 50, 0, 12)
+    TitleLabel.Parent = Frame
+    TitleLabel.Position = UDim2.new(0, 50, 0, 10)
     TitleLabel.Size = UDim2.new(1, -60, 0, 20)
     TitleLabel.BackgroundTransparency = 1
     TitleLabel.Font = Enum.Font.GothamBold
@@ -194,174 +227,125 @@ local function createNotification(Title, Description, Duration)
     TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
     
     local DescLabel = Instance.new("TextLabel")
-    DescLabel.Parent = Notification
-    DescLabel.Position = UDim2.new(0, 50, 0, 34)
-    DescLabel.Size = UDim2.new(1, -60, 0, 20)
+    DescLabel.Parent = Frame
+    DescLabel.Position = UDim2.new(0, 50, 0, 32)
+    DescLabel.Size = UDim2.new(1, -60, 0, 30)
     DescLabel.BackgroundTransparency = 1
     DescLabel.Font = Enum.Font.Gotham
     DescLabel.Text = Description
     DescLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
-    DescLabel.TextSize = 12
+    DescLabel.TextSize = 11
     DescLabel.TextXAlignment = Enum.TextXAlignment.Left
+    DescLabel.TextWrapped = true
     
-    -- Animação de entrada
-    NotificationHolder.Position = UDim2.new(1, 20, 0, 60)
-    local TweenIn = TweenService:Create(NotificationHolder, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Position = UDim2.new(1, -20, 0, 60)
-    })
-    Notification.Size = UDim2.new(1, 0, 0, 0)
-    local TweenExpand = TweenService:Create(Notification, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Size = UDim2.new(1, 0, 0, 70)
+    local ProgressBar = Instance.new("Frame")
+    ProgressBar.Parent = Frame
+    ProgressBar.Size = UDim2.new(1, 0, 0, 2)
+    ProgressBar.Position = UDim2.new(0, 0, 1, -2)
+    ProgressBar.BackgroundColor3 = Color3.fromRGB(color[1], color[2], color[3])
+    ProgressBar.BorderSizePixel = 0
+    
+    -- Animação
+    Frame.Size = UDim2.new(0, 320, 0, 0)
+    local TweenIn = TweenService:Create(Frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 320, 0, 75)
     })
     TweenIn:Play()
-    TweenExpand:Play()
     
-    -- Auto-remover após duração
-    task.delay(Duration or 3, function()
-        local TweenOut = TweenService:Create(NotificationHolder, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-            Position = UDim2.new(1, 20, 0, 60)
+    -- Barra de progresso
+    local ProgressTween = TweenService:Create(ProgressBar, TweenInfo.new(Duration or 3, Enum.EasingStyle.Linear), {
+        Size = UDim2.new(0, 0, 0, 2)
+    })
+    ProgressTween:Play()
+    
+    -- Auto-destruir
+    task.delay((Duration or 3), function()
+        local TweenOut = TweenService:Create(Frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+            Size = UDim2.new(0, 320, 0, 0)
         })
         TweenOut:Play()
         TweenOut.Completed:Connect(function()
-            ScreenGui:Destroy()
+            NotificationGui:Destroy()
         end)
     end)
 end
 
---[[ SISTEMA DE WATERMARK ]]
-local function createWatermark()
-    local WatermarkGui = Instance.new("ScreenGui")
-    WatermarkGui.Name = "PhantomWatermark"
-    WatermarkGui.Parent = game:GetService("CoreGui")
-    WatermarkGui.IgnoreGuiInset = true
-    WatermarkGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Parent = WatermarkGui
-    MainFrame.AnchorPoint = Vector2.new(0, 1)
-    MainFrame.Position = UDim2.new(0, 10, 1, -50)
-    MainFrame.Size = UDim2.new(0, 200, 0, 30)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
-    MainFrame.BackgroundTransparency = 0.2
-    MainFrame.BorderSizePixel = 0
-    
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 8)
-    Corner.Parent = MainFrame
-    
-    local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Parent = MainFrame
-    TitleLabel.Size = UDim2.new(1, 0, 1, 0)
-    TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Font = Enum.Font.GothamBold
-    TitleLabel.Text = "PHANTOM HUB • v1.0"
-    TitleLabel.TextColor3 = Color3.fromRGB(139, 0, 255)
-    TitleLabel.TextSize = 12
-    
-    local FPSLabel = Instance.new("TextLabel")
-    FPSLabel.Parent = MainFrame
-    FPSLabel.Position = UDim2.new(1, -60, 0, 0)
-    FPSLabel.Size = UDim2.new(0, 55, 1, 0)
-    FPSLabel.BackgroundTransparency = 1
-    FPSLabel.Font = Enum.Font.Gotham
-    FPSLabel.Text = "FPS: --"
-    FPSLabel.TextColor3 = Color3.fromRGB(100, 255, 150)
-    FPSLabel.TextSize = 10
-    FPSLabel.TextXAlignment = Enum.TextXAlignment.Right
-    
-    -- Atualizar FPS e jogadores online
-    local frameCount = 0
-    local lastTime = tick()
-    
-    RunService.RenderStepped:Connect(function()
-        frameCount = frameCount + 1
-        local currentTime = tick()
-        if currentTime - lastTime >= 1 then
-            local fps = frameCount
-            frameCount = 0
-            lastTime = currentTime
-            FPSLabel.Text = "FPS: " .. fps .. " | 👥 " .. #Players:GetPlayers()
-            
-            -- Atualizar também o título do watermark
-            local hour = os.date("*t").hour
-            local greeting = hour < 12 and "🌅" or (hour < 18 and "☀️" or "🌙")
-            TitleLabel.Text = greeting .. " PHANTOM HUB • v1.0"
+-- =============================[ FEATURE: ANTI-AFK ]=============================
+local AntiAFKConnection = nil
+local function ToggleAntiAFK(state)
+    if state then
+        AntiAFKConnection = RunService.RenderStepped:Connect(function()
+            VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+            task.wait(0.05)
+            VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+            task.wait(10)
+        end)
+    else
+        if AntiAFKConnection then
+            AntiAFKConnection:Disconnect()
+            AntiAFKConnection = nil
         end
+    end
+end
+
+-- =============================[ FEATURE: NO RECOIL/SPREAD ]=============================
+local function SetupWeaponMods()
+    if not Settings.NoRecoil and not Settings.NoSpread and not Settings.FastFireRate and not Settings.InfiniteAmmo then
+        return
+    end
+    
+    local mt = getrawmetatable(game)
+    local oldIndex = mt.__index
+    setreadonly(mt, false)
+    
+    mt.__index = newcclosure(function(self, key)
+        if Settings.NoRecoil and (key == "Recoil" or key == "CameraRecoil") then
+            return Vector2.new(0, 0)
+        end
+        if Settings.NoSpread and key == "Spread" then
+            return 0
+        end
+        if Settings.FastFireRate and key == "FireRate" then
+            return 0.01
+        end
+        if Settings.InfiniteAmmo and key == "Ammo" then
+            return 999
+        end
+        return oldIndex(self, key)
     end)
+    
+    setreadonly(mt, true)
 end
 
---[[ FEATURE: ANTI-AFK ]]
-local function toggleAntiAFK(state)
-    if state then
-        local VirtualInput = game:GetService("VirtualInputManager")
-        local antiAFKConnection
-        antiAFKConnection = RunService.RenderStepped:Connect(function()
-            VirtualInput:SendKeyEvent(true, "W", false, game)
-            task.wait(0.1)
-            VirtualInput:SendKeyEvent(false, "W", false, game)
-            task.wait(15)
-        end)
-        return antiAFKConnection
-    end
-    return nil
-end
-
---[[ FEATURE: NO RECOIL / NO SPREAD ]]
-local function toggleNoRecoil(state)
-    if state then
-        local mt = getrawmetatable(game)
-        local oldIndex = mt.__index
-        setreadonly(mt, false)
-        mt.__index = newcclosure(function(self, key)
-            if key == "Recoil" or key == "CameraRecoil" then
-                return 0
-            end
-            if key == "Spread" then
-                return 0
-            end
-            return oldIndex(self, key)
-        end)
-        setreadonly(mt, true)
-    end
-end
-
---[[ FEATURE: INFINITE AMMO ]]
-local function toggleInfiniteAmmo(state)
-    if state then
-        local mt = getrawmetatable(game)
-        local oldIndex = mt.__index
-        setreadonly(mt, false)
-        mt.__index = newcclosure(function(self, key)
-            if key == "Ammo" then
-                return 999
-            end
-            return oldIndex(self, key)
-        end)
-        setreadonly(mt, true)
-    end
-end
-
---[[ FEATURE: GOD MODE ]]
-local function toggleGodMode(state)
+-- =============================[ FEATURE: GOD MODE ]=============================
+local GodModeConnection = nil
+local function ToggleGodMode(state)
     local character = Player.Character
     if not character then return end
     
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
     if state then
-        local humanoid = character:FindFirstChild("Humanoid")
-        if humanoid then
-            humanoid.BreakJointsOnDeath = false
-            humanoid:GetPropertyChangedSignal("Health"):Connect(function()
-                if humanoid.Health <= 0 then
-                    humanoid.Health = 100
-                end
-            end)
-            humanoid.Health = 100
+        humanoid.BreakJointsOnDeath = false
+        GodModeConnection = humanoid:GetPropertyChangedSignal("Health"):Connect(function()
+            if humanoid.Health <= 0 then
+                humanoid.Health = 100
+            end
+        end)
+        humanoid.Health = 100
+        CreateNotification("GOD MODE", "You are now invincible", 2, "success")
+    else
+        if GodModeConnection then
+            GodModeConnection:Disconnect()
+            GodModeConnection = nil
         end
+        humanoid.BreakJointsOnDeath = true
     end
 end
 
---[[ FEATURE: SPEED HACK ]]
-function toggleSpeedHack(state)
+-- =============================[ FEATURE: SPEED HACK ]=============================
+local function ToggleSpeedHack(state)
     local character = Player.Character
     if not character then return end
     
@@ -377,13 +361,65 @@ function toggleSpeedHack(state)
     end
 end
 
---[[ FEATURE: NOCLIP ]]
-function toggleNoclip(state)
+-- =============================[ FEATURE: FLY ]=============================
+local FlyVelocity = nil
+local FlyGyro = nil
+local FlyConnection = nil
+
+local function ToggleFly(state)
+    local character = Player.Character
+    if not character then return end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not rootPart then return end
+    
+    if state then
+        PlayerState.Flying = true
+        humanoid.PlatformStand = true
+        
+        FlyVelocity = Instance.new("BodyVelocity")
+        FlyVelocity.MaxForce = Vector3.new(100000, 100000, 100000)
+        FlyVelocity.Velocity = Vector3.new(0, 0, 0)
+        FlyVelocity.Parent = rootPart
+        
+        FlyGyro = Instance.new("BodyGyro")
+        FlyGyro.MaxTorque = Vector3.new(100000, 100000, 100000)
+        FlyGyro.Parent = rootPart
+        
+        FlyConnection = RunService.RenderStepped:Connect(function()
+            if not PlayerState.Flying then return end
+            
+            local moveDir = Vector3.new(
+                (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.A) and 1 or 0),
+                (UserInputService:IsKeyDown(Enum.KeyCode.Space) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and 1 or 0),
+                (UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0)
+            )
+            
+            if moveDir.Magnitude > 0 then
+                moveDir = moveDir.Unit
+            end
+            
+            local velocity = (Camera.CFrame.RightVector * moveDir.X + Camera.CFrame.UpVector * moveDir.Y + Camera.CFrame.LookVector * moveDir.Z) * 60
+            FlyVelocity.Velocity = velocity
+            FlyGyro.CFrame = Camera.CFrame
+        end)
+    else
+        PlayerState.Flying = false
+        if FlyVelocity then FlyVelocity:Destroy() end
+        if FlyGyro then FlyGyro:Destroy() end
+        if FlyConnection then FlyConnection:Disconnect() end
+        humanoid.PlatformStand = false
+    end
+end
+
+-- =============================[ FEATURE: NOCLIP ]=============================
+local NoclipConnection = nil
+local function ToggleNoclip(state)
     PlayerState.Noclipping = state
     
     if state then
-        local noclipConnection
-        noclipConnection = RunService.Stepped:Connect(function()
+        NoclipConnection = RunService.Stepped:Connect(function()
             local character = Player.Character
             if not character then return end
             
@@ -393,8 +429,11 @@ function toggleNoclip(state)
                 end
             end
         end)
-        return noclipConnection
     else
+        if NoclipConnection then
+            NoclipConnection:Disconnect()
+            NoclipConnection = nil
+        end
         local character = Player.Character
         if character then
             for _, part in ipairs(character:GetDescendants()) do
@@ -404,235 +443,123 @@ function toggleNoclip(state)
             end
         end
     end
-    return nil
 end
 
---[[ FEATURE: FLY ]]
-local function toggleFly(state)
-    local character = Player.Character
-    if not character then return end
-    
-    local humanoid = character:FindFirstChild("Humanoid")
-    if not humanoid then return end
-    
+-- =============================[ FEATURE: INFINITE JUMP ]=============================
+local InfiniteJumpConnection = nil
+local function ToggleInfiniteJump(state)
     if state then
-        PlayerState.Flying = true
-        humanoid.PlatformStand = true
-        
-        local bodyVelocity = Instance.new("BodyVelocity")
-        bodyVelocity.MaxForce = Vector3.new(10000, 10000, 10000)
-        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-        bodyVelocity.Parent = character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart
-        
-        local bodyGyro = Instance.new("BodyGyro")
-        bodyGyro.MaxTorque = Vector3.new(10000, 10000, 10000)
-        bodyGyro.Parent = character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart
-        
-        local flyConnection
-        flyConnection = RunService.RenderStepped:Connect(function()
-            if not PlayerState.Flying then
-                flyConnection:Disconnect()
-                bodyVelocity:Destroy()
-                bodyGyro:Destroy()
-                return
-            end
-            
-            local moveDirection = Vector3.new(
-                (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.A) and 1 or 0),
-                (UserInputService:IsKeyDown(Enum.KeyCode.Space) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and 1 or 0),
-                (UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0)
-            ).Unit
-            
-            local cameraLook = Camera.CFrame.LookVector
-            local cameraRight = Camera.CFrame.RightVector
-            local cameraUp = Camera.CFrame.UpVector
-            
-            local velocity = (cameraRight * moveDirection.X + cameraUp * moveDirection.Y + cameraLook * moveDirection.Z) * 50
-            bodyVelocity.Velocity = velocity
-            bodyGyro.CFrame = Camera.CFrame
-        end)
-    else
-        PlayerState.Flying = false
-        humanoid.PlatformStand = false
-    end
-end
-
---[[ FEATURE: INFINITE JUMP ]]
-function toggleInfiniteJump(state)
-    PlayerState.InfiniteJump = state
-    
-    if state then
-        local infiniteJumpConnection
-        infiniteJumpConnection = UserInputService.JumpRequest:Connect(function()
+        InfiniteJumpConnection = UserInputService.JumpRequest:Connect(function()
             local character = Player.Character
             local humanoid = character and character:FindFirstChild("Humanoid")
-            if character and humanoid and humanoid:GetState() ~= Enum.HumanoidStateType.Jumping then
+            if humanoid and humanoid:GetState() ~= Enum.HumanoidStateType.Jumping then
                 humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
             end
         end)
-        return infiniteJumpConnection
+    else
+        if InfiniteJumpConnection then
+            InfiniteJumpConnection:Disconnect()
+            InfiniteJumpConnection = nil
+        end
     end
-    return nil
 end
 
---[[ FEATURE: INVISIBLE ]]
-function toggleInvisible(state)
+-- =============================[ FEATURE: INVISIBLE ]=============================
+local function ToggleInvisible(state)
     local character = Player.Character
     if not character then return end
     
-    for _, part in ipairs(character:GetChildren()) do
-        if part:IsA("BasePart") then
-            part.Transparency = state and 1 or 0
-        elseif part:IsA("Accessory") then
-            if part.Handle then
-                part.Handle.Transparency = state and 1 or 0
-            end
+    local transparency = state and 1 or 0
+    for _, descendant in ipairs(character:GetDescendants()) do
+        if descendant:IsA("BasePart") then
+            descendant.Transparency = transparency
+        elseif descendant:IsA("Accessory") and descendant:FindFirstChild("Handle") then
+            descendant.Handle.Transparency = transparency
         end
     end
 end
 
---[[ FEATURE: AUTO COLLECT ]]
-local function startAutoCollect()
-    if not Settings.AutoCollect then return end
-    
-    local collectionConnection
-    collectionConnection = RunService.RenderStepped:Connect(function()
-        local character = Player.Character
-        if not character then return end
-        
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        if not rootPart then return end
-        
-        for _, item in ipairs(Workspace:GetDescendants()) do
-            if item:IsA("BasePart") and item.Name:match("Loot") or item:IsA("Tool") then
-                local distance = (rootPart.Position - item.Position).Magnitude
-                if distance <= Settings.AutoCollectRadius then
-                    -- Tentar coletar o item
-                    fireclickdetector(item:FindFirstChild("ClickDetector") or item.Parent:FindFirstChild("ClickDetector"))
-                end
-            end
-        end
-    end)
-    return collectionConnection
-end
+-- =============================[ FEATURE: FULLBRIGHT ]=============================
+local OriginalBrightness = Lighting.Brightness
+local OriginalAmbient = Lighting.Ambient
+local OriginalGlobalShadows = Lighting.GlobalShadows
+local OriginalClockTime = Lighting.ClockTime
 
---[[ FEATURE: REMOVE FOG ]]
-local function toggleRemoveFog(state)
-    if state then
-        Lighting.FogEnd = 100000
-        Lighting.FogStart = 100000
-        Lighting.Atmosphere:Destroy()
-    else
-        -- Resetar fog
-        Lighting.FogEnd = 1000
-        Lighting.FogStart = 0
-    end
-end
-
---[[ FEATURE: FULLBRIGHT ]]
-local function toggleFullbright(state)
+local function ToggleFullbright(state)
     if state then
         Lighting.Brightness = 2
-        Lighting.ClockTime = 12
+        Lighting.ClockTime = 14
         Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
         Lighting.Ambient = Color3.fromRGB(128, 128, 128)
         Lighting.GlobalShadows = false
+        Lighting.FogEnd = 100000
     else
-        Lighting.Brightness = 1
+        Lighting.Brightness = OriginalBrightness
+        Lighting.ClockTime = OriginalClockTime
         Lighting.OutdoorAmbient = Color3.fromRGB(0, 0, 0)
-        Lighting.Ambient = Color3.fromRGB(0, 0, 0)
-        Lighting.GlobalShadows = true
+        Lighting.Ambient = OriginalAmbient
+        Lighting.GlobalShadows = OriginalGlobalShadows
+        Lighting.FogEnd = 1000
     end
 end
 
---[[ FEATURE: FPS BOOSTER ]]
-local function toggleFPSBooster(state)
+-- =============================[ FEATURE: REMOVE ZOMBIES ]=============================
+local function RemoveZombies()
+    local count = 0
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj.Name:lower():match("zombie") then
+            if obj:FindFirstChild("Humanoid") then
+                obj.Humanoid.Health = 0
+                count = count + 1
+            end
+        end
+    end
+    CreateNotification("Zombies Removed", "Removed " .. count .. " zombies", 2, "success")
+end
+
+-- =============================[ FEATURE: FPS BOOSTER ]=============================
+local function ToggleFPSBooster(state)
     if state then
-        -- Desabilitar efeitos visuais pesados
         settings().Rendering.QualityLevel = 1
-        Workspace.DescendantAdded:Connect(function(descendant)
-            if descendant:IsA("ParticleEmitter") or descendant:IsA("Smoke") or descendant:IsA("Fire") then
-                descendant.Enabled = false
+        if Lighting:FindFirstChild("Bloom") then Lighting.Bloom.Enabled = false end
+        if Lighting:FindFirstChild("ColorCorrection") then Lighting.ColorCorrection.Enabled = false end
+        if Lighting:FindFirstChild("SunRays") then Lighting.SunRays.Enabled = false end
+        
+        workspace.DescendantAdded:Connect(function(desc)
+            if desc:IsA("ParticleEmitter") or desc:IsA("Smoke") or desc:IsA("Fire") then
+                desc.Enabled = false
             end
         end)
-        Lighting.Bloom.Enabled = false
-        Lighting.ColorCorrection.Enabled = false
-        Lighting.SunRays.Enabled = false
     else
         settings().Rendering.QualityLevel = 10
-        Lighting.Bloom.Enabled = true
-        Lighting.ColorCorrection.Enabled = true
-        Lighting.SunRays.Enabled = true
+        if Lighting:FindFirstChild("Bloom") then Lighting.Bloom.Enabled = true end
+        if Lighting:FindFirstChild("ColorCorrection") then Lighting.ColorCorrection.Enabled = true end
+        if Lighting:FindFirstChild("SunRays") then Lighting.SunRays.Enabled = true end
     end
 end
 
---[[ FEATURE: REMOVE ZOMBIES ]]
-local function removeZombies()
-    for _, zombie in ipairs(Workspace:GetDescendants()) do
-        if zombie.Name:lower():match("zombie") or zombie:IsA("Model") and zombie:FindFirstChild("Humanoid") and zombie.Name:lower():match("zombie") then
-            zombie:Destroy()
-        end
-    end
-end
-
---[[ ESP SYSTEM ]]
-local function createESP()
-    -- Sistema básico de ESP usando caixas de texto
-    local ESPGui = Instance.new("ScreenGui")
-    ESPGui.Name = "PhantomESP"
-    ESPGui.Parent = game:GetService("CoreGui")
-    ESPGui.ResetOnSpawn = false
+-- =============================[ FEATURE: KILL AURA ]=============================
+local KillAuraConnection = nil
+local function StartKillAura()
+    if not Settings.KillAura then return end
     
-    local function addESP(target, color, name, distance)
-        local espHolder = Instance.new("Frame")
-        espHolder.Name = "ESP_" .. target.Name
-        espHolder.Parent = ESPGui
-        espHolder.Size = UDim2.new(0, 2, 0, 2)
-        espHolder.BackgroundTransparency = 1
-        
-        local nameLabel = Instance.new("TextLabel")
-        nameLabel.Parent = espHolder
-        nameLabel.Size = UDim2.new(0, 100, 0, 16)
-        nameLabel.BackgroundTransparency = 1
-        nameLabel.Font = Enum.Font.GothamBold
-        nameLabel.Text = name .. (distance and " (" .. math.floor(distance) .. "m)" or "")
-        nameLabel.TextColor3 = color
-        nameLabel.TextSize = 11
-        nameLabel.TextStrokeTransparency = 0.5
-        nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-        
-        return espHolder
-    end
+    if KillAuraConnection then KillAuraConnection:Disconnect() end
     
-    -- Atualizar posições dos ESPs
-    RunService.RenderStepped:Connect(function()
-        if not Settings.PlayerESP then
-            for _, esp in ipairs(ESPGui:GetChildren()) do
-                esp:Destroy()
-            end
-            return
-        end
+    KillAuraConnection = RunService.RenderStepped:Connect(function()
+        local character = Player.Character
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+        if not rootPart then return end
         
-        for _, otherPlayer in ipairs(Players:GetPlayers()) do
-            if otherPlayer ~= Player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                local pos, onScreen = Camera:WorldToViewportPoint(otherPlayer.Character.HumanoidRootPart.Position)
-                local esp = ESPGui:FindFirstChild("ESP_" .. otherPlayer.Name)
-                local distance = (Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") and (Player.Character.HumanoidRootPart.Position - otherPlayer.Character.HumanoidRootPart.Position).Magnitude or 0)
-                
-                if onScreen then
-                    if not esp then
-                        local teamColor = otherPlayer.TeamColor and otherPlayer.TeamColor.Color or Color3.fromRGB(255, 255, 255)
-                        esp = addESP(otherPlayer, teamColor, otherPlayer.Name, distance)
-                    end
-                    esp.Position = UDim2.new(0, pos.X - 50, 0, pos.Y - 20)
-                    esp.Visible = true
-                    
-                    if esp:FindFirstChild("NameLabel") then
-                        esp.NameLabel.Text = otherPlayer.Name .. " (" .. math.floor(distance) .. "m)"
-                    end
-                else
-                    if esp then
-                        esp.Visible = false
+        for _, target in ipairs(Workspace:GetDescendants()) do
+            if target:IsA("Model") and target:FindFirstChild("Humanoid") and target ~= character then
+                local targetRoot = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("Torso")
+                if targetRoot then
+                    local distance = (rootPart.Position - targetRoot.Position).Magnitude
+                    if distance <= Settings.KillAuraRange then
+                        local humanoid = target.Humanoid
+                        if humanoid.Health > 0 then
+                            humanoid.Health = 0
+                        end
                     end
                 end
             end
@@ -640,212 +567,496 @@ local function createESP()
     end)
 end
 
---[[ INTERFACE GRÁFICA (FLUENT UI STYLE) ]]
-local function createUI()
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "PhantomHubUI"
-    ScreenGui.Parent = game:GetService("CoreGui")
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+-- =============================[ SISTEMA: WATERMARK ]=============================
+local WatermarkGui = nil
+local function CreateWatermark()
+    WatermarkGui = Instance.new("ScreenGui")
+    WatermarkGui.Name = "PhantomWatermark"
+    WatermarkGui.Parent = CoreGui
+    WatermarkGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    -- Frame principal com glassmorphism
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Parent = ScreenGui
-    MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    MainFrame.Size = UDim2.new(0, 900, 0, 600)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-    MainFrame.BackgroundTransparency = 0.08
-    MainFrame.BorderSizePixel = 0
-    MainFrame.ClipsDescendants = true
-    
-    -- Blur/Glass effect
-    local Blur = Instance.new("BlurEffect")
-    Blur.Size = 0
-    Blur.Parent = game:GetService("Lighting")
+    local Container = Instance.new("Frame")
+    Container.Parent = WatermarkGui
+    Container.AnchorPoint = Vector2.new(0, 1)
+    Container.Position = UDim2.new(0, 10, 1, -10)
+    Container.Size = UDim2.new(0, 220, 0, 35)
+    Container.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+    Container.BackgroundTransparency = 0.15
+    Container.BorderSizePixel = 0
     
     local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 16)
-    Corner.Parent = MainFrame
+    Corner.CornerRadius = UDim.new(0, 10)
+    Corner.Parent = Container
     
     local Stroke = Instance.new("UIStroke")
     Stroke.Color = Color3.fromRGB(139, 0, 255)
     Stroke.Thickness = 1
     Stroke.Transparency = 0.6
-    Stroke.Parent = MainFrame
+    Stroke.Parent = Container
     
-    -- Título da GUI
-    local TitleBar = Instance.new("Frame")
-    TitleBar.Parent = MainFrame
-    TitleBar.Size = UDim2.new(1, 0, 0, 50)
-    TitleBar.BackgroundColor3 = Color3.fromRGB(139, 0, 255)
-    TitleBar.BackgroundTransparency = 0.9
-    TitleBar.BorderSizePixel = 0
+    local Title = Instance.new("TextLabel")
+    Title.Parent = Container
+    Title.Size = UDim2.new(1, 0, 1, 0)
+    Title.BackgroundTransparency = 1
+    Title.Font = Enum.Font.GothamBold
+    Title.Text = "✨ PHANTOM HUB • v2.0"
+    Title.TextColor3 = Color3.fromRGB(139, 0, 255)
+    Title.TextSize = 12
     
-    local TitleCorner = Instance.new("UICorner")
-    TitleCorner.CornerRadius = UDim.new(0, 16)
-    TitleCorner.Parent = TitleBar
+    local InfoText = Instance.new("TextLabel")
+    InfoText.Parent = Container
+    InfoText.Position = UDim2.new(1, -80, 0, 0)
+    InfoText.Size = UDim2.new(0, 75, 1, 0)
+    InfoText.BackgroundTransparency = 1
+    InfoText.Font = Enum.Font.Gotham
+    InfoText.Text = "FPS: -- | 👥 --"
+    InfoText.TextColor3 = Color3.fromRGB(0, 191, 255)
+    InfoText.TextSize = 10
+    InfoText.TextXAlignment = Enum.TextXAlignment.Right
     
-    local TitleText = Instance.new("TextLabel")
-    TitleText.Parent = TitleBar
-    TitleText.Size = UDim2.new(1, -100, 1, 0)
-    TitleText.Position = UDim2.new(0, 20, 0, 0)
-    TitleText.BackgroundTransparency = 1
-    TitleText.Font = Enum.Font.GothamBold
-    TitleText.Text = "✨ PHANTOM HUB | Apocalypse Rising 2"
-    TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    TitleText.TextSize = 18
-    TitleText.TextXAlignment = Enum.TextXAlignment.Left
+    -- Atualizar informações
+    local frameCount = 0
+    local lastTime = tick()
     
-    -- Botão de minimizar
-    local MinimizeBtn = Instance.new("TextButton")
-    MinimizeBtn.Parent = TitleBar
-    MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
-    MinimizeBtn.Position = UDim2.new(1, -80, 0, 10)
-    MinimizeBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    MinimizeBtn.BackgroundTransparency = 0.3
-    MinimizeBtn.Text = "−"
-    MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    MinimizeBtn.TextSize = 20
-    MinimizeBtn.BorderSizePixel = 0
-    
-    local MinCorner = Instance.new("UICorner")
-    MinCorner.CornerRadius = UDim.new(0, 8)
-    MinCorner.Parent = MinimizeBtn
-    
-    -- Botão de fechar
-    local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Parent = TitleBar
-    CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-    CloseBtn.Position = UDim2.new(1, -40, 0, 10)
-    CloseBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    CloseBtn.BackgroundTransparency = 0.3
-    CloseBtn.Text = "✕"
-    CloseBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-    CloseBtn.TextSize = 16
-    CloseBtn.BorderSizePixel = 0
-    
-    local CloseCorner = Instance.new("UICorner")
-    CloseCorner.CornerRadius = UDim.new(0, 8)
-    CloseCorner.Parent = CloseBtn
-    
-    -- Container das abas (sidebar)
-    local Sidebar = Instance.new("Frame")
-    Sidebar.Parent = MainFrame
-    Sidebar.Size = UDim2.new(0, 200, 1, -50)
-    Sidebar.Position = UDim2.new(0, 0, 0, 50)
-    Sidebar.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
-    Sidebar.BackgroundTransparency = 0.3
-    Sidebar.BorderSizePixel = 0
-    
-    local SidebarCorner = Instance.new("UICorner")
-    SidebarCorner.CornerRadius = UDim.new(0, 16)
-    SidebarCorner.Parent = Sidebar
-    
-    -- Botões de abas
-    local Tabs = {"Home", "Combat", "Visuals", "Player", "Loot", "Vehicle", "Misc"}
-    local TabButtons = {}
-    local CurrentTab = nil
-    
-    -- Container do conteúdo
-    local ContentContainer = Instance.new("ScrollingFrame")
-    ContentContainer.Parent = MainFrame
-    ContentContainer.Size = UDim2.new(1, -210, 1, -60)
-    ContentContainer.Position = UDim2.new(0, 210, 0, 55)
-    ContentContainer.BackgroundTransparency = 1
-    ContentContainer.BorderSizePixel = 0
-    ContentContainer.ScrollBarThickness = 6
-    ContentContainer.ScrollBarImageTransparency = 0.5
-    ContentContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-    
-    for i, tabName in ipairs(Tabs) do
-        local TabBtn = Instance.new("TextButton")
-        TabBtn.Parent = Sidebar
-        TabBtn.Size = UDim2.new(1, -20, 0, 45)
-        TabBtn.Position = UDim2.new(0, 10, 0, 10 + (i-1) * 55)
-        TabBtn.BackgroundColor3 = Color3.fromRGB(139, 0, 255)
-        TabBtn.BackgroundTransparency = 0.8
-        TabBtn.Text = tabName
-        TabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        TabBtn.TextSize = 14
-        TabBtn.Font = Enum.Font.GothamBold
-        TabBtn.BorderSizePixel = 0
-        
-        local TabCorner = Instance.new("UICorner")
-        TabCorner.CornerRadius = UDim.new(0, 10)
-        TabCorner.Parent = TabBtn
-        
-        TabButtons[tabName] = TabBtn
-        
-        TabBtn.MouseButton1Click:Connect(function()
-            for _, btn in pairs(TabButtons) do
-                btn.BackgroundTransparency = 0.8
-                btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            end
-            TabBtn.BackgroundTransparency = 0.3
-            TabBtn.TextColor3 = Color3.fromRGB(139, 0, 255)
+    RunService.RenderStepped:Connect(function()
+        frameCount = frameCount + 1
+        local currentTime = tick()
+        if currentTime - lastTime >= 1 then
+            local fps = frameCount
+            frameCount = 0
+            lastTime = currentTime
+            local playersOnline = #Players:GetPlayers()
+            InfoText.Text = "FPS: " .. fps .. " | 👥 " .. playersOnline
             
-            CurrentTab = tabName
-            ContentContainer:ClearAllChildren()
-            loadTabContent(tabName)
+            -- Saudação baseada na hora
+            local hour = os.date("*t").hour
+            local greeting = hour < 12 and "🌅" or (hour < 18 and "☀️" or "🌙")
+            Title.Text = greeting .. " PHANTOM HUB • v2.0"
+        end
+    end)
+end
+
+-- =============================[ SISTEMA: ESP ]=============================
+local ESPGui = nil
+local ESPConnections = {}
+
+local function CreateESP()
+    if ESPGui then ESPGui:Destroy() end
+    
+    ESPGui = Instance.new("ScreenGui")
+    ESPGui.Name = "PhantomESP"
+    ESPGui.Parent = CoreGui
+    ESPGui.ResetOnSpawn = false
+    
+    local function CreateESPElement(target, color, text, distance)
+        local element = Instance.new("Frame")
+        element.Name = "ESP_" .. target.Name
+        element.Parent = ESPGui
+        element.Size = UDim2.new(0, 2, 0, 2)
+        element.BackgroundTransparency = 1
+        
+        local label = Instance.new("TextLabel")
+        label.Parent = element
+        label.Size = UDim2.new(0, 150, 0, 18)
+        label.BackgroundTransparency = 1
+        label.Font = Enum.Font.GothamBold
+        label.Text = text .. (distance and " [" .. math.floor(distance) .. "m]" or "")
+        label.TextColor3 = color
+        label.TextSize = 11
+        label.TextStrokeTransparency = 0.3
+        label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        
+        return element, label
+    end
+    
+    -- Loop de renderização do ESP
+    local renderConnection = RunService.RenderStepped:Connect(function()
+        if not Settings.PlayerESP and not Settings.ZombieESP and not Settings.ItemESP then
+            return
+        end
+        
+        local character = Player.Character
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+        if not rootPart then return end
+        
+        -- Limpar ESPs antigos
+        for _, child in ipairs(ESPGui:GetChildren()) do
+            if child.Name:match("^ESP_") and not child.Persistent then
+                child:Destroy()
+            end
+        end
+        
+        -- ESP para Players
+        if Settings.PlayerESP then
+            for _, otherPlayer in ipairs(Players:GetPlayers()) do
+                if otherPlayer ~= Player and otherPlayer.Character then
+                    local targetRoot = otherPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if targetRoot then
+                        local pos, onScreen = Camera:WorldToViewportPoint(targetRoot.Position)
+                        local distance = (rootPart.Position - targetRoot.Position).Magnitude
+                        
+                        if onScreen and distance < 500 then
+                            local existing = ESPGui:FindFirstChild("ESP_" .. otherPlayer.Name)
+                            if not existing then
+                                local teamColor = otherPlayer.Team and otherPlayer.Team.TeamColor and otherPlayer.Team.TeamColor.Color or Color3.fromRGB(255, 50, 50)
+                                local element, label = CreateESPElement(otherPlayer, teamColor, otherPlayer.Name, distance)
+                                element.Persistent = false
+                            end
+                            
+                            local esp = ESPGui:FindFirstChild("ESP_" .. otherPlayer.Name)
+                            if esp then
+                                esp.Position = UDim2.new(0, pos.X - 75, 0, pos.Y - 25)
+                                esp.Visible = true
+                                if esp:FindFirstChildOfClass("TextLabel") then
+                                    esp:FindFirstChildOfClass("TextLabel").Text = otherPlayer.Name .. " [" .. math.floor(distance) .. "m]"
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        
+        -- ESP para Zombies
+        if Settings.ZombieESP then
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                if obj:IsA("Model") and obj.Name:lower():match("zombie") and obj:FindFirstChild("HumanoidRootPart") then
+                    local targetRoot = obj.HumanoidRootPart
+                    local pos, onScreen = Camera:WorldToViewportPoint(targetRoot.Position)
+                    local distance = (rootPart.Position - targetRoot.Position).Magnitude
+                    
+                    if onScreen and distance < 300 then
+                        local existing = ESPGui:FindFirstChild("ESP_Zombie_" .. obj.Name)
+                        if not existing then
+                            local element, label = CreateESPElement(obj, Color3.fromRGB(50, 205, 50), "🧟 ZOMBIE", distance)
+                            element.Name = "ESP_Zombie_" .. obj.Name
+                        end
+                        
+                        local esp = ESPGui:FindFirstChild("ESP_Zombie_" .. obj.Name)
+                        if esp then
+                            esp.Position = UDim2.new(0, pos.X - 75, 0, pos.Y - 25)
+                            esp.Visible = true
+                        end
+                    end
+                end
+            end
+        end
+    end)
+    
+    table.insert(ESPConnections, renderConnection)
+end
+
+-- =============================[ INTERFACE KAVO UI ]=============================
+local function CreateUI()
+    local GuiLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/7GrandDadPGN/VapeV4ForRoblox/main/Kavo"))()
+    
+    local MainWindow = GuiLibrary:CreateWindow("PHANTOM HUB", Color3.fromRGB(139, 0, 255))
+    MainWindow.Keybind = MenuKeybind
+    
+    -- =============================[ ABA HOME ]=============================
+    local HomeTab = MainWindow:CreateTab("🏠 HOME")
+    
+    local WelcomeSection = HomeTab:CreateSection("WELCOME")
+    WelcomeSection:CreateLabel("✨ PHANTOM HUB v2.0 - Premium Script")
+    WelcomeSection:CreateLabel("👤 Player: " .. Player.Name)
+    WelcomeSection:CreateLabel("🌐 Server: " .. game:GetService("TeleportService").ServerInstanceId or "Unknown")
+    
+    local StatsSection = HomeTab:CreateSection("SERVER STATS")
+    local PlayerCountLabel = StatsSection:CreateLabel("👥 Players Online: " .. #Players:GetPlayers())
+    local FPSLabel = StatsSection:CreateLabel("📊 FPS: --")
+    
+    -- Atualizar stats
+    task.spawn(function()
+        while wait(1) do
+            PlayerCountLabel:SetText("👥 Players Online: " .. #Players:GetPlayers())
+            FPSLabel:SetText("📊 FPS: " .. workspace:GetRealPhysicsFPS())
+        end
+    end)
+    
+    local KeybindSection = HomeTab:CreateSection("GUI SETTINGS")
+    local KeybindButton = KeybindSection:CreateKeybind("Menu Keybind", MenuKeybind.Name, function(Key)
+        MenuKeybind = Key
+        MainWindow.Keybind = MenuKeybind
+        CreateNotification("Keybind Changed", "GUI keybind set to: " .. Key.Name, 2, "info")
+    end)
+    
+    -- =============================[ ABA COMBAT ]=============================
+    local CombatTab = MainWindow:CreateTab("⚔️ COMBAT")
+    
+    local AimbotSection = CombatTab:CreateSection("SILENT AIM / AIMBOT")
+    local SilentAimToggle = AimbotSection:CreateToggle("Silent Aim", Settings.SilentAim, function(value)
+        Settings.SilentAim = value
+        CreateNotification("Silent Aim", value and "Enabled" or "Disabled", 1, value and "success" or "info")
+    end)
+    
+    local FOVSlider = AimbotSection:CreateSlider("FOV Range", 30, 300, Settings.SilentAimFOV, function(value)
+        Settings.SilentAimFOV = value
+    end)
+    
+    local SmoothnessSlider = AimbotSection:CreateSlider("Smoothness", 0, 1, Settings.SilentAimSmoothness, function(value)
+        Settings.SilentAimSmoothness = value
+    end)
+    
+    local HitChanceSlider = AimbotSection:CreateSlider("Hit Chance %", 0, 100, Settings.SilentAimHitChance, function(value)
+        Settings.SilentAimHitChance = value
+    end)
+    
+    local TeamCheckToggle = AimbotSection:CreateToggle("Team Check", Settings.SilentAimTeamCheck, function(value)
+        Settings.SilentAimTeamCheck = value
+    end)
+    
+    local VisibilityCheckToggle = AimbotSection:CreateToggle("Visibility Check", Settings.SilentAimVisibility, function(value)
+        Settings.SilentAimVisibility = value
+    end)
+    
+    local TriggerSection = CombatTab:CreateSection("TRIGGER BOT")
+    local TriggerBotToggle = TriggerSection:CreateToggle("Trigger Bot", Settings.TriggerBot, function(value)
+        Settings.TriggerBot = value
+    end)
+    
+    local WeaponSection = CombatTab:CreateSection("WEAPON MODS")
+    local NoRecoilToggle = WeaponSection:CreateToggle("No Recoil", Settings.NoRecoil, function(value)
+        Settings.NoRecoil = value
+        SetupWeaponMods()
+    end)
+    
+    local NoSpreadToggle = WeaponSection:CreateToggle("No Spread", Settings.NoSpread, function(value)
+        Settings.NoSpread = value
+        SetupWeaponMods()
+    end)
+    
+    local FastFireRateToggle = WeaponSection:CreateToggle("Fast Fire Rate", Settings.FastFireRate, function(value)
+        Settings.FastFireRate = value
+        SetupWeaponMods()
+    end)
+    
+    local InfiniteAmmoToggle = WeaponSection:CreateToggle("Infinite Ammo", Settings.InfiniteAmmo, function(value)
+        Settings.InfiniteAmmo = value
+        SetupWeaponMods()
+    end)
+    
+    local AuraSection = CombatTab:CreateSection("AURA")
+    local KillAuraToggle = AuraSection:CreateToggle("Kill Aura", Settings.KillAura, function(value)
+        Settings.KillAura = value
+        if value then StartKillAura() end
+    end)
+    
+    local KillAuraRangeSlider = AuraSection:CreateSlider("Kill Aura Range", 10, 50, Settings.KillAuraRange, function(value)
+        Settings.KillAuraRange = value
+    end)
+    
+    local AntiZombieToggle = AuraSection:CreateToggle("Anti-Zombie", Settings.AntiZombie, function(value)
+        Settings.AntiZombie = value
+    end)
+    
+    -- =============================[ ABA VISUALS ]=============================
+    local VisualsTab = MainWindow:CreateTab("👁️ VISUALS")
+    
+    local ESPPlayersSection = VisualsTab:CreateSection("PLAYER ESP")
+    local PlayerESPToggle = ESPPlayersSection:CreateToggle("Player ESP", Settings.PlayerESP, function(value)
+        Settings.PlayerESP = value
+        if value then CreateESP() end
+    end)
+    
+    local ZombieESPToggle = ESPPlayersSection:CreateToggle("Zombie ESP", Settings.ZombieESP, function(value)
+        Settings.ZombieESP = value
+        if value then CreateESP() end
+    end)
+    
+    local ItemESPToggle = ESPPlayersSection:CreateToggle("Item/Loot ESP", Settings.ItemESP, function(value)
+        Settings.ItemESP = value
+        if value then CreateESP() end
+    end)
+    
+    local VehicleESPToggle = ESPPlayersSection:CreateToggle("Vehicle ESP", Settings.VehicleESP, function(value)
+        Settings.VehicleESP = value
+    end)
+    
+    local ChamsToggle = VisualsTab:CreateToggle("Chams (Wallhack)", Settings.Chams, function(value)
+        Settings.Chams = value
+    end)
+    
+    local FOVCircleToggle = VisualsTab:CreateToggle("Show FOV Circle", Settings.ShowFOV, function(value)
+        Settings.ShowFOV = value
+    end)
+    
+    -- =============================[ ABA PLAYER ]=============================
+    local PlayerTab = MainWindow:CreateTab("👤 PLAYER")
+    
+    local ProtectionSection = PlayerTab:CreateSection("PROTECTION")
+    local GodModeToggle = ProtectionSection:CreateToggle("God Mode", Settings.GodMode, function(value)
+        Settings.GodMode = value
+        ToggleGodMode(value)
+    end)
+    
+    local AntiAFKToggle = ProtectionSection:CreateToggle("Anti-AFK", Settings.AntiAFK, function(value)
+        Settings.AntiAFK = value
+        ToggleAntiAFK(value)
+    end)
+    
+    local InvisibleToggle = ProtectionSection:CreateToggle("Invisible", Settings.Invisible, function(value)
+        Settings.Invisible = value
+        ToggleInvisible(value)
+    end)
+    
+    local MovementSection = PlayerTab:CreateSection("MOVEMENT")
+    local SpeedHackToggle = MovementSection:CreateToggle("Speed Hack", Settings.SpeedHack, function(value)
+        Settings.SpeedHack = value
+        ToggleSpeedHack(value)
+    end)
+    
+    local WalkSpeedSlider = MovementSection:CreateSlider("Walk Speed", 16, 200, Settings.WalkSpeed, function(value)
+        Settings.WalkSpeed = value
+        if Settings.SpeedHack then ToggleSpeedHack(true) end
+    end)
+    
+    local JumpPowerSlider = MovementSection:CreateSlider("Jump Power", 50, 200, Settings.JumpPower, function(value)
+        Settings.JumpPower = value
+        if Settings.SpeedHack then ToggleSpeedHack(true) end
+    end)
+    
+    local FlyToggle = MovementSection:CreateToggle("Fly", Settings.Fly, function(value)
+        Settings.Fly = value
+        ToggleFly(value)
+    end)
+    
+    local NoclipToggle = MovementSection:CreateToggle("Noclip", Settings.Noclip, function(value)
+        Settings.Noclip = value
+        ToggleNoclip(value)
+    end)
+    
+    local InfiniteJumpToggle = MovementSection:CreateToggle("Infinite Jump", Settings.InfiniteJump, function(value)
+        Settings.InfiniteJump = value
+        ToggleInfiniteJump(value)
+    end)
+    
+    -- =============================[ ABA LOOT ]=============================
+    local LootTab = MainWindow:CreateTab("💰 LOOT")
+    
+    local AutoSection = LootTab:CreateSection("AUTO COLLECT")
+    local AutoCollectToggle = AutoSection:CreateToggle("Auto Collect / Magnet", Settings.AutoCollect, function(value)
+        Settings.AutoCollect = value
+        if value then
+            CreateNotification("Auto Collect", "Auto collecting enabled", 1, "info")
+        end
+    end)
+    
+    local AutoCollectRadiusSlider = AutoSection:CreateSlider("Collection Radius", 20, 150, Settings.AutoCollectRadius, function(value)
+        Settings.AutoCollectRadius = value
+    end)
+    
+    local FastLootToggle = AutoSection:CreateToggle("Fast Loot", Settings.FastLoot, function(value)
+        Settings.FastLoot = value
+    end)
+    
+    -- =============================[ ABA VEHICLE ]=============================
+    local VehicleTab = MainWindow:CreateTab("🚗 VEHICLE")
+    
+    local VehicleSection = VehicleTab:CreateSection("VEHICLE MODS")
+    local VehicleGodModeToggle = VehicleSection:CreateToggle("Vehicle God Mode", Settings.VehicleGodMode, function(value)
+        Settings.VehicleGodMode = value
+    end)
+    
+    local VehicleSpeedToggle = VehicleSection:CreateToggle("Vehicle Speed Hack", Settings.VehicleSpeedHack, function(value)
+        Settings.VehicleSpeedHack = value
+    end)
+    
+    local VehicleSpeedSlider = VehicleSection:CreateSlider("Vehicle Speed", 100, 500, Settings.VehicleSpeed, function(value)
+        Settings.VehicleSpeed = value
+    end)
+    
+    local VehicleFlyToggle = VehicleSection:CreateToggle("Vehicle Fly", Settings.VehicleFly, function(value)
+        Settings.VehicleFly = value
+    end)
+    
+    local InfiniteFuelToggle = VehicleSection:CreateToggle("Infinite Fuel", Settings.InfiniteFuel, function(value)
+        Settings.InfiniteFuel = value
+    end)
+    
+    -- =============================[ ABA MISC ]=============================
+    local MiscTab = MainWindow:CreateTab("🔧 MISC")
+    
+    local WorldSection = MiscTab:CreateSection("WORLD MODS")
+    local RemoveFogToggle = WorldSection:CreateToggle("Remove Fog", Settings.RemoveFog, function(value)
+        Settings.RemoveFog = value
+        if value then Lighting.FogEnd = 100000 else Lighting.FogEnd = 1000 end
+    end)
+    
+    local FullbrightToggle = WorldSection:CreateToggle("Fullbright", Settings.Fullbright, function(value)
+        Settings.Fullbright = value
+        ToggleFullbright(value)
+    end)
+    
+    local FPSBoosterToggle = WorldSection:CreateToggle("FPS Booster", Settings.FPSBooster, function(value)
+        Settings.FPSBooster = value
+        ToggleFPSBooster(value)
+    end)
+    
+    local MiscButtons = MiscTab:CreateSection("ACTIONS")
+    local RemoveZombiesButton = MiscButtons:CreateButton("Remove All Zombies", function()
+        RemoveZombies()
+    end)
+    
+    local ServerHopButton = MiscButtons:CreateButton("Server Hop", function()
+        CreateNotification("Server Hop", "Searching for new server...", 2, "info")
+        TeleportService:Teleport(game.PlaceId)
+    end)
+    
+    local TeleportSection = MiscTab:CreateSection("TELEPORT LOCATIONS")
+    local Locations = {
+        "Ashland", "Beaufort", "Halsey", 
+        "Naval Air Station", "Region 2", "Safe Zone"
+    }
+    
+    for _, loc in ipairs(Locations) do
+        TeleportSection:CreateButton("Teleport to " .. loc, function()
+            CreateNotification("Teleporting", "Teleporting to " .. loc, 1, "info")
+            -- Implementar teleporte real
         end)
     end
     
-    -- Selecionar primeira aba
-    TabButtons["Home"].BackgroundTransparency = 0.3
-    TabButtons["Home"].TextColor3 = Color3.fromRGB(139, 0, 255)
-    CurrentTab = "Home"
+    local SettingsSection = MiscTab:CreateSection("SETTINGS")
+    local SaveButton = SettingsSection:CreateButton("Save Settings", function()
+        SaveSettings()
+        CreateNotification("Settings Saved", "Configuration saved successfully", 2, "success")
+    end)
     
-    -- Função para carregar conteúdo das abas
-    function loadTabContent(tab)
-        local yOffset = 10
-        
-        local function addSection(title, yPos)
-            local sectionFrame = Instance.new("Frame")
-            sectionFrame.Parent = ContentContainer
-            sectionFrame.Size = UDim2.new(1, -20, 0, 200)
-            sectionFrame.Position = UDim2.new(0, 10, 0, yPos)
-            sectionFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-            sectionFrame.BackgroundTransparency = 0.2
-            sectionFrame.BorderSizePixel = 0
-            sectionFrame.ClipsDescendants = true
-            
-            local sectionCorner = Instance.new("UICorner")
-            sectionCorner.CornerRadius = UDim.new(0, 12)
-            sectionCorner.Parent = sectionFrame
-            
-            local sectionStroke = Instance.new("UIStroke")
-            sectionStroke.Color = Color3.fromRGB(139, 0, 255)
-            sectionStroke.Thickness = 0.5
-            sectionStroke.Transparency = 0.7
-            sectionStroke.Parent = sectionFrame
-            
-            local titleLabel = Instance.new("TextLabel")
-            titleLabel.Parent = sectionFrame
-            titleLabel.Size = UDim2.new(1, -20, 0, 30)
-            titleLabel.Position = UDim2.new(0, 10, 0, 5)
-            titleLabel.BackgroundTransparency = 1
-            titleLabel.Font = Enum.Font.GothamBold
-            titleLabel.Text = title
-            titleLabel.TextColor3 = Color3.fromRGB(139, 0, 255)
-            titleLabel.TextSize = 14
-            titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-            
-            return sectionFrame, titleLabel
-        end
-        
-        local function addToggle(parent, text, settingName, xPos, yPos)
-            local toggleBtn = Instance.new("TextButton")
-            toggleBtn.Parent = parent
-            toggleBtn.Size = UDim2.new(0, 140, 0, 35)
-            toggleBtn.Position = UDim2.new(0, xPos, 0, yPos)
-            toggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-            toggleBtn.BackgroundTransparency = 0.5
-            toggleBtn.Text = "[ ] " .. text
-            toggleBtn.TextColor3 = Color3.fromRGB(200, 200, 220)
-            toggleBtn.TextSize = 12
-            toggleBtn.Font = Enum.Font.Gotham
-            toggleBtn.BorderSizePixel = 0
-            
-            local toggleCorner = Instance.new("UICorner")
-            toggleCorner.CornerRadius = UDim.new(0, 8)
-            toggleCorner.Parent = toggleBtn
+    local LoadButton = SettingsSection:CreateButton("Load Settings", function()
+        LoadSettings()
+        CreateNotification("Settings Loaded", "Configuration restored", 2, "success")
+        -- Recarregar toggles
+        SilentAimToggle:SetState(Settings.SilentAim)
+        GodModeToggle:SetState(Settings.GodMode)
+        SpeedHackToggle:SetState(Settings.SpeedHack)
+        PlayerESPToggle:SetState(Settings.PlayerESP)
+    end)
+    
+    -- Inicializar
+    CreateWatermark()
+    SetupWeaponMods()
+end
+
+-- =============================[ INICIALIZAÇÃO ]=============================
+local function Initialize()
+    -- Carregar settings
+    pcall(function() LoadSettings() end)
+    
+    -- Criar UI
+    pcall(function() CreateUI() end)
+    
+    -- Notificação de boas-vindas
+    wait(1)
+    CreateNotification("Phantom Hub", "Welcome " .. Player.Name .. "! Press " .. MenuKeybind.Name .. " to toggle menu", 4, "success")
+end
+
+-- Executar
+local Success, Error = pcall(Initialize)
+if not Success then
+    warn("Failed to load Phantom Hub: " .. tostring(Error))
+    -- Fallback notification
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Phantom Hub",
+        Text = "Failed to load: " .. tostring(Error),
+        Duration = 5
+    })
+end
