@@ -137,7 +137,7 @@ CombatTab:CreateToggle({
                                 local head = zombie:FindFirstChild("Head")
                                 if head then
                                     -- One Shot Damage
-                                    local args = {zombie, head, head.Position, 999999, weapon}
+                                    local args = {zombie, head, head.Position, 0, weapon}
                                     pcall(function() 
                                         shootRemote:FireServer(unpack(args)) 
                                     end)
