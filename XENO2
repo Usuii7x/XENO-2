@@ -52,7 +52,7 @@ end)
 
 -- ==================== INSTANT DAMAGE ====================
 local instantDamageEnabled = false
-local shootDelay = 0.3  -- Delay mais baixo para sentir mais "instantâneo"
+local shootDelay = 0.5  -- Delay mais baixo para sentir mais "instantâneo"
 
 CombatTab:CreateSection("⚡ Instant Damage")
 
@@ -126,7 +126,7 @@ CombatTab:CreateToggle({
 -- Delay do Auto Instant Damage
 CombatTab:CreateInput({
     Name = "⏱️ Delay do Instant Damage",
-    PlaceholderText = "0.3",
+    PlaceholderText = "0.5",
     RemoveTextAfterFocusLost = false,
     Callback = function(text)
         local num = tonumber(text)
