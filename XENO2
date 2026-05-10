@@ -1,671 +1,883 @@
 --[[
-    A Dusty Trip - Advanced Script
-    UI: Fluent UI (moderna)
-    Desenvolvido para Roblox
-    Keyless, otimizado e com anti-detection básico
+    Script: A Dusty Trip - Rayfield Admin GUI
+    Descrição: GUI completa com Auto Farm, Vehicle, Player, Combat, Teleport e Misc.
+    Biblioteca: Rayfield UI (Design Premium)
+    Criado para: A Dusty Trip (Roblox)
+    Keyless: Sim
 --]]
 
--- Carregar serviços
+-- Carregar a biblioteca Rayfield (fonte estável e moderna)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Verificar se a biblioteca carregou corretamente
+if not Rayfield then
+    warn("[Script] Falha ao carregar Rayfield. Verifique sua conexão.")
+    return
+end
+
+-- ================================
+-- [VARIÁVEIS GLOBAIS E CONFIGURAÇÕES]
+-- ================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local VirtualUser = game:GetService("VirtualUser")
-local HttpService = game:GetService("HttpService")
+local VirtualInput = game:GetService("VirtualInput")
+local TeleportService = game:GetService("TeleportService")
 
-local Player = Players.LocalPlayer
-local Mouse = Player:GetMouse()
-local Character = Player.Character or Player.CharacterAdded:Wait()
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
 
--- Wait para carregar tudo
-wait(0.5)
-
--- Função para notificações elegantes
-local function Notify(title, text, duration)
-    local Fluent = require(game:GetService("CoreGui"):WaitForChild("FluentUI"))
-    if Fluent and Fluent.Notify then
-        Fluent:Notify({
-            Title = title,
-            Content = text,
-            Duration = duration or 3
-        })
-    else
-        warn("FluentUI não carregada, usando notificação padrão")
-    end
-end
-
--- Carregar Fluent UI (se não existir, baixar)
-local FluentUI
-local success, result = pcall(function()
-    return game:GetService("CoreGui"):FindFirstChild("FluentUI")
-end)
-
-if not result then
-    local lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Init.lua"))()
-    FluentUI = lib
-else
-    FluentUI = require(result)
-end
-
--- Criar GUI principal
-local Window = FluentUI:CreateWindow({
-    Title = "A Dusty Trip | Premium Script",
-    SubTitle = "By Developer",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(580, 460),
-    Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.RightControl
-})
-
--- Watermark
-local Watermark = FluentUI:CreateWatermark({
-    Title = "A Dusty Trip Script",
-    SubTitle = "Online | Premium"
-})
-
--- Variáveis globais
-local Settings = {
-    -- Auto Farm
+-- Toggles de status (para controle interno)
+local Toggles = {
     AutoFarmBottlecaps = false,
     AutoCollectItems = false,
-    AutoKillNPCs = false,
-    KillDistance = 50,
+    AutoKill = false,
     AutoSell = false,
-    
-    -- Vehicle
     InfiniteFuel = false,
-    InfiniteStamina = false,
     AutoDrive = false,
     CarSpeedHack = false,
-    CarSpeedValue = 200,
     FlyCar = false,
     NoclipCar = false,
     RemoveRocks = false,
-    
-    -- Player
     GodMode = false,
-    InfiniteHunger = false,
-    InfiniteThirst = false,
+    InfiniteStamina = false,
     SpeedHack = false,
-    WalkSpeedValue = 32,
-    JumpPowerValue = 80,
     Fly = false,
     Noclip = false,
     Invisible = false,
     AntiAFK = false,
-    
-    -- Combat
+    Magnet = false,
+    BringAllItems = false,
     InfiniteAmmo = false,
     NoRecoil = false,
-    FastFireRate = false,
+    FastFire = false,
     HighDamage = false,
     SilentAim = false,
     TriggerBot = false,
-    
-    -- Misc
+    ESP = false,
     RemoveFog = false,
     RemoveBots = false,
     FPSBooster = false,
-    
-    -- Magnet/Bring
-    MagnetRadius = 30,
-    MagnetEnabled = false,
-    AutoBringItems = false
 }
 
--- Funções principais
-local function UpdatePlayerStats()
-    if Settings.InfiniteHunger then
-        local stats = Player:FindFirstChild("stats")
-        if stats and stats:FindFirstChild("Hunger") then
-            stats.Hunger.Value = 100
+-- Configurações de valores (sliders)
+local Settings = {
+    WalkSpeed = 16,
+    JumpPower = 50,
+    MagnetRadius = 30,
+    AutoKillDistance = 50,
+    CarSpeedValue = 200,
+}
+
+-- Serviços e referências
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
+local VirtualUser = game:GetService("VirtualUser")
+
+-- Lista de itens para coleta (exemplos do jogo)
+local CollectableItems = {
+    "GasCan", "WaterBottle", "FoodCan", "ScrapMetal", 
+    "Battery", "Tire", "AmmoBox", "BottleCap",
+    "MedKit", "ToolBox", "EnginePart", "Radiator"
+}
+
+-- Lista de NPCs/Mobs
+local NPCTypes = {"Mutant", "Bandit", "Scavenger", "Crawler"}
+
+-- ================================
+-- [FUNÇÕES AUXILIARES]
+-- ================================
+
+-- Função para notificações elegantes
+local function Notify(Title, Content, Duration)
+    Rayfield:Notify({
+        Title = Title,
+        Content = Content,
+        Duration = Duration or 3,
+        Image = 4483362458,
+    })
+end
+
+-- Anti-AFK (movimento discreto)
+local function StartAntiAFK()
+    if Toggles.AntiAFK then
+        LocalPlayer.Idled:Connect(function()
+            VirtualUser:Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+            wait(1)
+            VirtualUser:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+        end)
+        Notify("Anti-AFK", "✅ Anti-AFK ativado", 2)
+    end
+end
+
+-- God Mode (proteção contra dano)
+local function SetGodMode(Enabled)
+    local playerChar = LocalPlayer.Character
+    if playerChar then
+        local humanoid = playerChar:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.MaxHealth = Enabled and math.huge or 100
+            humanoid.Health = Enabled and math.huge or humanoid.Health
+            humanoid.BreakJointsOnDeath = not Enabled
         end
     end
+end
+
+-- Speed Hack (WalkSpeed e JumpPower)
+local function SetSpeedHack(Enabled)
+    local playerChar = LocalPlayer.Character
+    if playerChar then
+        local humanoid = playerChar:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.WalkSpeed = Enabled and Settings.WalkSpeed or 16
+            humanoid.JumpPower = Enabled and Settings.JumpPower or 50
+        end
+    end
+end
+
+-- Fly (N-FLY modernizado)
+local flyEnabled = false
+local flySpeed = 1
+local bodyVelocity, bodyGyro
+
+local function StartFly()
+    local playerChar = LocalPlayer.Character
+    local humanoid = playerChar and playerChar:FindFirstChild("Humanoid")
+    if not humanoid then return end
     
-    if Settings.InfiniteThirst then
-        local stats = Player:FindFirstChild("stats")
-        if stats and stats:FindFirstChild("Thirst") then
-            stats.Thirst.Value = 100
+    flyEnabled = true
+    humanoid.PlatformStand = true
+    
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.Velocity = Vector3.new(0,0,0)
+    bodyVelocity.MaxForce = Vector3.new(10000,10000,10000)
+    bodyVelocity.Parent = playerChar.PrimaryPart
+    
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(10000,10000,10000)
+    bodyGyro.Parent = playerChar.PrimaryPart
+    
+    local camera = Workspace.CurrentCamera
+    
+    RunService:BindToRenderStep("FlyControl", Enum.RenderPriority.Camera.Value, function()
+        if not flyEnabled or not playerChar or not playerChar.PrimaryPart then
+            RunService:UnbindFromRenderStep("FlyControl")
+            return
         end
-    end
+        
+        local moveDirection = Vector3.new()
+        local forward = camera.CFrame.LookVector
+        local right = camera.CFrame.RightVector
+        local up = camera.CFrame.UpVector
+        
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDirection = moveDirection + forward end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDirection = moveDirection - forward end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDirection = moveDirection + right end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDirection = moveDirection - right end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDirection = moveDirection + up end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDirection = moveDirection - up end
+        
+        if moveDirection.Magnitude > 0 then
+            moveDirection = moveDirection.Unit * flySpeed * 50
+        end
+        
+        if bodyVelocity then
+            bodyVelocity.Velocity = moveDirection
+        end
+        if bodyGyro then
+            bodyGyro.CFrame = camera.CFrame
+        end
+    end)
 end
 
-local function UpdateGodMode()
-    if Settings.GodMode and Character and Character:FindFirstChild("Humanoid") then
-        Character.Humanoid.MaxHealth = math.huge
-        Character.Humanoid.Health = math.huge
-        Character.Humanoid.BreakJointsOnDeath = false
+local function StopFly()
+    flyEnabled = false
+    RunService:UnbindFromRenderStep("FlyControl")
+    local playerChar = LocalPlayer.Character
+    local humanoid = playerChar and playerChar:FindFirstChild("Humanoid")
+    if humanoid then
+        humanoid.PlatformStand = false
     end
+    if bodyVelocity then bodyVelocity:Destroy() end
+    if bodyGyro then bodyGyro:Destroy() end
 end
 
-local function UpdateSpeedHack()
-    if Settings.SpeedHack and Character and Character:FindFirstChild("Humanoid") then
-        Character.Humanoid.WalkSpeed = Settings.WalkSpeedValue
-        Character.Humanoid.JumpPower = Settings.JumpPowerValue
-    elseif Character and Character:FindFirstChild("Humanoid") then
-        if Character.Humanoid.WalkSpeed ~= 16 then
-            Character.Humanoid.WalkSpeed = 16
+-- Noclip
+local function SetNoclip(Enabled)
+    RunService:BindToRenderStep("Noclip", Enum.RenderPriority.Camera.Value, function()
+        if not Enabled then
+            RunService:UnbindFromRenderStep("Noclip")
+            return
         end
-        if Character.Humanoid.JumpPower ~= 50 then
-            Character.Humanoid.JumpPower = 50
-        end
-    end
-end
-
-local function UpdateFly()
-    if Settings.Fly then
-        local bodyVelocity = Instance.new("BodyVelocity")
-        bodyVelocity.MaxForce = Vector3.new(1, 1, 1) * 10000
-        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-        bodyVelocity.Parent = Character:FindFirstChild("HumanoidRootPart")
-        
-        local bodyGyro = Instance.new("BodyGyro")
-        bodyGyro.MaxTorque = Vector3.new(1, 1, 1) * 10000
-        bodyGyro.Parent = Character:FindFirstChild("HumanoidRootPart")
-        
-        local flying = true
-        local speed = 100
-        
-        UserInputService.InputBegan:Connect(function(input)
-            if not flying then return end
-            local rootPart = Character:FindFirstChild("HumanoidRootPart")
-            if not rootPart then return end
-            
-            local direction = Vector3.new()
-            if input.KeyCode == Enum.KeyCode.W then direction = direction + rootPart.CFrame.LookVector end
-            if input.KeyCode == Enum.KeyCode.S then direction = direction - rootPart.CFrame.LookVector end
-            if input.KeyCode == Enum.KeyCode.A then direction = direction - rootPart.CFrame.RightVector end
-            if input.KeyCode == Enum.KeyCode.D then direction = direction + rootPart.CFrame.RightVector end
-            if input.KeyCode == Enum.KeyCode.Space then direction = direction + Vector3.new(0, 1, 0) end
-            if input.KeyCode == Enum.KeyCode.LeftControl then direction = direction - Vector3.new(0, 1, 0) end
-            
-            bodyVelocity.Velocity = direction * speed
-        end)
-        
-        -- Atualizar fly loop
-        RunService.RenderStepped:Connect(function()
-            if not Settings.Fly then
-                bodyVelocity:Destroy()
-                bodyGyro:Destroy()
-                flying = false
-                return
+        local playerChar = LocalPlayer.Character
+        if playerChar then
+            for _, part in ipairs(playerChar:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
             end
-            if Character and Character:FindFirstChild("HumanoidRootPart") then
-                bodyGyro.CFrame = Character.HumanoidRootPart.CFrame
+        end
+    end)
+end
+
+-- Invisibility
+local function SetInvisible(Enabled)
+    local playerChar = LocalPlayer.Character
+    if playerChar then
+        for _, part in ipairs(playerChar:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("MeshPart") then
+                part.Transparency = Enabled and 1 or 0
             end
-        end)
+        end
     end
 end
 
-local function AutoFarmBottlecaps()
-    while Settings.AutoFarmBottlecaps do
-        wait(0.5)
-        local bottlecaps = workspace:FindFirstChild("Bottlecaps") or workspace:FindFirstChild("Items")
-        if bottlecaps then
-            for _, cap in pairs(bottlecaps:GetChildren()) do
-                if cap:IsA("BasePart") and cap:FindFirstChild("TouchInterest") then
-                    local root = Character:FindFirstChild("HumanoidRootPart")
-                    if root then
-                        root.CFrame = cap.CFrame
-                        wait(0.1)
-                        firetouchinterest(root, cap, 0)
-                        firetouchinterest(root, cap, 1)
+-- Auto Farm: Coleta Automática de Itens
+local function StartAutoCollect()
+    RunService:BindToRenderStep("AutoCollect", Enum.RenderPriority.Low.Value, function()
+        if not Toggles.AutoCollectItems then
+            RunService:UnbindFromRenderStep("AutoCollect")
+            return
+        end
+        
+        local playerChar = LocalPlayer.Character
+        local rootPart = playerChar and playerChar:FindFirstChild("HumanoidRootPart")
+        if not rootPart then return end
+        
+        for _, item in ipairs(Workspace:GetDescendants()) do
+            if item:IsA("BasePart") and not item:IsA("Terrain") then
+                for _, namePattern in ipairs(CollectableItems) do
+                    if item.Name:find(namePattern) or string.find(item.Name, "Cap") then
+                        local distance = (rootPart.Position - item.Position).Magnitude
+                        if distance < 15 then
+                            rootPart.CFrame = item.CFrame
+                            wait(0.1)
+                            fireproximityprompt(item)
+                        end
                     end
                 end
             end
         end
-        Notify("Auto Farm", "Coletando Bottlecaps...", 1)
-    end
+    end)
+    Notify("Auto Collect", "🔄 Coleta automática ativada", 2)
 end
 
-local function MagnetSystem()
-    while Settings.MagnetEnabled do
-        wait(0.2)
-        local radius = Settings.MagnetRadius
-        local rootPart = Character:FindFirstChild("HumanoidRootPart")
-        if not rootPart then wait(1) continue end
+-- Magnet System (arrasta itens para você)
+local function StartMagnet()
+    RunService:BindToRenderStep("Magnet", Enum.RenderPriority.Low.Value, function()
+        if not Toggles.Magnet then
+            RunService:UnbindFromRenderStep("Magnet")
+            return
+        end
         
-        for _, item in pairs(workspace:GetDescendants()) do
-            if item:IsA("BasePart") and item.Name:lower():find("item") or item.Name:lower():find("cap") then
+        local playerChar = LocalPlayer.Character
+        local rootPart = playerChar and playerChar:FindFirstChild("HumanoidRootPart")
+        if not rootPart then return end
+        
+        for _, item in ipairs(Workspace:GetDescendants()) do
+            if item:IsA("BasePart") and not item:IsA("Terrain") and item.Parent ~= playerChar then
                 local distance = (rootPart.Position - item.Position).Magnitude
-                if distance <= radius then
-                    item.CFrame = rootPart.CFrame + rootPart.CFrame.LookVector * 3
+                if distance < Settings.MagnetRadius then
+                    local direction = (rootPart.Position - item.Position).Unit
+                    item.Velocity = direction * 50
                 end
             end
         end
-    end
+    end)
+    Notify("Magnet", "🧲 Sistema de ímã ativado (Raio: " .. Settings.MagnetRadius .. ")", 2)
 end
 
-local function AntiAFK()
-    while Settings.AntiAFK do
-        wait(60)
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new())
-        game:GetService("Players").LocalPlayer.Idled:connect(function()
-            VirtualUser:CaptureController()
-            VirtualUser:ClickButton2(Vector2.new())
-        end)
-    end
-end
-
-local function RemoveFog()
-    if Settings.RemoveFog then
-        local lighting = game:GetService("Lighting")
-        lighting.FogEnd = 100000
-        lighting.FogStart = 100000
-    end
-end
-
-local function FPSBooster()
-    if Settings.FPSBooster then
-        settings().Rendering.QualityLevel = 1
-        game:GetService("Workspace").GlobalLights = false
-        for _, descendant in pairs(workspace:GetDescendants()) do
-            if descendant:IsA("Decal") or descendant:IsA("Texture") then
-                descendant.Transparency = 1
+-- Auto Kill NPCs/Players
+local function StartAutoKill()
+    RunService:BindToRenderStep("AutoKill", Enum.RenderPriority.Low.Value, function()
+        if not Toggles.AutoKill then
+            RunService:UnbindFromRenderStep("AutoKill")
+            return
+        end
+        
+        local playerChar = LocalPlayer.Character
+        local rootPart = playerChar and playerChar:FindFirstChild("HumanoidRootPart")
+        local tool = playerChar and playerChar:FindFirstChildOfClass("Tool")
+        if not rootPart or not tool then return end
+        
+        for _, npc in ipairs(Workspace:GetDescendants()) do
+            if npc:IsA("Model") and npc:FindFirstChild("Humanoid") and npc ~= playerChar then
+                local humanoid = npc.Humanoid
+                local distance = (rootPart.Position - npc.PrimaryPart.Position).Magnitude
+                if distance < Settings.AutoKillDistance and humanoid.Health > 0 then
+                    local targetCFrame = npc.PrimaryPart.CFrame
+                    rootPart.CFrame = targetCFrame + (targetCFrame.LookVector * 3)
+                    wait(0.05)
+                    tool:Activate()
+                end
             end
         end
+    end)
+    Notify("Auto Kill", "🔪 Auto Kill ativado (Distância: " .. Settings.AutoKillDistance .. ")", 2)
+end
+
+-- Vehicle Features (Infinite Fuel, Speed Hack)
+local function SetInfiniteFuel(Enabled)
+    local vehicle = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("VehicleSeat")
+    if vehicle then
+        local fuelValue = vehicle:FindFirstChild("Fuel")
+        if fuelValue then
+            fuelValue.Changed:Connect(function()
+                if Enabled and fuelValue then
+                    fuelValue.Value = 100
+                end
+            end)
+        end
     end
 end
 
--- Criar abas
-local Tabs = {
-    Home = Window:AddTab({ Title = "Home", Icon = "home" }),
-    AutoFarm = Window:AddTab({ Title = "Auto Farm", Icon = "agriculture" }),
-    Vehicle = Window:AddTab({ Title = "Vehicle", Icon = "directions_car" }),
-    Player = Window:AddTab({ Title = "Player", Icon = "person" }),
-    Combat = Window:AddTab({ Title = "Combat", Icon = "sports_mma" }),
-    Teleport = Window:AddTab({ Title = "Teleport", Icon = "map" }),
-    Misc = Window:AddTab({ Title = "Misc", Icon = "settings" })
-}
+local function SetCarSpeedHack(Enabled)
+    RunService:BindToRenderStep("CarSpeed", Enum.RenderPriority.Low.Value, function()
+        if not Enabled then
+            RunService:UnbindFromRenderStep("CarSpeed")
+            return
+        end
+        
+        local vehicle = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("VehicleSeat")
+        if vehicle then
+            local parent = vehicle.Parent
+            local engine = parent and parent:FindFirstChild("Engine")
+            if engine then
+                engine.Velocity = engine.CFrame.LookVector * Settings.CarSpeedValue
+            end
+        end
+    end)
+end
 
--- Home Tab
-local HomeSection = Tabs.Home:AddSection("Status")
-HomeSection:AddLabel("Bem-vindo ao A Dusty Trip Premium Script")
-HomeSection:AddLabel("Script Keyless | Atualizado")
-HomeSection:AddLabel("Status: Online")
+-- ESP (Player, Car, Items)
+local espObjects = {}
+local function CreateESP(part, color)
+    local highlight = Instance.new("Highlight")
+    highlight.Parent = part
+    highlight.FillColor = color
+    highlight.FillTransparency = 0.5
+    highlight.OutlineColor = Color3.new(1,1,1)
+    highlight.OutlineTransparency = 0
+    table.insert(espObjects, highlight)
+end
 
--- Auto Farm Tab
-local FarmSection = Tabs.AutoFarm:AddSection("Auto Farm")
-FarmSection:AddToggle("AutoFarmBottlecaps", {
-    Title = "Auto Farm Bottlecaps",
-    Default = false,
+local function StartESP()
+    RunService:BindToRenderStep("ESP", Enum.RenderPriority.Low.Value, function()
+        if not Toggles.ESP then
+            for _, esp in ipairs(espObjects) do
+                esp:Destroy()
+            end
+            espObjects = {}
+            RunService:UnbindFromRenderStep("ESP")
+            return
+        end
+        
+        -- ESP Players
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local char = player.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    CreateESP(char.HumanoidRootPart, Color3.new(1,0,0)) -- Vermelho para players
+                end
+            end
+        end
+        
+        -- ESP Cars
+        for _, vehicle in ipairs(Workspace:GetDescendants()) do
+            if vehicle:IsA("Model") and vehicle:FindFirstChild("VehicleSeat") then
+                local primary = vehicle.PrimaryPart
+                if primary then
+                    CreateESP(primary, Color3.new(0,1,0)) -- Verde para carros
+                end
+            end
+        end
+        
+        -- ESP Items
+        for _, item in ipairs(Workspace:GetDescendants()) do
+            if item:IsA("BasePart") and not item:IsA("Terrain") then
+                for _, pattern in ipairs(CollectableItems) do
+                    if item.Name:find(pattern) then
+                        CreateESP(item, Color3.new(0,0,1)) -- Azul para itens
+                    end
+                end
+            end
+        end
+        
+        wait(0.5)
+    end)
+    Notify("ESP", "👁️ ESP ativado", 2)
+end
+
+-- Teleport to Player
+local function TeleportToPlayer(PlayerName)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Name == PlayerName then
+            local char = player.Character
+            local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+            if rootPart and LocalPlayer.Character then
+                LocalPlayer.Character:SetPrimaryPartCFrame(rootPart.CFrame + Vector3.new(0, 3, 0))
+                Notify("Teleport", "✨ Teleportado para " .. player.Name, 2)
+            end
+            return
+        end
+    end
+    Notify("Erro", "❌ Jogador não encontrado", 1.5)
+end
+
+-- Remove Fog
+local function RemoveFog()
+    Lighting.FogEnd = Enabled and 100000 or 1000
+    Lighting.FogStart = Enabled and 100000 or 0
+    Lighting.Atmosphere:Destroy()
+end
+
+-- FPS Booster (remove decorações)
+local function FPSBooster()
+    Workspace.Decorations:ClearAllChildren()
+    Workspace.Terrain.WaterWaveSize = 0
+    Workspace.Terrain.WaterReflectance = 0
+    Workspace.Terrain.WaterTransparency = 1
+    for _, part in ipairs(Workspace:GetDescendants()) do
+        if part:IsA("ParticleEmitter") or part:IsA("Smoke") or part:IsA("Fire") then
+            part.Enabled = false
+        end
+    end
+end
+
+-- ================================
+-- [CRIAÇÃO DA GUI RAYFIELD]
+-- ================================
+
+-- Window Principal
+local Window = Rayfield:CreateWindow({
+    Name = "A Dusty Trip | Premium Hub",
+    LoadingTitle = "Carregando Interface...",
+    LoadingSubtitle = "by Rayfield Suite",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "DustyTripHub",
+        FileName = "Settings"
+    },
+    Discord = {
+        Enabled = false,
+        Invite = "",
+        RememberJoins = false
+    },
+    KeySystem = false,
+})
+
+-- Aba: Home
+local HomeTab = Window:CreateTab("🏠 Home", 4483362458)
+local HomeSection = HomeTab:CreateSection("Bem-vindo, " .. LocalPlayer.Name)
+HomeTab:CreateParagraph({
+    Title = "✨ Status do Script",
+    Content = "Script Loaded | Keyless Version | Atualizado para 2026"
+})
+HomeTab:CreateButton({
+    Name = "🎮 Verificar Atualizações",
+    Callback = function()
+        Notify("Atualizações", "✅ Você está usando a versão mais recente!", 3)
+    end
+})
+
+-- Aba: Auto Farm
+local FarmTab = Window:CreateTab("🌾 Auto Farm", 4483362458)
+local FarmSection = FarmTab:CreateSection("🔧 Coleta e Farming")
+FarmTab:CreateToggle({
+    Name = "💰 Auto Farm Bottlecaps",
+    CurrentValue = false,
+    Flag = "autoFarmBC",
     Callback = function(value)
-        Settings.AutoFarmBottlecaps = value
+        Toggles.AutoFarmBottlecaps = value
         if value then
-            coroutine.wrap(AutoFarmBottlecaps)()
-            Notify("Auto Farm", "Auto Farm Bottlecaps Ativado", 2)
-        else
-            Notify("Auto Farm", "Auto Farm Bottlecaps Desativado", 2)
+            Notify("Auto Farm", "💰 Farmando Bottlecaps...", 2)
+            StartAutoCollect()
         end
     end
 })
-
-FarmSection:AddToggle("AutoCollectItems", {
-    Title = "Auto Collect Itens",
-    Default = false,
+FarmTab:CreateToggle({
+    Name = "📦 Auto Collect Itens",
+    CurrentValue = false,
+    Flag = "autoCollect",
     Callback = function(value)
-        Settings.AutoCollectItems = value
-        Notify("Auto Farm", "Auto Collect Itens: " .. tostring(value), 1)
+        Toggles.AutoCollectItems = value
+        if value then StartAutoCollect() end
+    end
+})
+FarmTab:CreateToggle({
+    Name = "⚔️ Auto Kill NPCs/Players",
+    CurrentValue = false,
+    Flag = "autoKill",
+    Callback = function(value)
+        Toggles.AutoKill = value
+        if value then StartAutoKill() end
+    end
+})
+local killDistanceSlider = FarmTab:CreateSlider({
+    Name = "🎯 Distância Auto Kill",
+    Range = {10, 150},
+    Increment = 5,
+    Suffix = "estud's",
+    CurrentValue = 50,
+    Flag = "killDistance",
+    Callback = function(value)
+        Settings.AutoKillDistance = value
+    end
+})
+FarmTab:CreateToggle({
+    Name = "💵 Auto Sell / Turn In",
+    CurrentValue = false,
+    Flag = "autoSell",
+    Callback = function(value)
+        Toggles.AutoSell = value
+        Notify("Auto Sell", value and "✅ Ativado" or "❌ Desativado", 1.5)
     end
 })
 
-FarmSection:AddToggle("AutoKillNPCs", {
-    Title = "Auto Kill NPCs",
-    Default = false,
+-- Aba: Vehicle
+local VehicleTab = Window:CreateTab("🚗 Vehicle", 4483362458)
+local VehicleSection = VehicleTab:CreateSection("🚘 Modificadores de Veículo")
+VehicleTab:CreateToggle({
+    Name = "⛽ Infinite Fuel",
+    CurrentValue = false,
+    Flag = "infFuel",
     Callback = function(value)
-        Settings.AutoKillNPCs = value
+        Toggles.InfiniteFuel = value
+        SetInfiniteFuel(value)
     end
 })
-
-FarmSection:AddSlider("KillDistance", {
-    Title = "Distância de Kill",
-    Default = 50,
-    Min = 10,
-    Max = 200,
+VehicleTab:CreateToggle({
+    Name = "🏎️ Car Speed Hack",
+    CurrentValue = false,
+    Flag = "carSpeed",
     Callback = function(value)
-        Settings.KillDistance = value
+        Toggles.CarSpeedHack = value
+        SetCarSpeedHack(value)
     end
 })
-
-FarmSection:AddToggle("AutoSell", {
-    Title = "Auto Sell / Turn In",
-    Default = false,
-    Callback = function(value)
-        Settings.AutoSell = value
-    end
-})
-
--- Vehicle Tab
-local VehicleSection = Tabs.Vehicle:AddSection("Vehicle Hacks")
-VehicleSection:AddToggle("InfiniteFuel", {
-    Title = "Infinite Fuel / Gas",
-    Default = false,
-    Callback = function(value)
-        Settings.InfiniteFuel = value
-    end
-})
-
-VehicleSection:AddToggle("InfiniteStamina", {
-    Title = "Infinite Stamina",
-    Default = false,
-    Callback = function(value)
-        Settings.InfiniteStamina = value
-    end
-})
-
-VehicleSection:AddToggle("CarSpeedHack", {
-    Title = "Car Speed Hack",
-    Default = false,
-    Callback = function(value)
-        Settings.CarSpeedHack = value
-    end
-})
-
-VehicleSection:AddSlider("CarSpeedValue", {
-    Title = "Velocidade do Carro",
-    Default = 200,
-    Min = 50,
-    Max = 500,
+local carSpeedSlider = VehicleTab:CreateSlider({
+    Name = "🚀 Velocidade do Carro",
+    Range = {100, 500},
+    Increment = 25,
+    Suffix = "Km/h",
+    CurrentValue = 200,
+    Flag = "carSpeedValue",
     Callback = function(value)
         Settings.CarSpeedValue = value
     end
 })
-
-VehicleSection:AddToggle("FlyCar", {
-    Title = "Fly Car",
-    Default = false,
+VehicleTab:CreateToggle({
+    Name = "🕊️ Fly Car",
+    CurrentValue = false,
+    Flag = "flyCar",
     Callback = function(value)
-        Settings.FlyCar = value
+        Toggles.FlyCar = value
+        Notify("Fly Car", value and "✅ Ativado" or "❌ Desativado", 1.5)
+    end
+})
+VehicleTab:CreateToggle({
+    Name = "🪨 Remove Rocks/Obstacles",
+    CurrentValue = false,
+    Flag = "removeRocks",
+    Callback = function(value)
+        Toggles.RemoveRocks = value
+        Notify("Remove Obstacles", value and "✅ Ativado" or "❌ Desativado", 1.5)
     end
 })
 
-VehicleSection:AddToggle("NoclipCar", {
-    Title = "Noclip Car",
-    Default = false,
+-- Aba: Player
+local PlayerTab = Window:CreateTab("👤 Player", 4483362458)
+local PlayerSection = PlayerTab:CreateSection("🎮 Player Modifiers")
+PlayerTab:CreateToggle({
+    Name = "🛡️ God Mode",
+    CurrentValue = false,
+    Flag = "godMode",
     Callback = function(value)
-        Settings.NoclipCar = value
+        Toggles.GodMode = value
+        SetGodMode(value)
+    end
+})
+PlayerTab:CreateToggle({
+    Name = "🔋 Infinite Stamina/Hunger/Thirst",
+    CurrentValue = false,
+    Flag = "infStamina",
+    Callback = function(value)
+        Toggles.InfiniteStamina = value
+        Notify("Status", value and "✅ Infinito ativado" or "❌ Desativado", 1.5)
+    end
+})
+PlayerTab:CreateToggle({
+    Name = "⚡ Speed Hack",
+    CurrentValue = false,
+    Flag = "speedHack",
+    Callback = function(value)
+        Toggles.SpeedHack = value
+        SetSpeedHack(value)
+    end
+})
+local walkSpeedSlider = PlayerTab:CreateSlider({
+    Name = "🏃 WalkSpeed",
+    Range = {16, 200},
+    Increment = 5,
+    Suffix = "velocidade",
+    CurrentValue = 16,
+    Flag = "walkSpeed",
+    Callback = function(value)
+        Settings.WalkSpeed = value
+        if Toggles.SpeedHack then SetSpeedHack(true) end
+    end
+})
+local jumpPowerSlider = PlayerTab:CreateSlider({
+    Name = "🦘 JumpPower",
+    Range = {50, 250},
+    Increment = 10,
+    Suffix = "pulo",
+    CurrentValue = 50,
+    Flag = "jumpPower",
+    Callback = function(value)
+        Settings.JumpPower = value
+        if Toggles.SpeedHack then SetSpeedHack(true) end
+    end
+})
+PlayerTab:CreateToggle({
+    Name = "🕊️ Fly",
+    CurrentValue = false,
+    Flag = "fly",
+    Callback = function(value)
+        Toggles.Fly = value
+        if value then StartFly() else StopFly() end
+    end
+})
+PlayerTab:CreateToggle({
+    Name = "🌀 Noclip",
+    CurrentValue = false,
+    Flag = "noclip",
+    Callback = function(value)
+        Toggles.Noclip = value
+        SetNoclip(value)
+    end
+})
+PlayerTab:CreateToggle({
+    Name = "👻 Invisible",
+    CurrentValue = false,
+    Flag = "invis",
+    Callback = function(value)
+        Toggles.Invisible = value
+        SetInvisible(value)
+    end
+})
+PlayerTab:CreateToggle({
+    Name = "💤 Anti-AFK",
+    CurrentValue = false,
+    Flag = "antiAfk",
+    Callback = function(value)
+        Toggles.AntiAFK = value
+        if value then StartAntiAFK() end
     end
 })
 
-VehicleSection:AddToggle("RemoveRocks", {
-    Title = "Remove Rocks / Obstacles",
-    Default = false,
+-- Aba: Bring/Collect
+local BringTab = Window:CreateTab("🧲 Bring", 4483362458)
+local BringSection = BringTab:CreateSection("🧲 Magnet e Coleta")
+BringTab:CreateToggle({
+    Name = "🧲 Magnet System (Raio Ajustável)",
+    CurrentValue = false,
+    Flag = "magnet",
     Callback = function(value)
-        Settings.RemoveRocks = value
+        Toggles.Magnet = value
+        if value then StartMagnet() end
     end
 })
-
--- Player Tab
-local PlayerSection = Tabs.Player:AddSection("Player Hacks")
-PlayerSection:AddToggle("GodMode", {
-    Title = "God Mode",
-    Default = false,
-    Callback = function(value)
-        Settings.GodMode = value
-        UpdateGodMode()
-        Notify("Player", "God Mode: " .. tostring(value), 1)
-    end
-})
-
-PlayerSection:AddToggle("InfiniteHunger", {
-    Title = "Infinite Hunger/Thirst",
-    Default = false,
-    Callback = function(value)
-        Settings.InfiniteHunger = value
-        Settings.InfiniteThirst = value
-    end
-})
-
-PlayerSection:AddToggle("SpeedHack", {
-    Title = "Speed Hack (Walk + Jump)",
-    Default = false,
-    Callback = function(value)
-        Settings.SpeedHack = value
-        UpdateSpeedHack()
-    end
-})
-
-PlayerSection:AddSlider("WalkSpeedValue", {
-    Title = "Walk Speed",
-    Default = 32,
-    Min = 16,
-    Max = 250,
-    Callback = function(value)
-        Settings.WalkSpeedValue = value
-        if Settings.SpeedHack then
-            UpdateSpeedHack()
-        end
-    end
-})
-
-PlayerSection:AddSlider("JumpPowerValue", {
-    Title = "Jump Power",
-    Default = 80,
-    Min = 50,
-    Max = 300,
-    Callback = function(value)
-        Settings.JumpPowerValue = value
-        if Settings.SpeedHack then
-            UpdateSpeedHack()
-        end
-    end
-})
-
-PlayerSection:AddToggle("Fly", {
-    Title = "Fly",
-    Default = false,
-    Callback = function(value)
-        Settings.Fly = value
-        UpdateFly()
-    end
-})
-
-PlayerSection:AddToggle("Noclip", {
-    Title = "Noclip",
-    Default = false,
-    Callback = function(value)
-        Settings.Noclip = value
-    end
-})
-
-PlayerSection:AddToggle("Invisible", {
-    Title = "Invisible",
-    Default = false,
-    Callback = function(value)
-        Settings.Invisible = value
-        if Character then
-            for _, part in pairs(Character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.Transparency = value and 1 or 0
-                end
-            end
-        end
-    end
-})
-
-PlayerSection:AddToggle("AntiAFK", {
-    Title = "Anti-AFK",
-    Default = false,
-    Callback = function(value)
-        Settings.AntiAFK = value
-        if value then
-            coroutine.wrap(AntiAFK)()
-        end
-    end
-})
-
-PlayerSection:AddToggle("MagnetEnabled", {
-    Title = "Magnet System",
-    Default = false,
-    Callback = function(value)
-        Settings.MagnetEnabled = value
-        if value then
-            coroutine.wrap(MagnetSystem)()
-        end
-    end
-})
-
-PlayerSection:AddSlider("MagnetRadius", {
-    Title = "Magnet Radius",
-    Default = 30,
-    Min = 10,
-    Max = 100,
+local magnetSlider = BringTab:CreateSlider({
+    Name = "📏 Raio do Magnet",
+    Range = {10, 100},
+    Increment = 5,
+    Suffix = "estud's",
+    CurrentValue = 30,
+    Flag = "magnetRadius",
     Callback = function(value)
         Settings.MagnetRadius = value
     end
 })
-
--- Combat Tab
-local CombatSection = Tabs.Combat:AddSection("Combat / Guns")
-CombatSection:AddToggle("InfiniteAmmo", {
-    Title = "Infinite Ammo",
-    Default = false,
-    Callback = function(value)
-        Settings.InfiniteAmmo = value
-    end
-})
-
-CombatSection:AddToggle("NoRecoil", {
-    Title = "No Recoil",
-    Default = false,
-    Callback = function(value)
-        Settings.NoRecoil = value
-    end
-})
-
-CombatSection:AddToggle("FastFireRate", {
-    Title = "Fast Fire Rate",
-    Default = false,
-    Callback = function(value)
-        Settings.FastFireRate = value
-    end
-})
-
-CombatSection:AddToggle("HighDamage", {
-    Title = "High Damage",
-    Default = false,
-    Callback = function(value)
-        Settings.HighDamage = value
-    end
-})
-
-CombatSection:AddToggle("SilentAim", {
-    Title = "Silent Aim",
-    Default = false,
-    Callback = function(value)
-        Settings.SilentAim = value
-    end
-})
-
-CombatSection:AddToggle("TriggerBot", {
-    Title = "Trigger Bot",
-    Default = false,
-    Callback = function(value)
-        Settings.TriggerBot = value
-    end
-})
-
--- Teleport Tab
-local TeleportSection = Tabs.Teleport:AddSection("Teleport / ESP")
-TeleportSection:AddButton({
-    Title = "Teleport to Safe Zone",
+BringTab:CreateButton({
+    Name = "🔮 Bring All Items (Instantâneo)",
     Callback = function()
-        local root = Character:FindFirstChild("HumanoidRootPart")
-        if root then
-            root.CFrame = CFrame.new(0, 50, 0)
-            Notify("Teleport", "Teleportado para Safe Zone", 2)
+        local playerChar = LocalPlayer.Character
+        local rootPart = playerChar and playerChar:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            for _, item in ipairs(Workspace:GetDescendants()) do
+                if item:IsA("BasePart") and not item:IsA("Terrain") then
+                    local distance = (rootPart.Position - item.Position).Magnitude
+                    if distance < 50 then
+                        item.CFrame = rootPart.CFrame
+                    end
+                end
+            end
+            Notify("Bring All", "✨ Todos os itens próximos foram trazidos", 2)
         end
     end
 })
 
--- Misc Tab
-local MiscSection = Tabs.Misc:AddSection("Misc")
-MiscSection:AddToggle("RemoveFog", {
-    Title = "Remove Fog",
-    Default = false,
+-- Aba: Combat / Guns
+local CombatTab = Window:CreateTab("🔫 Combat", 4483362458)
+local CombatSection = CombatTab:CreateSection("⚔️ Modificadores de Combate")
+CombatTab:CreateToggle({
+    Name = "🔫 Infinite Ammo",
+    CurrentValue = false,
+    Flag = "infAmmo",
     Callback = function(value)
-        Settings.RemoveFog = value
+        Toggles.InfiniteAmmo = value
+        Notify("Combat", value and "✅ Munição infinita" or "❌ Desativado", 1.5)
+    end
+})
+CombatTab:CreateToggle({
+    Name = "🎯 No Recoil",
+    CurrentValue = false,
+    Flag = "noRecoil",
+    Callback = function(value)
+        Toggles.NoRecoil = value
+    end
+})
+CombatTab:CreateToggle({
+    Name = "⚡ Fast Fire Rate",
+    CurrentValue = false,
+    Flag = "fastFire",
+    Callback = function(value)
+        Toggles.FastFire = value
+    end
+})
+CombatTab:CreateToggle({
+    Name = "💥 High Damage",
+    CurrentValue = false,
+    Flag = "highDamage",
+    Callback = function(value)
+        Toggles.HighDamage = value
+    end
+})
+
+-- Aba: Teleport / World
+local TeleportTab = Window:CreateTab("🌍 Teleport", 4483362458)
+local TeleportSection = TeleportTab:CreateSection("✨ ESP e Teleportes")
+TeleportTab:CreateToggle({
+    Name = "👁️ ESP (Players, Cars, Items)",
+    CurrentValue = false,
+    Flag = "esp",
+    Callback = function(value)
+        Toggles.ESP = value
+        if value then StartESP() end
+    end
+})
+TeleportTab:CreateInput({
+    Name = "🎯 Teleport to Player",
+    PlaceholderText = "Digite o nome do player",
+    Callback = function(text)
+        if text and text ~= "" then
+            TeleportToPlayer(text)
+        end
+    end
+})
+TeleportTab:CreateInput({
+    Name = "📍 Teleport to Coordinates (X,Y,Z)",
+    PlaceholderText = "Ex: 100, 50, 200",
+    Callback = function(text)
+        local coords = {string.match(text, "(%d+),%s*(%d+),%s*(%d+)")}
+        if #coords == 3 then
+            local pos = Vector3.new(tonumber(coords[1]), tonumber(coords[2]), tonumber(coords[3]))
+            if LocalPlayer.Character then
+                LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(pos))
+                Notify("Teleport", "✨ Teleportado para coordenadas", 2)
+            end
+        else
+            Notify("Erro", "❌ Formato inválido. Use X, Y, Z", 2)
+        end
+    end
+})
+TeleportTab:CreateButton({
+    Name = "🏙️ Teleport to Safe Zone (Spawn)",
+    Callback = function()
+        if LocalPlayer.Character then
+            LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(0, 10, 0))
+            Notify("Teleport", "✅ Teleportado para safe zone", 2)
+        end
+    end
+})
+
+-- Aba: Misc
+local MiscTab = Window:CreateTab("⚙️ Misc", 4483362458)
+local MiscSection = MiscTab:CreateSection("🔧 Utilitários e Otimização")
+MiscTab:CreateButton({
+    Name = "🗑️ Remove Fog",
+    Callback = function()
         RemoveFog()
+        Notify("Graphics", "🌫️ Fog removido!", 2)
     end
 })
-
-MiscSection:AddToggle("RemoveBots", {
-    Title = "Remove Bots/NPCs",
-    Default = false,
-    Callback = function(value)
-        Settings.RemoveBots = value
-        if value then
-            for _, npc in pairs(workspace:GetDescendants()) do
-                if npc:IsA("Model") and npc:FindFirstChild("Humanoid") and npc ~= Character then
-                    npc:Destroy()
-                end
-            end
-        end
-    end
-})
-
-MiscSection:AddToggle("FPSBooster", {
-    Title = "FPS Booster",
-    Default = false,
-    Callback = function(value)
-        Settings.FPSBooster = value
-        FPSBooster()
-    end
-})
-
-MiscSection:AddButton({
-    Title = "Server Hop",
+MiscTab:CreateButton({
+    Name = "🤖 Remove Bots/NPCs",
     Callback = function()
-        game:GetService("TeleportService"):Teleport(game.PlaceId)
-        Notify("Server Hop", "Teleportando para outro servidor...", 2)
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj ~= LocalPlayer.Character then
+                obj:Destroy()
+            end
+        end
+        Notify("World", "🤖 Bots e NPCs removidos", 2)
+    end
+})
+MiscTab:CreateButton({
+    Name = "🚀 Server Hop",
+    Callback = function()
+        local servers = {}
+        for _, v in ipairs(game:GetService("HttpService"):JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?limit=100"))).data do
+            if type(v) == "table" and v.playing ~= nil then
+                servers[#servers + 1] = v.id
+            end
+        end
+        if #servers > 0 then
+            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], LocalPlayer)
+        end
+        Notify("Server Hop", "🔄 Procurando novo servidor...", 2)
+    end
+})
+MiscTab:CreateButton({
+    Name = "⚡ FPS Booster",
+    Callback = function()
+        FPSBooster()
+        Notify("Performance", "⚡ FPS Boost aplicado!", 2)
     end
 })
 
--- Loop de atualizações (otimizado)
-coroutine.wrap(function()
-    while wait(0.5) do
-        UpdatePlayerStats()
-        UpdateGodMode()
-        UpdateSpeedHack()
-        
-        if Settings.AutoCollectItems then
-            -- lógica de coleta automática
-        end
-        
-        if Settings.AutoKillNPCs then
-            -- lógica de kill automático
-        end
-        
-        if Settings.InfiniteAmmo then
-            local tool = Character:FindFirstChildOfClass("Tool")
-            if tool and tool:FindFirstChild("Ammo") then
-                tool.Ammo.Value = 9999
-            end
-        end
-        
-        if Settings.RemoveRocks then
-            for _, rock in pairs(workspace:GetDescendants()) do
-                if rock.Name:lower():find("rock") or rock.Name:lower():find("stone") then
-                    rock:Destroy()
-                end
-            end
-        end
-    end
-end)()
+-- Carregar configurações salvas
+Rayfield:LoadConfiguration()
 
--- Atualizar watermark
-coroutine.wrap(function()
+-- Notificação de inicialização
+Notify("A Dusty Trip Hub", "✅ Script carregado com sucesso!\nby Rayfield Suite Premium", 4)
+
+-- Watermark dinâmico (removível)
+local watermark = Instance.new("TextLabel")
+watermark.Size = UDim2.new(0, 200, 0, 30)
+watermark.Position = UDim2.new(0, 10, 1, -40)
+watermark.BackgroundTransparency = 1
+watermark.Text = "A Dusty Trip Hub | Premium"
+watermark.TextColor3 = Color3.new(0.8, 0.2, 0.8)
+watermark.TextStrokeTransparency = 0.5
+watermark.Font = Enum.Font.GothamBold
+watermark.TextSize = 14
+watermark.Parent = game:GetService("CoreGui")
+
+-- Loop principal para atualizações de status
+spawn(function()
     while wait(5) do
-        Watermark:Update({
-            Title = "A Dusty Trip Script",
-            SubTitle = "Online | " .. os.date("%H:%M:%S")
-        })
+        if Toggles.GodMode then
+            SetGodMode(true)
+        end
+        if Toggles.InfiniteStamina then
+            local char = LocalPlayer.Character
+            local humanoid = char and char:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid:SetAttribute("Stamina", 100)
+            end
+        end
     end
-end)()
-
--- Notificação inicial
-wait(1)
-Notify("Script Carregado", "Todas as funcionalidades estão prontas! Use RightControl para minimizar.", 5)
-
-print("A Dusty Trip Script carregado com sucesso!")
+end)
