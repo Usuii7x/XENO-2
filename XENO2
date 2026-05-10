@@ -1,546 +1,842 @@
---[[
-    Rayfield UI para PolyZ Zombie
-    Compatível com a versão mais recente do jogo
-    Interface completa com ESP, Aimbot, e recursos de Farm
-]]
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 
--- Carregar a biblioteca Rayfield
-local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
+-- Load Rayfield UI Library
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- Criar a janela principal
+-- UI Window Configuration
 local Window = Rayfield:CreateWindow({
-    Name = "PolyZ Zombie Hub",
-    Icon = 0,
-    LoadingTitle = "Carregando PolyZ Hub",
-    LoadingSubtitle = "By ScriptMaster",
-    Theme = "Dark",
-    ToggleUIKeybind = Enum.KeyCode.RightShift,
+    Name = "XENO HUB | POLY-Z",
+    Icon = 71338090068856,
+    LoadingTitle = "Carregnando...",
+    LoadingSubtitle = "Autor: @alyssonzkn",
+    Theme = "BlackWhite",
+    ToggleUIKeybind = Enum.KeyCode.K,
     ConfigurationSaving = {
         Enabled = true,
-        FolderName = "PolyZ_Hub",
-        FileName = "Config_V1"
-    },
-    KeySystem = false
+        FolderName = "ZombieHub",
+        FileName = "Config"
+    }
 })
 
--- Função de notificação simplificada
-local function Notify(Title, Content, Duration)
-    Rayfield:Notify({
-        Title = Title,
-        Content = Content,
-        Duration = Duration or 3
-    })
-end
-
-Notify("PolyZ Hub", "Script carregado com sucesso!", 3)
-
--- ============================================
--- SERVIÇOS E VARIÁVEIS GLOBAIS
--- ============================================
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local Camera = workspace.CurrentCamera
-
--- Variáveis de estado
-local ESPEnabled = false
-local AimbotEnabled = false
-local AutoFarmEnabled = false
-local SilentAimEnabled = false
-local ShowTeam = false
-local ZombieESPColor = Color3.fromRGB(255, 50, 50)
-local ItemESPColor = Color3.fromRGB(50, 255, 50)
-local PlayerESPColor = Color3.fromRGB(50, 150, 255)
-
-local espObjects = {}
-local aimbotFOV = 150
-local aimbotSmoothness = 0.3
-
--- ============================================
--- FUNÇÕES DE UTILIDADE
--- ============================================
-local function GetZombies()
-    local zombies = {}
-    for _, v in ipairs(workspace:GetChildren()) do
-        if v:FindFirstChild("Humanoid") and v:FindFirstChild("Head") then
-            if v.Name:lower():find("zombie") or v:FindFirstChild("Zombie") then
-                table.insert(zombies, v)
+-- Utility Functions
+local function getEquippedWeaponName()
+    local model = workspace:FindFirstChild("Players"):FindFirstChild(player.Name)
+    if model then
+        for _, child in ipairs(model:GetChildren()) do
+            if child:IsA("Model") then
+                return child.Name
             end
         end
     end
-    return zombies
+    return "M1911"
 end
 
-local function GetItems()
-    local items = {}
-    for _, v in ipairs(workspace:GetChildren()) do
-        if v:IsA("Model") and (v:FindFirstChild("Handle") or v:FindFirstChild("Part")) then
-            if v.Name:lower():find("ammo") or v.Name:lower():find("weapon") or v.Name:lower():find("med") then
-                table.insert(items, v)
-            end
-        end
-    end
-    return items
-end
+-- Combat Tab
+local CombatTab = Window:CreateTab("⚔️ Combate", "Skull")
 
-local function GetNearestZombie()
-    local character = LocalPlayer.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
-    
-    local rootPart = character.HumanoidRootPart
-    local nearest = nil
-    local shortestDistance = aimbotFOV
-    
-    for _, zombie in ipairs(GetZombies()) do
-        if zombie and zombie:FindFirstChild("Head") and zombie:FindFirstChild("Humanoid") and zombie.Humanoid.Health > 0 then
-            local headPos = Camera:WorldToViewportPoint(zombie.Head.Position)
-            local screenDistance = (Vector2.new(headPos.X, headPos.Y) - UserInputService:GetMouseLocation()).magnitude
-            
-            if screenDistance < shortestDistance then
-                shortestDistance = screenDistance
-                nearest = zombie
-            end
-        end
-    end
-    
-    return nearest
-end
+-- Weapon Label
+local weaponLabel = CombatTab:CreateLabel("🔫 Atraso de tiro: carregando...")
 
--- ============================================
--- SISTEMA DE ESP
--- ============================================
-local function CreateESP(instance, color, name)
-    if not instance or not instance:FindFirstChild("HumanoidRootPart") then return nil end
-    
-    -- Highlight para contorno
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "ESP_Highlight"
-    highlight.FillColor = color
-    highlight.FillTransparency = 0.6
-    highlight.OutlineColor = color
-    highlight.OutlineTransparency = 0.2
-    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    highlight.Adornee = instance
-    highlight.Parent = instance
-    
-    -- BillboardGui para nome
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "ESP_Name"
-    billboard.Size = UDim2.new(0, 200, 0, 50)
-    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-    billboard.AlwaysOnTop = true
-    billboard.Parent = instance
-    
-    local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(1, 0, 1, 0)
-    textLabel.BackgroundTransparency = 1
-    textLabel.Text = name
-    textLabel.TextColor3 = color
-    textLabel.TextStrokeTransparency = 0
-    textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-    textLabel.TextScaled = true
-    textLabel.Font = Enum.Font.GothomBold
-    textLabel.Parent = billboard
-    
-    return {highlight = highlight, billboard = billboard}
-end
-
-local function RemoveESP(instance)
-    if instance and instance:FindFirstChild("ESP_Highlight") then
-        instance.ESP_Highlight:Destroy()
-    end
-    if instance and instance:FindFirstChild("ESP_Name") then
-        instance.ESP_Name:Destroy()
-    end
-end
-
-local function UpdateESP()
-    if not ESPEnabled then
-        for _, obj in pairs(espObjects) do
-            RemoveESP(obj)
-        end
-        espObjects = {}
-        return
-    end
-    
-    -- ESP para Zombies
-    for _, zombie in ipairs(GetZombies()) do
-        if not espObjects[zombie] then
-            local distance = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and 
-                             (zombie:FindFirstChild("HumanoidRootPart") and (LocalPlayer.Character.HumanoidRootPart.Position - zombie.HumanoidRootPart.Position).magnitude or 999)) or 999
-            local health = zombie:FindFirstChild("Humanoid") and math.floor(zombie.Humanoid.Health) or 0
-            espObjects[zombie] = CreateESP(zombie, ZombieESPColor, "🧟 " .. zombie.Name .. " | " .. health .. "❤️ | " .. math.floor(distance) .. "m")
-        end
-    end
-    
-    -- ESP para Itens
-    if ShowTeam then
-        for _, item in ipairs(GetItems()) do
-            if not espObjects[item] then
-                espObjects[item] = CreateESP(item, ItemESPColor, "📦 " .. item.Name)
-            end
-        end
-    end
-end
-
--- Loop do ESP
-RunService.RenderStepped:Connect(function()
-    if ESPEnabled then
-        UpdateESP()
+-- Update label
+task.spawn(function()
+    while true do
+        weaponLabel:Set("🔫 Arma atual: " .. getEquippedWeaponName())
+        task.wait(0.1)
     end
 end)
 
--- ============================================
--- SISTEMA DE AIMBOT
--- ============================================
-local function AimAt(position)
-    if not AimbotEnabled then return end
-    
-    local tweenInfo = TweenInfo.new(aimbotSmoothness, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
-    local tween = TweenService:Create(Camera, tweenInfo, {CFrame = CFrame.new(Camera.CFrame.Position, position)})
-    tween:Play()
-end
+-- Auto Headshots
+local autoKill = true
+local shootDelay = 0.5
 
-local function SilentAim(targetPosition)
-    if not SilentAimEnabled then return end
-    
-    -- Calcula o ângulo de visualização para o alvo
-    local cameraCF = Camera.CFrame
-    local direction = (targetPosition - cameraCF.Position).unit
-    local newCF = CFrame.new(cameraCF.Position, cameraCF.Position + direction)
-    
-    -- Aplica silenciosamente (invisível para outros jogadores)
-    Camera.CFrame = newCF
-end
-
--- Aimbot automático
-RunService.RenderStepped:Connect(function()
-    if not AimbotEnabled then return end
-    
-    local nearestZombie = GetNearestZombie()
-    if nearestZombie and nearestZombie:FindFirstChild("Head") then
-        local headPos = nearestZombie.Head.Position
-        if SilentAimEnabled then
-            SilentAim(headPos)
+-- Text input for shot delay
+CombatTab:CreateInput({
+    Name = "⏱️ Atraso de tiro (0-5 sec)",
+    PlaceholderText = "0.5",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(text)
+        local num = tonumber(text)
+        if num and num >= 0 and num <= 2 then
+            shootDelay = num
+            Rayfield:Notify({
+                Title = "Success",
+                Content = "Shot delay set to "..num.." seconds",
+                Duration = 3,
+                Image = 4483362458
+            })
         else
-            AimAt(headPos)
+            Rayfield:Notify({
+                Title = "Error",
+                Content = "Please enter a number between 0 and 5",
+                Duration = 3,
+                Image = 4483362458
+            })
         end
-    end
-end)
-
--- ============================================
--- SISTEMA DE AUTO FARM
--- ============================================
-local function AutoFarm()
-    while AutoFarmEnabled and RunService.RenderStepped do
-        local nearestZombie = GetNearestZombie()
-        if nearestZombie and nearestZombie:FindFirstChild("HumanoidRootPart") then
-            local character = LocalPlayer.Character
-            if character and character:FindFirstChild("HumanoidRootPart") then
-                -- Movimento automático em direção ao zumbi
-                local hrp = character.HumanoidRootPart
-                local zombiePos = nearestZombie.HumanoidRootPart.Position
-                local direction = (zombiePos - hrp.Position).unit
-                local newPos = hrp.Position + direction * 16
-                
-                hrp.CFrame = CFrame.new(newPos, zombiePos)
-                
-                -- Disparo automático (simula clique do mouse)
-                local args = {
-                    [1] = nearestZombie:FindFirstChild("Head") or nearestZombie:FindFirstChild("HumanoidRootPart")
-                }
-                game:GetService("ReplicatedStorage"):FindFirstChild("Damage") and 
-                game:GetService("ReplicatedStorage").Damage:FireServer(unpack(args))
-            end
-        end
-        wait(0.1)
-    end
-end
-
--- ============================================
--- RECURSOS DE JOGABILIDADE
--- ============================================
-local function InfiniteAmmo()
-    local backpack = LocalPlayer.Backpack
-    local character = LocalPlayer.Character
-    
-    for _, tool in ipairs(backpack:GetChildren()) do
-        if tool:IsA("Tool") and tool:FindFirstChild("Ammo") then
-            tool.Ammo.Value = 999
-        end
-    end
-    
-    if character then
-        for _, tool in ipairs(character:GetChildren()) do
-            if tool:IsA("Tool") and tool:FindFirstChild("Ammo") then
-                tool.Ammo.Value = 999
-            end
-        end
-    end
-end
-
-local function NoRecoil()
-    local character = LocalPlayer.Character
-    if character then
-        for _, tool in ipairs(character:GetChildren()) do
-            if tool:IsA("Tool") and tool:FindFirstChild("Recoil") then
-                tool.Recoil.Value = 0
-            end
-        end
-    end
-end
-
-local function SpeedHack(speed)
-    local character = LocalPlayer.Character
-    if character and character:FindFirstChild("Humanoid") then
-        character.Humanoid.WalkSpeed = speed
-    end
-end
-
-local function JumpPower(power)
-    local character = LocalPlayer.Character
-    if character and character:FindFirstChild("Humanoid") then
-        character.Humanoid.JumpPower = power
-    end
-end
-
--- Loops para recursos contínuos
-game:GetService("LoopRun").RenderStepped:Connect(function()
-    if InfiniteAmmo then
-        InfiniteAmmo()
-    end
-    if NoRecoil then
-        NoRecoil()
-    end
-end)
-
--- ============================================
--- CRIAÇÃO DAS ABAS E GUI
--- ============================================
-
--- ABA: COMBATE
-local CombatTab = Window:CreateTab("⚔️ Combate", nil)
-
-CombatTab:CreateToggle({
-    Name = "🔫 Mira Automática (Aimbot)",
-    CurrentValue = false,
-    Callback = function(Value)
-        AimbotEnabled = Value
-        Notify("Aimbot", Value and "Ativado" or "Desativado", 2)
-    end
+    end,
 })
 
 CombatTab:CreateToggle({
-    Name = "🎯 Mira Silenciosa",
+    Name = "🔪 Auto Headshots",
     CurrentValue = false,
-    Callback = function(Value)
-        SilentAimEnabled = Value
-        Notify("Mira Silenciosa", Value and "Ativada" : "Desativada", 2)
-    end
-})
-
-CombatTab:CreateSlider({
-    Name = "📏 Alcance do Aimbot",
-    Range = {50, 500},
-    Increment = 10,
-    Suffix = "estudos",
-    CurrentValue = 150,
-    Callback = function(Value)
-        aimbotFOV = Value
-    end
-})
-
-CombatTab:CreateSlider({
-    Name = "⚡ Suavidade da Mira",
-    Range = {0.1, 1},
-    Increment = 0.05,
-    Suffix = "seg",
-    CurrentValue = 0.3,
-    Callback = function(Value)
-        aimbotSmoothness = Value
-    end
-})
-
--- ABA: VISUAIS
-local VisualTab = Window:CreateTab("👁️ Visuais", nil)
-
-VisualTab:CreateToggle({
-    Name = "👤 ESP (Wallhack)",
-    CurrentValue = false,
-    Callback = function(Value)
-        ESPEnabled = Value
-        if not Value then
-            for _, obj in pairs(espObjects) do
-                RemoveESP(obj)
-            end
-            espObjects = {}
-        end
-        Notify("ESP", Value and "Ativado" or "Desativado", 2)
-    end
-})
-
-VisualTab:CreateColorPicker({
-    Name = "🎨 Cor dos Zumbis no ESP",
-    CurrentValue = ZombieESPColor,
-    Callback = function(Value)
-        ZombieESPColor = Value
-        if ESPEnabled then
-            for _, zombie in ipairs(GetZombies()) do
-                if espObjects[zombie] and espObjects[zombie].highlight then
-                    espObjects[zombie].highlight.FillColor = Value
-                    espObjects[zombie].highlight.OutlineColor = Value
-                end
-                if espObjects[zombie] and espObjects[zombie].billboard then
-                    local textLabel = espObjects[zombie].billboard.TextLabel
-                    if textLabel then
-                        textLabel.TextColor3 = Value
+    Flag = "AutoKillZombies",
+    Callback = function(state)
+        autoKill = state
+        if state then
+            task.spawn(function()
+                while autoKill do
+                    local enemies = workspace:FindFirstChild("Enemies")
+                    local shootRemote = Remotes:FindFirstChild("ShootEnemy")
+                    if enemies and shootRemote then
+                        local weapon = getEquippedWeaponName()
+                        for _, zombie in pairs(enemies:GetChildren()) do
+                            if zombie:IsA("Model") then
+                                local head = zombie:FindFirstChild("Head")
+                                if head then
+                                    local args = {zombie, head, head.Position, 0.5, weapon}
+                                    pcall(function() shootRemote:FireServer(unpack(args)) end)
+                                end
+                            end
+                        end
                     end
+                    task.wait(shootDelay)
                 end
-            end
+            end)
         end
     end
 })
 
-VisualTab:CreateToggle({
-    Name = "📦 Mostrar Itens no ESP",
+CombatTab:CreateToggle({
+    Name = "⏩ Pular Rodada Automática",
     CurrentValue = false,
-    Callback = function(Value)
-        ShowTeam = Value
-        if ESPEnabled then
-            UpdateESP()
+    Flag = "AutoSkipRound",
+    Callback = function(state)
+        autoSkip = state
+        if state then
+            task.spawn(function()
+                while autoSkip do
+                    local skip = Remotes:FindFirstChild("CastClientSkipVote")
+                    if skip then
+                        pcall(function() skip:FireServer() end)
+                    end
+                    task.wait(0.1)
+                end
+            end)
         end
     end
 })
 
--- ABA: JOGABILIDADE
-local GameplayTab = Window:CreateTab("🎮 Jogabilidade", nil)
-
-GameplayTab:CreateToggle({
-    Name = "🤖 Auto Farm",
-    CurrentValue = false,
-    Callback = function(Value)
-        AutoFarmEnabled = Value
-        if Value then
-            coroutine.wrap(AutoFarm)()
-        end
-        Notify("Auto Farm", Value and "Ativado" or "Desativado", 2)
-    end
-})
-
-GameplayTab:CreateButton({
-    Name = "💀 Insta Kill (Clique para ativar)",
-    Callback = function()
-        for _, zombie in ipairs(GetZombies()) do
-            if zombie:FindFirstChild("Humanoid") then
-                zombie.Humanoid.Health = 0
-            end
-        end
-        Notify("Insta Kill", "Todos os zumbis foram eliminados!", 2)
-    end
-})
-
-GameplayTab:CreateSlider({
-    Name = "🏃 Velocidade do Personagem",
+CombatTab:CreateSlider({
+    Name = "🏃‍♂️ Velocidade de caminhada",
     Range = {16, 200},
     Increment = 1,
-    Suffix = "studs/s",
+    Suffix = "unidades",
     CurrentValue = 16,
+    Flag = "WalkSpeed",
     Callback = function(Value)
-        SpeedHack(Value)
+        game.Players.LocalPlayer.Character:WaitForChild("Humanoid").WalkSpeed = Value
     end
 })
 
-GameplayTab:CreateSlider({
-    Name = "🦿 Altura do Pulo",
-    Range = {50, 200},
-    Increment = 5,
-    Suffix = "power",
-    CurrentValue = 50,
-    Callback = function(Value)
-        JumpPower(Value)
-    end
-})
+-- Misc Tab
+local MiscTab = Window:CreateTab("✨ Utilitários", "Sparkles")
 
-GameplayTab:CreateToggle({
-    Name = "🔫 Munição Infinita",
-    CurrentValue = false,
-    Callback = function(Value)
-        if Value then
-            InfiniteAmmo()
-        end
-    end
-})
+MiscTab:CreateSection("🔧 Ferramentas")
 
-GameplayTab:CreateToggle({
-    Name = "🎯 Sem Recuo",
-    CurrentValue = false,
-    Callback = function(Value)
-        if Value then
-            NoRecoil()
-        end
-    end
-})
-
--- ABA: UTILIDADES
-local UtilitiesTab = Window:CreateTab("🔧 Utilidades", nil)
-
-UtilitiesTab:CreateButton({
-    Name = "❤️ Curar Personagem",
+MiscTab:CreateButton({
+    Name = "🚪 Excluir Todas as Portas",
     Callback = function()
-        local character = LocalPlayer.Character
-        if character and character:FindFirstChild("Humanoid") then
-            character.Humanoid.Health = character.Humanoid.MaxHealth
-            Notify("Curado", "Vida restaurada ao máximo!", 2)
+        local doorsFolder = workspace:FindFirstChild("Doors")
+        if doorsFolder then
+            for _, group in pairs(doorsFolder:GetChildren()) do
+                if group:IsA("Folder") or group:IsA("Model") then
+                    group:Destroy()
+                end
+            end
+            Rayfield:Notify({
+                Title = "Success",
+                Content = "All doors deleted!",
+                Duration = 3,
+                Image = 4483362458
+            })
         end
     end
 })
 
-UtilitiesTab:CreateButton({
-    Name = "💰 Pegar Todos os Itens Próximos",
+MiscTab:CreateButton({
+    Name = "🎯 Munição Infinita",
     Callback = function()
-        local character = LocalPlayer.Character
-        if not character then return end
-        
-        local hrp = character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-        
-        for _, item in ipairs(GetItems()) do
-            if item:FindFirstChild("Handle") then
-                local distance = (hrp.Position - (item:FindFirstChild("Handle") and item.Handle.Position or item.PrimaryPart.Position)).magnitude
-                if distance < 30 then
-                    -- Simula coleta do item
-                    local firePosition = item:FindFirstChild("Handle") and item.Handle or item.PrimaryPart
-                    if firePosition then
-                        game:GetService("ReplicatedStorage").Pickup:FireServer(firePosition)
+        local vars = player:FindFirstChild("Variables")
+        if not vars then return end
+
+        local ammoAttributes = {  
+            "Primary_Mag",  
+            "Secondary_Mag"  
+        }  
+
+        for _, attr in ipairs(ammoAttributes) do  
+            if vars:GetAttribute(attr) ~= nil then  
+                vars:SetAttribute(attr, 100000000)  
+            end  
+        end
+        Rayfield:Notify({
+            Title = "Magazines",
+            Content = "Infinite magazines set!",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
+})
+
+MiscTab:CreateSection("💎 Melhorias visuais")
+
+MiscTab:CreateButton({
+    Name = "🌟 Ative Todas as Vantagens",
+    Callback = function()
+        local vars = player:FindFirstChild("Variables")
+        if not vars then return end
+
+        local perks = {  
+            "Bandoiler_Perk",  
+            "DoubleUp_Perk",  
+            "Haste_Perk",  
+            "Tank_Perk",  
+            "GasMask_Perk",  
+            "DeadShot_Perk",  
+            "DoubleMag_Perk",  
+            "WickedGrenade_Perk"  
+        }  
+
+        for _, perk in ipairs(perks) do  
+            if vars:GetAttribute(perk) ~= nil then  
+                vars:SetAttribute(perk, true)  
+            end  
+        end
+        Rayfield:Notify({
+            Title = "Perks",
+            Content = "All perks activated!",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
+})
+
+MiscTab:CreateButton({
+    Name = "🔫 Aprimorar Armas",
+    Callback = function()
+        local vars = player:FindFirstChild("Variables")
+        if not vars then return end
+
+        local enchants = {  
+            "Primary_Enhanced",  
+            "Secondary_Enhanced"  
+        }  
+
+        for _, attr in ipairs(enchants) do  
+            if vars:GetAttribute(attr) ~= nil then  
+                vars:SetAttribute(attr, true)  
+            end  
+        end
+        Rayfield:Notify({
+            Title = "Enhancement",
+            Content = "Weapons enhanced!",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
+})
+
+
+MiscTab:CreateButton({
+    Name = "💫 Armas Celestiais",
+    Callback = function()
+        local gunData = player:FindFirstChild("GunData")
+        if not gunData then return end
+
+        for _, value in ipairs(gunData:GetChildren()) do  
+            if value:IsA("StringValue") then  
+                value.Value = "celestial"  
+            end  
+        end
+        Rayfield:Notify({
+            Title = "Weapons",
+            Content = "Set to Celestial tier!",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
+})
+
+-- Open Tab
+local OpenTab = Window:CreateTab("🎁 Caixas", "Gift")
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local selectedQuantity = 1
+local selectedOutfitType = "Random" -- para Outfit cases
+
+OpenTab:CreateDropdown({
+    Name = "🔢 Quantidade aberta",
+    Options = {"1", "25", "50", "200"},
+    CurrentOption = "1",
+    Flag = "OpenQuantity",
+    Callback = function(Option)
+        selectedQuantity = tonumber(Option)
+    end,
+})
+
+OpenTab:CreateSection("📦 Caixas de abertura automática")
+
+-- Dropdown para tipos de Outfit
+OpenTab:CreateDropdown({
+    Name = "👕 Tipo de Roupa",
+    Options = {
+        "Aleatório", "Chapéu", "Acessório de Torso", "Acessório de Perna", "Acessório Facial", 
+        "Acessório de Braço", "Acessório de Costas", "Luvas", "Sapatos", "Cabelo",
+        "Camisa", "Calças", "Cor de Cabelo", "Cor da Pele", "Rosto"
+    },
+    CurrentOption = "Aleatório",
+    Callback = function(option)
+        selectedOutfitType = option
+    end,
+})
+
+-- Caixas Camufladas
+local autoOpenCamo = false
+OpenTab:CreateToggle({
+    Name = "🕶️ Caixas Camufladas",
+    CurrentValue = false,
+    Callback = function(state)
+        autoOpenCamo = state
+        if state then
+            task.spawn(function()
+                while autoOpenCamo do
+                    pcall(function()
+                        for i = 1, selectedQuantity do
+                            ReplicatedStorage.Remotes.OpenCamoCrate:InvokeServer("Random")
+                            task.wait(0.1)
+                        end
+                    end)
+                    task.wait(1)
+                end
+            end)
+        end
+    end
+})
+
+-- Caixas de Roupas
+local autoOpenOutfit = false
+OpenTab:CreateToggle({
+    Name = "👕 Caixas de Roupas",
+    CurrentValue = false,
+    Callback = function(state)
+        autoOpenOutfit = state
+        if state then
+            task.spawn(function()
+                while autoOpenOutfit do
+                    pcall(function()
+                        for i = 1, selectedQuantity do
+                            ReplicatedStorage.Remotes.OpenOutfitCrate:InvokeServer(selectedOutfitType)
+                            task.wait(0.1)
+                        end
+                    end)
+                    task.wait(1)
+                end
+            end)
+        end
+    end
+})
+
+-- Caixas de Pet
+local autoOpenPet = false
+OpenTab:CreateToggle({
+    Name = "🐾 Caixas de Pet",
+    CurrentValue = false,
+    Callback = function(state)
+        autoOpenPet = state
+        if state then
+            task.spawn(function()
+                while autoOpenPet do
+                    pcall(function()
+                        for i = 1, selectedQuantity do
+                            ReplicatedStorage.Remotes.OpenPetCrate:InvokeServer(1)
+                            task.wait(0.1)
+                        end
+                    end)
+                    task.wait(0.1)
+                end
+            end)
+        end
+    end
+})
+
+-- Caixas de Armas
+local autoOpenGun = false
+OpenTab:CreateToggle({
+    Name = "🔫 Caixas de Armas",
+    CurrentValue = false,
+    Callback = function(state)
+        autoOpenGun = state
+        if state then
+            task.spawn(function()
+                while autoOpenGun do
+                    pcall(function()
+                        for i = 1, selectedQuantity do
+                            ReplicatedStorage.Remotes.OpenGunCrate:InvokeServer(1)
+                            task.wait(0.1)
+                        end
+                    end)
+                    task.wait(0.1)
+                end
+            end)
+        end
+    end
+})
+
+-- Mod Tab
+local ModTab = Window:CreateTab("🌀 Mods", "Skull")
+
+-- Variáveis do Mod de Órbita
+local spinning = false
+local angle = 0
+local speed = 5
+local radius = 15
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local HRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+
+player.CharacterAdded:Connect(function(char)
+    HRP = char:WaitForChild("HumanoidRootPart")
+end)
+
+-- Loop principal da órbita
+RunService.RenderStepped:Connect(function(dt)
+    if spinning and HRP then
+        local function findNearestBoss()
+            local bosses = {
+                workspace.Enemies:FindFirstChild("GoblinKing"),
+                workspace.Enemies:FindFirstChild("CaptainBoom"),
+                workspace.Enemies:FindFirstChild("Fungarth")
+            }
+
+            local nearestBoss = nil
+            local shortestDistance = math.huge
+
+            for _, boss in pairs(bosses) do
+                if boss and boss:FindFirstChild("Head") then
+                    local distance = (boss.Head.Position - HRP.Position).Magnitude
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        nearestBoss = boss
                     end
                 end
             end
+            return nearestBoss
         end
-        Notify("Itens", "Itens próximos coletados!", 2)
+
+        local boss = findNearestBoss()
+        if boss and boss:FindFirstChild("Head") then
+            angle = angle + dt * speed
+            local bossPos = boss.Head.Position
+            local offset = Vector3.new(math.cos(angle), 0, math.sin(angle)) * radius
+            local orbitPos = bossPos + offset
+            HRP.CFrame = CFrame.new(Vector3.new(orbitPos.X, bossPos.Y, orbitPos.Z), bossPos)
+        end
+    end
+end)
+
+-- Botão de órbita
+ModTab:CreateToggle({
+    Name = "🌪️ Órbita ao Redor do Chefe",
+    CurrentValue = false,
+    Callback = function(value)
+        spinning = value
     end
 })
 
-UtilitiesTab:CreateButton({
-    Name = "🚀 Teletransportar para Safe Zone",
+-- Slider de velocidade
+ModTab:CreateSlider({
+    Name = "⚡ Velocidade de Rotação",
+    Range = {1, 20},
+    Increment = 0.1,
+    Suffix = "x",
+    CurrentValue = 5,
+    Callback = function(val)
+        speed = val
+    end
+})
+
+-- Slider de raio
+ModTab:CreateSlider({
+    Name = "📏 Raio da Órbita",
+    Range = {5, 100},
+    Increment = 1,
+    Suffix = "unidades",
+    CurrentValue = 15,
+    Callback = function(val)
+        radius = val
+    end
+})
+
+ModTab:CreateButton({
+    Name = "🛸 TP para Plataforma Inteligente",
     Callback = function()
-        local character = LocalPlayer.Character
-        if character and character:FindFirstChild("HumanoidRootPart") then
-            -- Encontra a safe zone no mapa
-            for _, v in ipairs(workspace:GetChildren()) do
-                if v.Name:lower():find("safe") or v.Name:lower():find("zone") then
-                    if v:IsA("Part") or v:IsA("Model") then
-                        local position = v:IsA("Part") and v.Position or (v:FindFirstChild("Part") and v.Part.Position) or Vector3.new(0, 5, 0)
-                        character.HumanoidRootPart.CFrame = CFrame.new(position)
-                        Notify("Teleporte", "Teletransportado para a Safe Zone!", 2)
-                        break
-                    end
-                end
+        local Players = game:GetService("Players")
+        local RunService = game:GetService("RunService")
+        local player = Players.LocalPlayer
+        local HRP = player.Character and player.Character:WaitForChild("HumanoidRootPart")
+
+        if not HRP then
+            warn("❌ HumanoidRootPart não encontrado")
+            return
+        end
+
+        local currentPos = HRP.Position
+        local targetPos = currentPos + Vector3.new(0, 60, 0)
+
+        -- Criar plataforma
+        local platform = Instance.new("Part")
+        platform.Size = Vector3.new(20, 1, 20)
+        platform.Anchored = true
+        platform.Position = targetPos - Vector3.new(0, 2, 0)
+        platform.Color = Color3.fromRGB(120, 120, 120)
+        platform.Material = Enum.Material.Metal
+        platform.Name = "SmartPlatform"
+        platform.Parent = workspace
+
+        -- Teleportar jogador
+        HRP.CFrame = CFrame.new(targetPos + Vector3.new(0, 2, 0))
+
+        -- Timer de auto-destruição
+        local isStanding = true
+        local lastTouch = tick()
+
+        local conn
+        conn = RunService.RenderStepped:Connect(function()
+            if not platform or not platform.Parent then
+                conn:Disconnect()
+                return
             end
+
+            local char = player.Character
+            local humanoidRoot = char and char:FindFirstChild("HumanoidRootPart")
+            if not humanoidRoot then return end
+
+            local rayOrigin = humanoidRoot.Position
+            local rayDirection = Vector3.new(0, -5, 0)
+            local raycastParams = RaycastParams.new()
+            raycastParams.FilterDescendantsInstances = {char}
+            raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+            local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+            if raycastResult and raycastResult.Instance == platform then
+                lastTouch = tick()
+            end
+
+            if tick() - lastTouch > 10 then
+                platform:Destroy()
+                conn:Disconnect()
+            end
+        end)
+    end
+})
+
+-- ============================================
+--          ANTI-AFK SCRIPT
+-- ============================================
+local AntiAFKTab = Window:CreateTab("🚫 Anti-AFK", "Clock")
+
+-- Variáveis do Anti-AFK
+local antiAfkActive = false
+local movementActive = true
+local mouseActive = true
+local interval = 30
+local mode = "Médio"
+local notifications = false
+local runningTasks = {}
+local lastActionTime = 0
+
+-- Configurações por modo
+local modeSettings = {
+    Leve = {
+        movementChance = 0.3,
+        mouseMovement = 2,
+        variance = 0.2,
+        keys = {"W", "A", "S", "D"}
+    },
+    Médio = {
+        movementChance = 0.6,
+        mouseMovement = 5,
+        variance = 0.5,
+        keys = {"W", "A", "S", "D"}
+    },
+    Agressivo = {
+        movementChance = 0.9,
+        mouseMovement = 10,
+        variance = 0.8,
+        keys = {"W", "A", "S", "D", "Space"}
+    }
+}
+
+-- Função para randomizar intervalo
+local function getRandomizedInterval()
+    local variance = modeSettings[mode].variance
+    local minTime = interval * (1 - variance)
+    local maxTime = interval * (1 + variance)
+    return math.random(minTime * 10, maxTime * 10) / 10
+end
+
+-- Função para simular tecla
+local function simulateKeyPress(key)
+    local VirtualUser = game:GetService("VirtualUser")
+    
+    if key == "Space" then
+        pcall(function()
+            game:GetService("Players").LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end)
+    else
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:SetKeyDown(key)
+            task.wait(0.1)
+            VirtualUser:SetKeyUp(key)
+        end)
+    end
+    
+    if notifications then
+        Rayfield:Notify({
+            Title = "Anti-AFK",
+            Content = "Tecla pressionada: " .. key,
+            Duration = 2
+        })
+    end
+end
+
+-- Função para simular mouse
+local function simulateMouseMovement()
+    local mouse = game:GetService("Players").LocalPlayer:GetMouse()
+    local movement = modeSettings[mode].mouseMovement
+    local offsetX = math.random(-movement, movement)
+    local offsetY = math.random(-movement, movement)
+    
+    pcall(function()
+        mouse.Move(Vector2.new(mouse.X + offsetX, mouse.Y + offsetY))
+        
+        if notifications then
+            Rayfield:Notify({
+                Title = "Anti-AFK",
+                Content = "Mouse movido",
+                Duration = 2
+            })
+        end
+    end)
+end
+
+-- Função para executar ação
+local function performAction()
+    if not antiAfkActive then return end
+    
+    local shouldMove = movementActive and math.random() <= modeSettings[mode].movementChance
+    local shouldMouse = mouseActive and math.random() <= modeSettings[mode].movementChance
+    
+    if shouldMove then
+        local keys = modeSettings[mode].keys
+        local selectedKey = keys[math.random(#keys)]
+        simulateKeyPress(selectedKey)
+    end
+    
+    if shouldMouse then
+        simulateMouseMovement()
+    end
+    
+    if not shouldMove and not shouldMouse and movementActive then
+        simulateKeyPress("W")
+        task.wait(0.05)
+        simulateKeyPress("S")
+    end
+end
+
+-- Loop principal
+local function antiAfkLoop()
+    while antiAfkActive do
+        local currentTime = tick()
+        local timeSinceLast = currentTime - lastActionTime
+        
+        if timeSinceLast >= getRandomizedInterval() then
+            performAction()
+            lastActionTime = currentTime
+        end
+        
+        task.wait(1)
+    end
+end
+
+-- Funções de controle
+local function startAntiAfk()
+    if runningTasks.mainLoop then
+        task.cancel(runningTasks.mainLoop)
+    end
+    
+    runningTasks.mainLoop = task.spawn(antiAfkLoop)
+    
+    if notifications then
+        Rayfield:Notify({
+            Title = "Anti-AFK",
+            Content = "Anti-AFK ativado!",
+            Duration = 3
+        })
+    end
+end
+
+local function stopAntiAfk()
+    if runningTasks.mainLoop then
+        task.cancel(runningTasks.mainLoop)
+        runningTasks.mainLoop = nil
+    end
+    
+    if notifications then
+        Rayfield:Notify({
+            Title = "Anti-AFK",
+            Content = "Anti-AFK desativado!",
+            Duration = 3
+        })
+    end
+end
+
+-- Criar seção principal
+local AntiAFKSection = AntiAFKTab:CreateSection("Controle Principal")
+
+-- Toggle principal
+AntiAFKTab:CreateToggle({
+    Name = "Ativar Anti-AFK",
+    CurrentValue = false,
+    Flag = "AntiAFKMain",
+    Callback = function(Value)
+        antiAfkActive = Value
+        if Value then
+            startAntiAfk()
+        else
+            stopAntiAfk()
         end
     end
 })
 
--- Notificação final
-Notify("PolyZ Hub", "Interface carregada com sucesso! Pressione RightShift para abrir/fechar.", 5)
+-- Seção de tipos de ação
+local ActionSection = AntiAFKTab:CreateSection("Tipos de Ação")
+
+-- Toggle movimento
+AntiAFKTab:CreateToggle({
+    Name = "Anti-AFK por Movimento",
+    CurrentValue = true,
+    Flag = "MovementAntiAFK",
+    Callback = function(Value)
+        movementActive = Value
+    end
+})
+
+-- Toggle mouse
+AntiAFKTab:CreateToggle({
+    Name = "Anti-AFK por Mouse",
+    CurrentValue = true,
+    Flag = "MouseAntiAFK",
+    Callback = function(Value)
+        mouseActive = Value
+    end
+})
+
+-- Seção de configurações
+local ConfigSection = AntiAFKTab:CreateSection("Configurações Avançadas")
+
+-- Slider de intervalo
+AntiAFKTab:CreateSlider({
+    Name = "Intervalo de Ação (segundos)",
+    Range = {5, 60},
+    Increment = 1,
+    Suffix = "s",
+    CurrentValue = 30,
+    Flag = "ActionInterval",
+    Callback = function(Value)
+        interval = Value
+    end
+})
+
+-- Dropdown de modo
+AntiAFKTab:CreateDropdown({
+    Name = "Modo de Simulação",
+    Options = {"Leve", "Médio", "Agressivo"},
+    CurrentOption = "Médio",
+    Flag = "SimulationMode",
+    Callback = function(Option)
+        mode = Option
+    end
+})
+
+-- Toggle notificações
+AntiAFKTab:CreateToggle({
+    Name = "Notificações",
+    CurrentValue = false,
+    Flag = "Notifications",
+    Callback = function(Value)
+        notifications = Value
+    end
+})
+
+-- Seção de comandos
+local CommandsSection = AntiAFKTab:CreateSection("Comandos Rápidos")
+
+-- Botão de teste
+AntiAFKTab:CreateButton({
+    Name = "Testar Agora",
+    Callback = function()
+        local wasActive = antiAfkActive
+        local wasMovement = movementActive
+        local wasMouse = mouseActive
+        
+        antiAfkActive = true
+        movementActive = true
+        mouseActive = true
+        
+        Rayfield:Notify({
+            Title = "Teste Anti-AFK",
+            Content = "Executando ação de teste...",
+            Duration = 2
+        })
+        
+        performAction()
+        
+        antiAfkActive = wasActive
+        movementActive = wasMovement
+        mouseActive = wasMouse
+    end
+})
+
+-- Botão de destruição da UI (adicionado também na aba Anti-AFK)
+AntiAFKTab:CreateButton({
+    Name = "Destruir Interface",
+    Callback = function()
+        if runningTasks.mainLoop then
+            task.cancel(runningTasks.mainLoop)
+        end
+        Rayfield:Destroy()
+    end
+})
+
+-- Label informativo
+local InfoSectionAFK = AntiAFKTab:CreateSection("Informações")
+AntiAFKTab:CreateLabel(
+    "Anti-AFK integrado\n" ..
+    "• Movimento aleatório\n" ..
+    "• Mouse randomizado\n" ..
+    "• 3 modos de intensidade\n" ..
+    "• Proteção anti-detecção"
+)
+
+-- ============================================
+--          CARREGAR CONFIGURAÇÃO
+-- ============================================
+Rayfield:LoadConfiguration()
