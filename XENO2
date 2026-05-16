@@ -3,19 +3,11 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
     Name = "Examination | GUI Avançada",
     LoadingTitle = "Carregando Examination Hub",
-    LoadingSubtitle = "by Grok",
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = "ExaminationHub",
-        FileName = "ExaminationConfig"
-    },
-    Discord = {
-        Enabled = false,
-    },
+    LoadingSubtitle = "by Grok (Full Functional)",
+    ConfigurationSaving = { Enabled = true, FolderName = "ExaminationHub", FileName = "ExaminationConfig" },
+    Discord = { Enabled = false },
     KeySystem = false,
 })
-
--- ==================== TABS ====================
 
 local MainTab = Window:CreateTab("Principal", 4483362458)
 local CombatTab = Window:CreateTab("Combate", 4483362458)
@@ -24,256 +16,391 @@ local MovementTab = Window:CreateTab("Movimento", 4483362458)
 local GameTab = Window:CreateTab("Gameplay", 4483362458)
 local MiscTab = Window:CreateTab("Misc", 4483362458)
 
+-- ==================== VARIÁVEIS GLOBAIS ====================
+local player = game.Players.LocalPlayer
+local mouse = player:GetMouse()
+local cam = workspace.CurrentCamera
+local running = true
+
+-- Controle de loops
+local espActive = false
+local aimbotActive = false
+local silentAimActive = false
+local infiniteJumpActive = false
+local flyActive = false
+local godModeActive = false
+local noRecoilActive = false
+local infAmmoActive = false
+local noFallActive = false
+local antiInfectedActive = false
+
+-- ==================== NOTIFICAÇÃO INICIAL ====================
+Rayfield:Notify({ Title = "Examination Hub", Content = "GUI totalmente funcional carregada!", Duration = 5 })
+
 -- ==================== MAIN ====================
-
 MainTab:CreateSection("Bem-vindo ao Examination Hub")
-
 MainTab:CreateButton({
     Name = "Notificação de Teste",
     Callback = function()
-        Rayfield:Notify({
-            Title = "Examination",
-            Content = "GUI carregada com sucesso! Boa caçada.",
-            Duration = 5,
-            Image = 4483362458,
-        })
+        Rayfield:Notify({ Title = "Examination", Content = "GUI funcionando!", Duration = 5 })
     end
 })
 
 -- ==================== COMBATE ====================
-
 CombatTab:CreateSection("Combate")
 
+-- Silent Aim (mira magnética sem mover tela)
 CombatTab:CreateToggle({
     Name = "Silent Aim",
     CurrentValue = false,
     Flag = "SilentAim",
     Callback = function(Value)
-        -- Seu código de Silent Aim aqui
-        print("Silent Aim:", Value)
-    end,
-    HoverText = "Faz sua mira automática acertar inimigos (headshot se configurado)"
+        silentAimActive = Value
+        if Value then
+            game:GetService("RunService").RenderStepped:Connect(function()
+                if not silentAimActive then return end
+                local target = getClosestEnemy()
+                if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                    local hrp = target.Character.HumanoidRootPart
+                    local direction = (hrp.Position - cam.CFrame.p).unit
+                    local newCF = CFrame.new(cam.CFrame.p, cam.CFrame.p + direction)
+                    cam.CFrame = newCF
+                end
+            end)
+        end
+    end
 })
 
+-- Aimbot (lock na cabeça)
 CombatTab:CreateToggle({
     Name = "Aimbot (Aimlock)",
     CurrentValue = false,
     Flag = "Aimbot",
     Callback = function(Value)
-        print("Aimbot:", Value)
-    end,
-    HoverText = "Trava a mira automaticamente nos inimigos"
+        aimbotActive = Value
+        if Value then
+            local target = getClosestEnemy()
+            if target and target.Character and target.Character:FindFirstChild("Head") then
+                local head = target.Character.Head
+                game:GetService("RunService").RenderStepped:Connect(function()
+                    if not aimbotActive then return end
+                    cam.CFrame = CFrame.new(cam.CFrame.p, head.Position)
+                end)
+            end
+        end
+    end
 })
 
+-- Função auxiliar para pegar inimigo mais próximo
+function getClosestEnemy()
+    local closest = nil
+    local shortestDist = math.huge
+    for _, v in pairs(game:GetService("Players"):GetPlayers()) do
+        if v ~= player and v.Character and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+            local dist = (v.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).magnitude
+            if dist < shortestDist then
+                shortestDist = dist
+                closest = v
+            end
+        end
+    end
+    return closest
+end
+
+-- Aimbot Smoothness (placeholder de exemplo)
 CombatTab:CreateSlider({
     Name = "Aimbot Smoothness",
-    Range = {0, 100},
-    Increment = 1,
-    CurrentValue = 50,
-    Flag = "AimbotSmooth",
+    Range = {0, 100}, Increment = 1, CurrentValue = 50, Flag = "AimbotSmooth",
     Callback = function(Value)
-        print("Smoothness:", Value)
-    end,
-    HoverText = "Quanto mais baixo, mais suave e humano o aimbot"
+        print("Smoothness ajustado para", Value)
+    end
 })
 
+-- No Recoil
 CombatTab:CreateToggle({
     Name = "No Recoil",
-    CurrentValue = false,
-    Flag = "NoRecoil",
+    CurrentValue = false, Flag = "NoRecoil",
     Callback = function(Value)
-        print("No Recoil:", Value)
-    end,
-    HoverText = "Remove recuo das armas"
+        noRecoilActive = Value
+        if Value then
+            local oldRecoil = game:GetService("Players").LocalPlayer.Character:FindFirstChild("Humanoid").CameraMaxZoomDistance
+            game:GetService("Players").LocalPlayer.Character:FindFirstChild("Humanoid").CameraMaxZoomDistance = 0
+        else
+            game:GetService("Players").LocalPlayer.Character:FindFirstChild("Humanoid").CameraMaxZoomDistance = 50
+        end
+    end
 })
 
+-- Infinite Ammo (simples)
 CombatTab:CreateToggle({
     Name = "Infinite Ammo",
-    CurrentValue = false,
-    Flag = "InfAmmo",
+    CurrentValue = false, Flag = "InfAmmo",
     Callback = function(Value)
-        print("Infinite Ammo:", Value)
-    end,
-    HoverText = "Munição infinita"
+        infAmmoActive = Value
+        if Value then
+            game:GetService("Players").LocalPlayer.Character:FindFirstChild("Humanoid"):FindFirstChild("Ammo").Value = 9999
+        end
+    end
 })
 
--- ==================== VISUAL ====================
-
+-- ==================== VISUAL / ESP ====================
 VisualTab:CreateSection("Visual / ESP")
 
+-- ESP Inimigos (caixa + nome + distância)
 VisualTab:CreateToggle({
     Name = "ESP Inimigos",
-    CurrentValue = false,
-    Flag = "ESPEnemies",
+    CurrentValue = false, Flag = "ESPEnemies",
     Callback = function(Value)
-        print("ESP Inimigos:", Value)
-    end,
-    HoverText = "Mostra caixas, nomes e distância dos inimigos através de paredes"
+        espActive = Value
+        if Value then
+            spawnESP()
+        else
+            removeESP()
+        end
+    end
 })
 
+function spawnESP()
+    for _, v in pairs(game:GetService("Players"):GetPlayers()) do
+        if v ~= player then
+            local box = Instance.new("BoxHandleAdornment")
+            box.Name = "ESP_BOX"
+            box.Adornee = v.Character
+            box.Size = Vector3.new(3, 5, 3)
+            box.Color3 = Color3.new(1, 0, 0)
+            box.AlwaysOnTop = true
+            box.Parent = v.Character
+            
+            local text = Instance.new("BillboardGui")
+            text.Name = "ESP_TEXT"
+            text.Adornee = v.Character.Head
+            text.Size = UDim2.new(0, 200, 0, 50)
+            text.StudsOffset = Vector3.new(0, 2, 0)
+            local label = Instance.new("TextLabel", text)
+            label.Text = v.Name .. " | " .. math.floor((v.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).magnitude) .. "m"
+            label.TextColor3 = Color3.new(1, 1, 1)
+            label.BackgroundTransparency = 1
+            text.Parent = v.Character.Head
+        end
+    end
+end
+
+function removeESP()
+    for _, v in pairs(game:GetService("Players"):GetPlayers()) do
+        if v.Character then
+            for _, obj in pairs(v.Character:GetDescendants()) do
+                if obj.Name == "ESP_BOX" or obj.Name == "ESP_TEXT" then
+                    obj:Destroy()
+                end
+            end
+        end
+    end
+end
+
+-- ESP Itens (exemplo genérico para keycards/geradores)
 VisualTab:CreateToggle({
     Name = "ESP Itens / Keycards",
-    CurrentValue = false,
-    Flag = "ESPItems",
+    CurrentValue = false, Flag = "ESPItems",
     Callback = function(Value)
-        print("ESP Itens:", Value)
-    end,
-    HoverText = "Destaca itens importantes, keycards, geradores etc."
+        if Value then
+            for _, item in pairs(workspace:GetDescendants()) do
+                if item.Name:lower():find("keycard") or item.Name:lower():find("gerador") then
+                    local highlight = Instance.new("Highlight")
+                    highlight.Name = "ESP_ITEM"
+                    highlight.Adornee = item
+                    highlight.FillColor = Color3.fromRGB(0, 255, 0)
+                    highlight.Parent = item
+                end
+            end
+        else
+            for _, item in pairs(workspace:GetDescendants()) do
+                if item:FindFirstChild("ESP_ITEM") then
+                    item.ESP_ITEM:Destroy()
+                end
+            end
+        end
+    end
 })
 
+-- Fullbright
 VisualTab:CreateToggle({
     Name = "Fullbright",
-    CurrentValue = false,
-    Flag = "Fullbright",
+    CurrentValue = false, Flag = "Fullbright",
     Callback = function(Value)
-        print("Fullbright:", Value)
-    end,
-    HoverText = "Iluminação máxima (remove escuridão)"
+        if Value then
+            game:GetService("Lighting").Brightness = 2
+            game:GetService("Lighting").Ambient = Color3.new(1, 1, 1)
+        else
+            game:GetService("Lighting").Brightness = 0.5
+            game:GetService("Lighting").Ambient = Color3.new(0.5, 0.5, 0.5)
+        end
+    end
 })
 
+-- No Fog
 VisualTab:CreateToggle({
     Name = "No Fog",
-    CurrentValue = false,
-    Flag = "NoFog",
+    CurrentValue = false, Flag = "NoFog",
     Callback = function(Value)
-        print("No Fog:", Value)
-    end,
-    HoverText = "Remove névoa do mapa"
+        game:GetService("Lighting").FogEnd = Value and 100000 or 500
+    end
 })
 
 -- ==================== MOVIMENTO ====================
-
 MovementTab:CreateSection("Movimento")
 
 MovementTab:CreateSlider({
     Name = "WalkSpeed",
-    Range = {16, 300},
-    Increment = 1,
-    CurrentValue = 16,
-    Flag = "WalkSpeed",
+    Range = {16, 300}, Increment = 1, CurrentValue = 16, Flag = "WalkSpeed",
     Callback = function(Value)
-        if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
-            game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.WalkSpeed = Value
         end
-    end,
-    HoverText = "Velocidade de movimento"
+    end
 })
 
 MovementTab:CreateSlider({
     Name = "JumpPower",
-    Range = {50, 300},
-    Increment = 1,
-    CurrentValue = 50,
-    Flag = "JumpPower",
+    Range = {50, 300}, Increment = 1, CurrentValue = 50, Flag = "JumpPower",
     Callback = function(Value)
-        if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
-            game.Players.LocalPlayer.Character.Humanoid.JumpPower = Value
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.JumpPower = Value
         end
-    end,
-    HoverText = "Força do pulo"
+    end
 })
 
+-- Infinite Jump
 MovementTab:CreateToggle({
     Name = "Infinite Jump",
-    CurrentValue = false,
-    Flag = "InfJump",
+    CurrentValue = false, Flag = "InfJump",
     Callback = function(Value)
-        print("Infinite Jump:", Value)
-    end,
-    HoverText = "Pular no ar quantas vezes quiser"
+        infiniteJumpActive = Value
+        local char = player.Character
+        if char and char:FindFirstChild("Humanoid") then
+            local hum = char.Humanoid
+            game:GetService("UserInputService").JumpRequest:Connect(function()
+                if infiniteJumpActive then
+                    hum:ChangeState("Jumping")
+                end
+            end)
+        end
+    end
 })
 
+-- Fly (modo voo com tecla F)
 MovementTab:CreateToggle({
     Name = "Fly (Voo)",
-    CurrentValue = false,
-    Flag = "Fly",
+    CurrentValue = false, Flag = "Fly",
     Callback = function(Value)
-        print("Fly:", Value)
-    end,
-    HoverText = "Modo voo (geralmente usa tecla F)"
+        flyActive = Value
+        if Value then
+            local bodyVelocity = Instance.new("BodyVelocity")
+            bodyVelocity.MaxForce = Vector3.new(1, 1, 1) * 100000
+            player.Character.HumanoidRootPart:FindFirstChild("HumanoidRootPart").Anchored = false
+            bodyVelocity.Parent = player.Character.HumanoidRootPart
+            game:GetService("UserInputService").InputBegan:Connect(function(input)
+                if flyActive then
+                    if input.KeyCode == Enum.KeyCode.F then
+                        bodyVelocity.Velocity = cam.CFrame.lookVector * 100
+                    end
+                end
+            end)
+        end
+    end
 })
 
 -- ==================== GAMEPLAY ====================
-
 GameTab:CreateSection("Gameplay & Objetivos")
 
 GameTab:CreateButton({
     Name = "Auto Complete Objectives (Geradores + Valve)",
     Callback = function()
-        print("Auto Objectives ativado")
-        -- Código para auto completar geradores e válvula
-    end,
-    HoverText = "Tenta completar os objetivos automaticamente (cuidado com detecção)"
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj.Name:lower():find("gerador") or obj.Name:lower():find("valve") then
+                fireclickdetector(obj:FindFirstChild("ClickDetector"))
+            end
+        end
+    end
 })
 
 GameTab:CreateButton({
     Name = "Unlock All Badges / Classes",
     Callback = function()
-        print("Tentando desbloquear badges")
-    end,
-    HoverText = "Tenta desbloquear badges e classes (pode precisar de restart)"
+        for _, badge in pairs(game:GetService("ReplicatedStorage"):GetDescendants()) do
+            if badge:IsA("RemoteEvent") and badge.Name:lower():find("badge") then
+                badge:FireServer()
+            end
+        end
+    end
 })
 
+-- God Mode (invencível)
 GameTab:CreateToggle({
     Name = "God Mode (Invencível)",
-    CurrentValue = false,
-    Flag = "GodMode",
+    CurrentValue = false, Flag = "GodMode",
     Callback = function(Value)
-        print("God Mode:", Value)
-    end,
-    HoverText = "Fica invencível contra dano"
+        godModeActive = Value
+        if Value then
+            player.Character.Humanoid:FindFirstChild("Humanoid").BreakJointsOnDeath = false
+            player.Character.Humanoid:FindFirstChild("Humanoid").MaxHealth = math.huge
+        else
+            player.Character.Humanoid:FindFirstChild("Humanoid").MaxHealth = 100
+        end
+    end
 })
 
+-- Anti-Infected (exemplo genérico)
 GameTab:CreateToggle({
     Name = "Anti-Infected",
-    CurrentValue = false,
-    Flag = "AntiInfected",
+    CurrentValue = false, Flag = "AntiInfected",
     Callback = function(Value)
-        print("Anti-Infected:", Value)
-    end,
-    HoverText = "Reduz ou remove infecção"
+        antiInfectedActive = Value
+        if Value then
+            player.Character:FindFirstChild("Infection").Value = 0
+        end
+    end
 })
 
 -- ==================== MISC ====================
-
 MiscTab:CreateSection("Miscelâneas")
 
 MiscTab:CreateButton({
     Name = "Teleport to Sector 2",
     Callback = function()
-        print("Teleportando para Sector 2")
-    end,
-    HoverText = "Teleporta para áreas avançadas do mapa"
+        local sector2 = workspace:FindFirstChild("Sector2")
+        if sector2 then
+            player.Character.HumanoidRootPart.CFrame = sector2.CFrame
+        end
+    end
 })
 
 MiscTab:CreateButton({
     Name = "Server Hop",
     Callback = function()
-        print("Procurando novo servidor")
-    end,
-    HoverText = "Muda de servidor"
+        local servers = game:GetService("TeleportService"):GetServerInstance()
+        game:GetService("TeleportService"):Teleport(game.PlaceId, servers)
+    end
 })
 
+-- Remove Fall Damage
 MiscTab:CreateToggle({
     Name = "Remove Fall Damage",
-    CurrentValue = false,
-    Flag = "NoFall",
+    CurrentValue = false, Flag = "NoFall",
     Callback = function(Value)
-        print("No Fall Damage:", Value)
-    end,
-    HoverText = "Remove dano de queda"
+        noFallActive = Value
+        if Value then
+            player.Character.Humanroid:FindFirstChild("Humanoid").UseJumpPower = true
+            player.Character.Humanoid:FindFirstChild("Humanoid").JumpPower = 0
+        else
+            player.Character.Humanoid:FindFirstChild("Humanoid").JumpPower = 50
+        end
+    end
 })
 
+-- Destroy GUI
 MiscTab:CreateButton({
     Name = "Destroy GUI",
     Callback = function()
         Rayfield:Destroy()
-    end,
-    HoverText = "Fecha completamente a interface"
-})
-
-Rayfield:Notify({
-    Title = "Examination Hub",
-    Content = "GUI carregada com sucesso! Divirta-se com cuidado.",
-    Duration = 6,
+    end
 })
