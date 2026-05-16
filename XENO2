@@ -1,991 +1,279 @@
---[[
-    Blox Fruits Advanced Script Hub
-    Versão: 2.0.0
-    Design: Fluent UI - Tema Roze/Neon
-    Keyless System
---]]
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- Verificação de ambiente
-if not game:IsLoaded() then
-    game.Loaded:Wait()
-end
-
--- Variáveis globais
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local CoreGui = game:GetService("CoreGui")
-local HttpService = game:GetService("HttpService")
-local VirtualUser = game:GetService("VirtualUser")
-local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
-
--- Configurações do usuário
-local Settings = {
-    Theme = "NeonPurple",
-    GUIKey = Enum.KeyCode.RightShift,
-    Notifications = true,
-    Watermark = true,
-    AutoSave = true,
-}
-
--- Tabela de configurações das features
-local Features = {
-    -- Auto Farm
-    AutoFarmLevel = false,
-    AutoQuest = false,
-    AutoFarmSelectedMob = false,
-    AutoFarmBosses = false,
-    AutoFarmChests = false,
-    AutoFarmFactory = false,
-    AutoFarmSeaEvents = false,
-    SelectedMob = "",
-    SelectedBoss = "",
-    
-    -- Combat
-    AutoKillAura = false,
-    KillAuraRange = 50,
-    KillAuraDelay = 0.1,
-    Aimbot = false,
-    AimbotFOV = 120,
-    AimbotSmoothness = 0.3,
-    TeamCheck = true,
-    AutoSkillZ = false,
-    AutoSkillX = false,
-    AutoSkillC = false,
-    AutoSkillV = false,
-    AutoSkillF = false,
-    AutoAwakened = false,
-    GodMode = false,
-    SemiGodMode = false,
-    InfiniteObservation = false,
-    
-    -- ESP
-    PlayerESP = false,
-    FruitESP = false,
-    ChestESP = false,
-    NPCESP = false,
-    IslandESP = false,
-    Tracers = false,
-    Chams = false,
-    
-    -- Sea/Travel
-    AutoNextSea = false,
-    AutoSail = false,
-    FastBoat = false,
-    BoatSpeed = 150,
-    TeleportIsland = "",
-    
-    -- Fruits
-    AutoFruitFinder = false,
-    AutoStoreFruit = false,
-    AutoEatFruit = false,
-    FruitNotifier = false,
-    BringFruits = false,
-    
-    -- Misc
-    AutoRaceV4 = false,
-    AutoHaki = false,
-    WalkSpeed = 16,
-    JumpPower = 50,
-    Fly = false,
-    Noclip = false,
-    InfiniteStamina = false,
-    RemoveFog = false,
-    FPSBooster = false,
-    ServerHop = false,
-    AntiAFK = false,
-    SpawnItem = "",
-    TeleportToPlayer = "",
-}
-
--- Tabela de cores do tema
-local Themes = {
-    NeonPurple = {
-        Primary = Color3.fromRGB(156, 66, 245),
-        Secondary = Color3.fromRGB(114, 46, 209),
-        Accent = Color3.fromRGB(0, 255, 255),
-        Background = Color3.fromRGB(20, 20, 30),
-        Surface = Color3.fromRGB(30, 30, 40),
-        Text = Color3.fromRGB(255, 255, 255),
-        TextSecondary = Color3.fromRGB(180, 180, 200),
-        Glow = Color3.fromRGB(156, 66, 245),
+local Window = Rayfield:CreateWindow({
+    Name = "Examination | GUI Avançada",
+    LoadingTitle = "Carregando Examination Hub",
+    LoadingSubtitle = "by Grok",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "ExaminationHub",
+        FileName = "ExaminationConfig"
     },
-    DarkBlue = {
-        Primary = Color3.fromRGB(0, 120, 255),
-        Secondary = Color3.fromRGB(0, 80, 200),
-        Accent = Color3.fromRGB(0, 200, 255),
-        Background = Color3.fromRGB(15, 20, 35),
-        Surface = Color3.fromRGB(25, 30, 45),
-        Text = Color3.fromRGB(255, 255, 255),
-        TextSecondary = Color3.fromRGB(170, 180, 210),
-        Glow = Color3.fromRGB(0, 120, 255),
+    Discord = {
+        Enabled = false,
     },
-    Crimson = {
-        Primary = Color3.fromRGB(220, 40, 80),
-        Secondary = Color3.fromRGB(180, 30, 60),
-        Accent = Color3.fromRGB(255, 100, 100),
-        Background = Color3.fromRGB(25, 15, 20),
-        Surface = Color3.fromRGB(35, 25, 30),
-        Text = Color3.fromRGB(255, 255, 255),
-        TextSecondary = Color3.fromRGB(200, 170, 180),
-        Glow = Color3.fromRGB(220, 40, 80),
-    },
-}
+    KeySystem = false,
+})
 
--- Sistema de notificações
-local NotificationSystem = {}
-function NotificationSystem:Show(title, description, duration, icon)
-    duration = duration or 3
-    icon = icon or "Info"
-    
-    local notificationHolder = Instance.new("Frame")
-    notificationHolder.Name = "Notification"
-    notificationHolder.Size = UDim2.new(0, 320, 0, 0)
-    notificationHolder.Position = UDim2.new(1, -340, 0, 60)
-    notificationHolder.BackgroundTransparency = 1
-    notificationHolder.Parent = guiMain
-    
-    local notificationFrame = Instance.new("Frame")
-    notificationFrame.Size = UDim2.new(1, 0, 0, 70)
-    notificationFrame.BackgroundColor3 = Themes[Settings.Theme].Surface
-    notificationFrame.BorderSizePixel = 0
-    notificationFrame.ClipsDescendants = true
-    notificationFrame.Parent = notificationHolder
-    
-    -- Glow effect
-    local glow = Instance.new("ImageLabel")
-    glow.Size = UDim2.new(1, 20, 1, 20)
-    glow.Position = UDim2.new(0, -10, 0, -10)
-    glow.BackgroundTransparency = 1
-    glow.Image = "rbxassetid://5028857089"
-    glow.ImageColor3 = Themes[Settings.Theme].Glow
-    glow.ImageTransparency = 0.7
-    glow.Parent = notificationFrame
-    
-    local topBar = Instance.new("Frame")
-    topBar.Size = UDim2.new(1, 0, 0, 3)
-    topBar.BackgroundColor3 = Themes[Settings.Theme].Primary
-    topBar.BorderSizePixel = 0
-    topBar.Parent = notificationFrame
-    
-    local iconLabel = Instance.new("TextLabel")
-    iconLabel.Size = UDim2.new(0, 40, 1, 0)
-    iconLabel.BackgroundTransparency = 1
-    iconLabel.Text = icon
-    iconLabel.TextColor3 = Themes[Settings.Theme].Primary
-    iconLabel.Font = Enum.Font.GothamBold
-    iconLabel.TextSize = 24
-    iconLabel.Parent = notificationFrame
-    
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, -50, 0, 30)
-    titleLabel.Position = UDim2.new(0, 45, 0, 5)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = title
-    titleLabel.TextColor3 = Themes[Settings.Theme].Text
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.TextSize = 14
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.Parent = notificationFrame
-    
-    local descLabel = Instance.new("TextLabel")
-    descLabel.Size = UDim2.new(1, -50, 0, 30)
-    descLabel.Position = UDim2.new(0, 45, 0, 35)
-    descLabel.BackgroundTransparency = 1
-    descLabel.Text = description
-    descLabel.TextColor3 = Themes[Settings.Theme].TextSecondary
-    descLabel.Font = Enum.Font.Gotham
-    descLabel.TextSize = 11
-    descLabel.TextXAlignment = Enum.TextXAlignment.Left
-    descLabel.TextWrapped = true
-    descLabel.Parent = notificationFrame
-    
-    notificationFrame.Size = UDim2.new(1, 0, 0, 0)
-    local tween = TweenService:Create(notificationFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {Size = UDim2.new(1, 0, 0, 70)})
-    tween:Play()
-    
-    task.wait(duration)
-    
-    local closeTween = TweenService:Create(notificationFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {Size = UDim2.new(1, 0, 0, 0)})
-    closeTween:Play()
-    closeTween.Completed:Connect(function()
-        notificationHolder:Destroy()
-    end)
-end
+-- ==================== TABS ====================
 
--- Sistema de Watermark
-local Watermark = {}
-function Watermark:Update()
-    if not Settings.Watermark then return end
-    local fps = math.floor(1 / RunService.RenderStepped:Wait())
-    local time = os.date("%H:%M:%S")
-    watermarkLabel.Text = string.format("Blox Fruits Hub | FPS: %d | %s", fps, time)
-end
+local MainTab = Window:CreateTab("Principal", 4483362458)
+local CombatTab = Window:CreateTab("Combate", 4483362458)
+local VisualTab = Window:CreateTab("Visual", 4483362458)
+local MovementTab = Window:CreateTab("Movimento", 4483362458)
+local GameTab = Window:CreateTab("Gameplay", 4483362458)
+local MiscTab = Window:CreateTab("Misc", 4483362458)
 
--- Função para criar GUI principal
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "BloxFruitsHub"
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.Parent = CoreGui
+-- ==================== MAIN ====================
 
--- Estilos globais
-local styles = {
-    CornerRadius = UDim.new(0, 8),
-    ButtonCorner = UDim.new(0, 6),
-    GlowSize = UDim.new(1, 20),
-}
+MainTab:CreateSection("Bem-vindo ao Examination Hub")
 
--- Frame principal da GUI
-local guiMain = Instance.new("Frame")
-guiMain.Name = "MainFrame"
-guiMain.Size = UDim2.new(0, 900, 0, 600)
-guiMain.Position = UDim2.new(0.5, -450, 0.5, -300)
-guiMain.BackgroundColor3 = Themes[Settings.Theme].Background
-guiMain.BackgroundTransparency = 0.05
-guiMain.BorderSizePixel = 0
-guiMain.ClipsDescendants = true
-guiMain.Visible = false
-guiMain.Parent = screenGui
-
--- Blur effect
-local blur = Instance.new("BlurEffect")
-blur.Size = 8
-blur.Parent = guiMain
-
--- Corner radius
-local corner = Instance.new("UICorner")
-corner.CornerRadius = styles.CornerRadius
-corner.Parent = guiMain
-
--- Glow border
-local glowBorder = Instance.new("ImageLabel")
-glowBorder.Size = UDim2.new(1, 20, 1, 20)
-glowBorder.Position = UDim2.new(0, -10, 0, -10)
-glowBorder.BackgroundTransparency = 1
-glowBorder.Image = "rbxassetid://5028857089"
-glowBorder.ImageColor3 = Themes[Settings.Theme].Glow
-glowBorder.ImageTransparency = 0.8
-glowBorder.ZIndex = 0
-glowBorder.Parent = guiMain
-
--- Header da GUI
-local header = Instance.new("Frame")
-header.Size = UDim2.new(1, 0, 0, 50)
-header.BackgroundColor3 = Themes[Settings.Theme].Surface
-header.BackgroundTransparency = 0.3
-header.BorderSizePixel = 0
-header.Parent = guiMain
-
-local headerCorner = Instance.new("UICorner")
-headerCorner.CornerRadius = UDim.new(0, 8)
-headerCorner.Parent = header
-
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(0, 200, 1, 0)
-titleLabel.Position = UDim2.new(0, 15, 0, 0)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "BLOX FRUITS HUB"
-titleLabel.TextColor3 = Themes[Settings.Theme].Text
-titleLabel.TextScaled = true
-titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextSize = 14
-titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.Parent = header
-
-local subtitleLabel = Instance.new("TextLabel")
-subtitleLabel.Size = UDim2.new(0, 300, 1, 0)
-subtitleLabel.Position = UDim2.new(0, 200, 0, 0)
-subtitleLabel.BackgroundTransparency = 1
-subtitleLabel.Text = "Advanced Script Hub"
-subtitleLabel.TextColor3 = Themes[Settings.Theme].TextSecondary
-subtitleLabel.TextScaled = true
-subtitleLabel.Font = Enum.Font.Gotham
-subtitleLabel.TextSize = 10
-subtitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-subtitleLabel.Parent = header
-
--- Close button
-local closeButton = Instance.new("TextButton")
-closeButton.Size = UDim2.new(0, 35, 0, 35)
-closeButton.Position = UDim2.new(1, -45, 0, 7)
-closeButton.BackgroundColor3 = Color3.fromRGB(255, 70, 70)
-closeButton.BackgroundTransparency = 0.2
-closeButton.Text = "✕"
-closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeButton.TextSize = 18
-closeButton.Font = Enum.Font.GothamBold
-closeButton.BorderSizePixel = 0
-closeButton.Parent = header
-
-local closeCorner = Instance.new("UICorner")
-closeCorner.CornerRadius = UDim.new(0, 6)
-closeCorner.Parent = closeButton
-
-closeButton.MouseButton1Click:Connect(function()
-    guiMain.Visible = false
-end)
-
--- Minimize button
-local minimizeButton = Instance.new("TextButton")
-minimizeButton.Size = UDim2.new(0, 35, 0, 35)
-minimizeButton.Position = UDim2.new(1, -90, 0, 7)
-minimizeButton.BackgroundColor3 = Themes[Settings.Theme].Primary
-minimizeButton.BackgroundTransparency = 0.2
-minimizeButton.Text = "−"
-minimizeButton.TextColor3 = Themes[Settings.Theme].Text
-minimizeButton.TextSize = 24
-minimizeButton.Font = Enum.Font.GothamBold
-minimizeButton.BorderSizePixel = 0
-minimizeButton.Parent = header
-
-local minimizeCorner = Instance.new("UICorner")
-minimizeCorner.CornerRadius = UDim.new(0, 6)
-minimizeCorner.Parent = minimizeButton
-
-local isMinimized = false
-minimizeButton.MouseButton1Click:Connect(function()
-    isMinimized = not isMinimized
-    local targetSize = isMinimized and UDim2.new(0, 900, 0, 50) or UDim2.new(0, 900, 0, 600)
-    local targetTrans = isMinimized and 0.8 or 0.05
-    local tween = TweenService:Create(guiMain, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {Size = targetSize, BackgroundTransparency = targetTrans})
-    tween:Play()
-    
-    for _, child in pairs(guiMain:GetChildren()) do
-        if child:IsA("Frame") and child.Name ~= "MainFrame" and child ~= header and child.Name ~= "Sidebar" then
-            child.Visible = not isMinimized
-        end
+MainTab:CreateButton({
+    Name = "Notificação de Teste",
+    Callback = function()
+        Rayfield:Notify({
+            Title = "Examination",
+            Content = "GUI carregada com sucesso! Boa caçada.",
+            Duration = 5,
+            Image = 4483362458,
+        })
     end
-end)
+})
 
--- Sidebar
-local sidebar = Instance.new("Frame")
-sidebar.Size = UDim2.new(0, 200, 1, -50)
-sidebar.Position = UDim2.new(0, 0, 0, 50)
-sidebar.BackgroundColor3 = Themes[Settings.Theme].Surface
-sidebar.BackgroundTransparency = 0.2
-sidebar.BorderSizePixel = 0
-sidebar.Parent = guiMain
+-- ==================== COMBATE ====================
 
-local sidebarCorner = Instance.new("UICorner")
-sidebarCorner.CornerRadius = UDim.new(0, 0)
-sidebarCorner.Parent = sidebar
+CombatTab:CreateSection("Combate")
 
--- Tabs
-local Tabs = {
-    "HOME", "AUTO FARM", "COMBAT", "ESP", "SEA", "FRUITS", "MISC"
-}
+CombatTab:CreateToggle({
+    Name = "Silent Aim",
+    CurrentValue = false,
+    Flag = "SilentAim",
+    Callback = function(Value)
+        -- Seu código de Silent Aim aqui
+        print("Silent Aim:", Value)
+    end,
+    HoverText = "Faz sua mira automática acertar inimigos (headshot se configurado)"
+})
 
-local activeTab = "HOME"
-local tabButtons = {}
-local contentFrames = {}
+CombatTab:CreateToggle({
+    Name = "Aimbot (Aimlock)",
+    CurrentValue = false,
+    Flag = "Aimbot",
+    Callback = function(Value)
+        print("Aimbot:", Value)
+    end,
+    HoverText = "Trava a mira automaticamente nos inimigos"
+})
 
--- Criar abas
-for i, tabName in ipairs(Tabs) do
-    local tabButton = Instance.new("TextButton")
-    tabButton.Size = UDim2.new(1, -20, 0, 45)
-    tabButton.Position = UDim2.new(0, 10, 0, 10 + (i-1) * 50)
-    tabButton.BackgroundColor3 = activeTab == tabName and Themes[Settings.Theme].Primary or Color3.new(1, 1, 1)
-    tabButton.BackgroundTransparency = activeTab == tabName and 0.8 or 0.95
-    tabButton.Text = "   " .. tabName
-    tabButton.TextColor3 = Themes[Settings.Theme].Text
-    tabButton.TextSize = 13
-    tabButton.Font = Enum.Font.GothamSemibold
-    tabButton.TextXAlignment = Enum.TextXAlignment.Left
-    tabButton.BorderSizePixel = 0
-    tabButton.Parent = sidebar
-    
-    local tabCorner = Instance.new("UICorner")
-    tabCorner.CornerRadius = UDim.new(0, 8)
-    tabCorner.Parent = tabButton
-    
-    local tabIcon = Instance.new("TextLabel")
-    tabIcon.Size = UDim2.new(0, 30, 1, 0)
-    tabIcon.BackgroundTransparency = 1
-    tabIcon.Text = getTabIcon(tabName)
-    tabIcon.TextColor3 = Themes[Settings.Theme].Primary
-    tabIcon.TextSize = 16
-    tabIcon.Font = Enum.Font.GothamBold
-    tabIcon.TextXAlignment = Enum.TextXAlignment.Center
-    tabIcon.Parent = tabButton
-    
-    tabButtons[tabName] = tabButton
-    
-    -- Content frame
-    local contentFrame = Instance.new("ScrollingFrame")
-    contentFrame.Size = UDim2.new(1, -220, 1, -70)
-    contentFrame.Position = UDim2.new(0, 210, 0, 60)
-    contentFrame.BackgroundTransparency = 1
-    contentFrame.BorderSizePixel = 0
-    contentFrame.ClipsDescendants = false
-    contentFrame.ScrollBarThickness = 4
-    contentFrame.ScrollBarImageColor3 = Themes[Settings.Theme].Primary
-    contentFrame.Visible = activeTab == tabName
-    contentFrame.Parent = guiMain
-    
-    local contentLayout = Instance.new("UIListLayout")
-    contentLayout.Padding = UDim.new(0, 10)
-    contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    contentLayout.Parent = contentFrame
-    
-    local contentPadding = Instance.new("UIPadding")
-    contentPadding.PaddingLeft = UDim.new(0, 10)
-    contentPadding.PaddingRight = UDim.new(0, 10)
-    contentPadding.PaddingTop = UDim.new(0, 10)
-    contentPadding.PaddingBottom = UDim.new(0, 10)
-    contentPadding.Parent = contentFrame
-    
-    contentFrames[tabName] = contentFrame
-    
-    tabButton.MouseButton1Click:Connect(function()
-        for _, btn in pairs(tabButtons) do
-            btn.BackgroundTransparency = 0.95
-            btn.TextColor3 = Themes[Settings.Theme].Text
+CombatTab:CreateSlider({
+    Name = "Aimbot Smoothness",
+    Range = {0, 100},
+    Increment = 1,
+    CurrentValue = 50,
+    Flag = "AimbotSmooth",
+    Callback = function(Value)
+        print("Smoothness:", Value)
+    end,
+    HoverText = "Quanto mais baixo, mais suave e humano o aimbot"
+})
+
+CombatTab:CreateToggle({
+    Name = "No Recoil",
+    CurrentValue = false,
+    Flag = "NoRecoil",
+    Callback = function(Value)
+        print("No Recoil:", Value)
+    end,
+    HoverText = "Remove recuo das armas"
+})
+
+CombatTab:CreateToggle({
+    Name = "Infinite Ammo",
+    CurrentValue = false,
+    Flag = "InfAmmo",
+    Callback = function(Value)
+        print("Infinite Ammo:", Value)
+    end,
+    HoverText = "Munição infinita"
+})
+
+-- ==================== VISUAL ====================
+
+VisualTab:CreateSection("Visual / ESP")
+
+VisualTab:CreateToggle({
+    Name = "ESP Inimigos",
+    CurrentValue = false,
+    Flag = "ESPEnemies",
+    Callback = function(Value)
+        print("ESP Inimigos:", Value)
+    end,
+    HoverText = "Mostra caixas, nomes e distância dos inimigos através de paredes"
+})
+
+VisualTab:CreateToggle({
+    Name = "ESP Itens / Keycards",
+    CurrentValue = false,
+    Flag = "ESPItems",
+    Callback = function(Value)
+        print("ESP Itens:", Value)
+    end,
+    HoverText = "Destaca itens importantes, keycards, geradores etc."
+})
+
+VisualTab:CreateToggle({
+    Name = "Fullbright",
+    CurrentValue = false,
+    Flag = "Fullbright",
+    Callback = function(Value)
+        print("Fullbright:", Value)
+    end,
+    HoverText = "Iluminação máxima (remove escuridão)"
+})
+
+VisualTab:CreateToggle({
+    Name = "No Fog",
+    CurrentValue = false,
+    Flag = "NoFog",
+    Callback = function(Value)
+        print("No Fog:", Value)
+    end,
+    HoverText = "Remove névoa do mapa"
+})
+
+-- ==================== MOVIMENTO ====================
+
+MovementTab:CreateSection("Movimento")
+
+MovementTab:CreateSlider({
+    Name = "WalkSpeed",
+    Range = {16, 300},
+    Increment = 1,
+    CurrentValue = 16,
+    Flag = "WalkSpeed",
+    Callback = function(Value)
+        if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
+            game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
         end
-        for _, frame in pairs(contentFrames) do
-            frame.Visible = false
+    end,
+    HoverText = "Velocidade de movimento"
+})
+
+MovementTab:CreateSlider({
+    Name = "JumpPower",
+    Range = {50, 300},
+    Increment = 1,
+    CurrentValue = 50,
+    Flag = "JumpPower",
+    Callback = function(Value)
+        if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
+            game.Players.LocalPlayer.Character.Humanoid.JumpPower = Value
         end
-        tabButton.BackgroundTransparency = 0.8
-        tabButton.TextColor3 = Themes[Settings.Theme].Primary
-        contentFrames[tabName].Visible = true
-        activeTab = tabName
-    end)
-end
+    end,
+    HoverText = "Força do pulo"
+})
 
--- Helper function para ícones das abas
-function getTabIcon(tabName)
-    local icons = {
-        HOME = "🏠",
-        ["AUTO FARM"] = "⚡",
-        COMBAT = "⚔️",
-        ESP = "👁️",
-        SEA = "🌊",
-        FRUITS = "🍎",
-        MISC = "⚙️"
-    }
-    return icons[tabName] or "📁"
-end
+MovementTab:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Flag = "InfJump",
+    Callback = function(Value)
+        print("Infinite Jump:", Value)
+    end,
+    HoverText = "Pular no ar quantas vezes quiser"
+})
 
--- Função para criar cards
-function createCard(parent, title, order)
-    local card = Instance.new("Frame")
-    card.Size = UDim2.new(1, -20, 0, 0)
-    card.BackgroundColor3 = Themes[Settings.Theme].Surface
-    card.BackgroundTransparency = 0.1
-    card.BorderSizePixel = 0
-    card.AutomaticSize = Enum.AutomaticSize.Y
-    card.Parent = parent
-    
-    local cardCorner = Instance.new("UICorner")
-    cardCorner.CornerRadius = UDim.new(0, 10)
-    cardCorner.Parent = card
-    
-    local cardTitle = Instance.new("TextLabel")
-    cardTitle.Size = UDim2.new(1, -20, 0, 35)
-    cardTitle.Position = UDim2.new(0, 10, 0, 5)
-    cardTitle.BackgroundTransparency = 1
-    cardTitle.Text = title
-    cardTitle.TextColor3 = Themes[Settings.Theme].Primary
-    cardTitle.TextSize = 14
-    cardTitle.Font = Enum.Font.GothamBold
-    cardTitle.TextXAlignment = Enum.TextXAlignment.Left
-    cardTitle.Parent = card
-    
-    local separator = Instance.new("Frame")
-    separator.Size = UDim2.new(1, -20, 0, 1)
-    separator.Position = UDim2.new(0, 10, 0, 40)
-    separator.BackgroundColor3 = Themes[Settings.Theme].Primary
-    separator.BackgroundTransparency = 0.7
-    separator.BorderSizePixel = 0
-    separator.Parent = card
-    
-    local contentContainer = Instance.new("Frame")
-    contentContainer.Size = UDim2.new(1, 0, 0, 0)
-    contentContainer.Position = UDim2.new(0, 0, 0, 45)
-    contentContainer.BackgroundTransparency = 1
-    contentContainer.AutomaticSize = Enum.AutomaticSize.Y
-    contentContainer.Parent = card
-    
-    local contentLayout = Instance.new("UIListLayout")
-    contentLayout.Padding = UDim.new(0, 8)
-    contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    contentLayout.Parent = contentContainer
-    
-    local contentPadding = Instance.new("UIPadding")
-    contentPadding.PaddingLeft = UDim.new(0, 10)
-    contentPadding.PaddingRight = UDim.new(0, 10)
-    contentPadding.PaddingBottom = UDim.new(0, 10)
-    contentPadding.Parent = contentContainer
-    
-    return {
-        Card = card,
-        Container = contentContainer,
-        Layout = contentLayout,
-        AddToggle = function(self, label, configKey, defaultValue)
-            local toggleFrame = Instance.new("Frame")
-            toggleFrame.Size = UDim2.new(1, 0, 0, 35)
-            toggleFrame.BackgroundTransparency = 1
-            toggleFrame.Parent = self.Container
-            
-            local toggleLabel = Instance.new("TextLabel")
-            toggleLabel.Size = UDim2.new(0, 150, 1, 0)
-            toggleLabel.BackgroundTransparency = 1
-            toggleLabel.Text = label
-            toggleLabel.TextColor3 = Themes[Settings.Theme].Text
-            toggleLabel.TextSize = 12
-            toggleLabel.Font = Enum.Font.Gotham
-            toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
-            toggleLabel.Parent = toggleFrame
-            
-            local toggleButton = Instance.new("TextButton")
-            toggleButton.Size = UDim2.new(0, 50, 0, 25)
-            toggleButton.Position = UDim2.new(1, -60, 0.5, -12.5)
-            toggleButton.BackgroundColor3 = defaultValue and Themes[Settings.Theme].Primary or Color3.fromRGB(60, 60, 70)
-            toggleButton.Text = defaultValue and "ON" or "OFF"
-            toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-            toggleButton.TextSize = 11
-            toggleButton.Font = Enum.Font.GothamBold
-            toggleButton.BorderSizePixel = 0
-            toggleButton.Parent = toggleFrame
-            
-            local toggleCorner = Instance.new("UICorner")
-            toggleCorner.CornerRadius = UDim.new(1, 0)
-            toggleCorner.Parent = toggleButton
-            
-            if Features[configKey] == nil then
-                Features[configKey] = defaultValue
-            else
-                toggleButton.BackgroundColor3 = Features[configKey] and Themes[Settings.Theme].Primary or Color3.fromRGB(60, 60, 70)
-                toggleButton.Text = Features[configKey] and "ON" or "OFF"
-            end
-            
-            toggleButton.MouseButton1Click:Connect(function()
-                Features[configKey] = not Features[configKey]
-                toggleButton.BackgroundColor3 = Features[configKey] and Themes[Settings.Theme].Primary or Color3.fromRGB(60, 60, 70)
-                toggleButton.Text = Features[configKey] and "ON" or "OFF"
-                if Settings.Notifications then
-                    NotificationSystem:Show("Toggle", string.format("%s %s", label, Features[configKey] and "ativado" or "desativado"), 1, "⚙️")
-                end
-            end)
-            
-            return toggleButton
-        end,
-        
-        AddSlider = function(self, label, configKey, minVal, maxVal, defaultVal)
-            local sliderFrame = Instance.new("Frame")
-            sliderFrame.Size = UDim2.new(1, 0, 0, 50)
-            sliderFrame.BackgroundTransparency = 1
-            sliderFrame.Parent = self.Container
-            
-            local sliderLabel = Instance.new("TextLabel")
-            sliderLabel.Size = UDim2.new(0, 150, 0, 20)
-            sliderLabel.BackgroundTransparency = 1
-            sliderLabel.Text = label
-            sliderLabel.TextColor3 = Themes[Settings.Theme].Text
-            sliderLabel.TextSize = 12
-            sliderLabel.Font = Enum.Font.Gotham
-            sliderLabel.TextXAlignment = Enum.TextXAlignment.Left
-            sliderLabel.Parent = sliderFrame
-            
-            local valueLabel = Instance.new("TextLabel")
-            valueLabel.Size = UDim2.new(0, 50, 0, 20)
-            valueLabel.Position = UDim2.new(1, -60, 0, 0)
-            valueLabel.BackgroundTransparency = 1
-            valueLabel.Text = tostring(defaultVal)
-            valueLabel.TextColor3 = Themes[Settings.Theme].Primary
-            valueLabel.TextSize = 12
-            valueLabel.Font = Enum.Font.GothamBold
-            valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-            valueLabel.Parent = sliderFrame
-            
-            local slider = Instance.new("Frame")
-            slider.Size = UDim2.new(1, -20, 0, 4)
-            slider.Position = UDim2.new(0, 0, 0, 30)
-            slider.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-            slider.BackgroundTransparency = 0.5
-            slider.BorderSizePixel = 0
-            slider.Parent = sliderFrame
-            
-            local sliderCorner = Instance.new("UICorner")
-            sliderCorner.CornerRadius = UDim.new(1, 0)
-            sliderCorner.Parent = slider
-            
-            local fill = Instance.new("Frame")
-            fill.Size = UDim2.new((defaultVal - minVal) / (maxVal - minVal), 0, 1, 0)
-            fill.BackgroundColor3 = Themes[Settings.Theme].Primary
-            fill.BorderSizePixel = 0
-            fill.Parent = slider
-            
-            local fillCorner = Instance.new("UICorner")
-            fillCorner.CornerRadius = UDim.new(1, 0)
-            fillCorner.Parent = fill
-            
-            local dragButton = Instance.new("TextButton")
-            dragButton.Size = UDim2.new(0, 12, 0, 12)
-            dragButton.Position = UDim2.new((defaultVal - minVal) / (maxVal - minVal), -6, 0.5, -6)
-            dragButton.BackgroundColor3 = Themes[Settings.Theme].Primary
-            dragButton.Text = ""
-            dragButton.BorderSizePixel = 0
-            dragButton.AutoButtonColor = false
-            dragButton.Parent = slider
-            
-            local dragCorner = Instance.new("UICorner")
-            dragCorner.CornerRadius = UDim.new(1, 0)
-            dragCorner.Parent = dragButton
-            
-            if Features[configKey] == nil then
-                Features[configKey] = defaultVal
-            else
-                local val = Features[configKey]
-                valueLabel.Text = tostring(val)
-                fill.Size = UDim2.new((val - minVal) / (maxVal - minVal), 0, 1, 0)
-                dragButton.Position = UDim2.new((val - minVal) / (maxVal - minVal), -6, 0.5, -6)
-            end
-            
-            local dragging = false
-            dragButton.MouseButton1Down:Connect(function()
-                dragging = true
-                while dragging and dragButton and dragButton.Parent do
-                    local mousePos = Mouse.X
-                    local sliderPos = slider.AbsolutePosition.X
-                    local sliderWidth = slider.AbsoluteSize.X
-                    local percent = math.clamp((mousePos - sliderPos) / sliderWidth, 0, 1)
-                    local value = minVal + (maxVal - minVal) * percent
-                    value = math.floor(value)
-                    valueLabel.Text = tostring(value)
-                    fill.Size = UDim2.new(percent, 0, 1, 0)
-                    dragButton.Position = UDim2.new(percent, -6, 0.5, -6)
-                    Features[configKey] = value
-                    RunService.RenderStepped:Wait()
-                end
-            end)
-            
-            UserInputService.InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                    dragging = false
-                end
-            end)
-            
-            return slider
-        end,
-        
-        AddDropdown = function(self, label, configKey, options, defaultVal)
-            local dropdownFrame = Instance.new("Frame")
-            dropdownFrame.Size = UDim2.new(1, 0, 0, 40)
-            dropdownFrame.BackgroundTransparency = 1
-            dropdownFrame.Parent = self.Container
-            
-            local dropdownLabel = Instance.new("TextLabel")
-            dropdownLabel.Size = UDim2.new(0, 150, 1, 0)
-            dropdownLabel.BackgroundTransparency = 1
-            dropdownLabel.Text = label
-            dropdownLabel.TextColor3 = Themes[Settings.Theme].Text
-            dropdownLabel.TextSize = 12
-            dropdownLabel.Font = Enum.Font.Gotham
-            dropdownLabel.TextXAlignment = Enum.TextXAlignment.Left
-            dropdownLabel.Parent = dropdownFrame
-            
-            local dropdownButton = Instance.new("TextButton")
-            dropdownButton.Size = UDim2.new(0, 150, 0, 30)
-            dropdownButton.Position = UDim2.new(1, -160, 0.5, -15)
-            dropdownButton.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-            dropdownButton.Text = defaultVal or options[1]
-            dropdownButton.TextColor3 = Themes[Settings.Theme].Text
-            dropdownButton.TextSize = 11
-            dropdownButton.Font = Enum.Font.Gotham
-            dropdownButton.BorderSizePixel = 0
-            dropdownButton.Parent = dropdownFrame
-            
-            local dropdownCorner = Instance.new("UICorner")
-            dropdownCorner.CornerRadius = UDim.new(0, 6)
-            dropdownCorner.Parent = dropdownButton
-            
-            local dropdownList = Instance.new("Frame")
-            dropdownList.Size = UDim2.new(0, 150, 0, 0)
-            dropdownList.Position = UDim2.new(1, -160, 0.5, 15)
-            dropdownList.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-            dropdownList.BackgroundTransparency = 0.05
-            dropdownList.BorderSizePixel = 0
-            dropdownList.ClipsDescendants = true
-            dropdownList.Visible = false
-            dropdownList.Parent = dropdownFrame
-            
-            local dropdownListCorner = Instance.new("UICorner")
-            dropdownListCorner.CornerRadius = UDim.new(0, 6)
-            dropdownListCorner.Parent = dropdownList
-            
-            local listLayout = Instance.new("UIListLayout")
-            listLayout.Padding = UDim.new(0, 2)
-            listLayout.Parent = dropdownList
-            
-            if Features[configKey] == nil then
-                Features[configKey] = defaultVal or options[1]
-            end
-            
-            for _, option in ipairs(options) do
-                local optionButton = Instance.new("TextButton")
-                optionButton.Size = UDim2.new(1, 0, 0, 30)
-                optionButton.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-                optionButton.BackgroundTransparency = 0.5
-                optionButton.Text = option
-                optionButton.TextColor3 = Themes[Settings.Theme].TextSecondary
-                optionButton.TextSize = 11
-                optionButton.Font = Enum.Font.Gotham
-                optionButton.BorderSizePixel = 0
-                optionButton.Parent = dropdownList
-                
-                local optionCorner = Instance.new("UICorner")
-                optionCorner.CornerRadius = UDim.new(0, 4)
-                optionCorner.Parent = optionButton
-                
-                optionButton.MouseButton1Click:Connect(function()
-                    dropdownButton.Text = option
-                    Features[configKey] = option
-                    dropdownList.Visible = false
-                    dropdownList.Size = UDim2.new(0, 150, 0, 0)
-                    if Settings.Notifications then
-                        NotificationSystem:Show("Dropdown", string.format("%s selecionado: %s", label, option), 1, "📋")
-                    end
-                end)
-            end
-            
-            dropdownButton.MouseButton1Click:Connect(function()
-                dropdownList.Visible = not dropdownList.Visible
-                if dropdownList.Visible then
-                    local height = #options * 32
-                    dropdownList.Size = UDim2.new(0, 150, 0, math.min(height, 150))
-                else
-                    dropdownList.Size = UDim2.new(0, 150, 0, 0)
-                end
-            end)
-            
-            return dropdownButton
-        end,
-        
-        AddButton = function(self, label, callback)
-            local button = Instance.new("TextButton")
-            button.Size = UDim2.new(0, 180, 0, 35)
-            button.BackgroundColor3 = Themes[Settings.Theme].Primary
-            button.BackgroundTransparency = 0.8
-            button.Text = label
-            button.TextColor3 = Themes[Settings.Theme].Text
-            button.TextSize = 12
-            button.Font = Enum.Font.GothamSemibold
-            button.BorderSizePixel = 0
-            button.Parent = self.Container
-            
-            local buttonCorner = Instance.new("UICorner")
-            buttonCorner.CornerRadius = UDim.new(0, 6)
-            buttonCorner.Parent = button
-            
-            button.MouseButton1Click:Connect(function()
-                callback()
-                if Settings.Notifications then
-                    NotificationSystem:Show("Botão", string.format("%s executado", label), 1, "🔘")
-                end
-            end)
-            
-            return button
-        end,
-    }
-end
+MovementTab:CreateToggle({
+    Name = "Fly (Voo)",
+    CurrentValue = false,
+    Flag = "Fly",
+    Callback = function(Value)
+        print("Fly:", Value)
+    end,
+    HoverText = "Modo voo (geralmente usa tecla F)"
+})
 
--- Watermark
-local watermarkLabel = Instance.new("TextLabel")
-watermarkLabel.Size = UDim2.new(0, 250, 0, 20)
-watermarkLabel.Position = UDim2.new(1, -260, 1, -30)
-watermarkLabel.BackgroundTransparency = 1
-watermarkLabel.Text = "Blox Fruits Hub | FPS: 60 | 00:00:00"
-watermarkLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-watermarkLabel.TextSize = 10
-watermarkLabel.Font = Enum.Font.Gotham
-watermarkLabel.TextXAlignment = Enum.TextXAlignment.Right
-watermarkLabel.Parent = guiMain
+-- ==================== GAMEPLAY ====================
 
--- Auto-update watermark
-RunService.RenderStepped:Connect(function()
-    Watermark:Update()
-end)
+GameTab:CreateSection("Gameplay & Objetivos")
 
--- ============================================
--- IMPLEMENTAÇÃO DAS FEATURES
--- ============================================
+GameTab:CreateButton({
+    Name = "Auto Complete Objectives (Geradores + Valve)",
+    Callback = function()
+        print("Auto Objectives ativado")
+        -- Código para auto completar geradores e válvula
+    end,
+    HoverText = "Tenta completar os objetivos automaticamente (cuidado com detecção)"
+})
 
--- Auto Farm Loop
-task.spawn(function()
-    while true do
-        task.wait(0.1)
-        if not guiMain.Visible then continue end
-        
-        -- Auto Farm Level
-        if Features.AutoFarmLevel then
-            -- Lógica de auto farm
-            local targetLevel = LocalPlayer.Data.Level.Value
-            -- Implementar lógica de grinding
-        end
-        
-        -- Auto Quest
-        if Features.AutoQuest then
-            -- Lógica de auto quest
-        end
-        
-        -- Auto Kill Aura
-        if Features.AutoKillAura then
-            -- Lógica de kill aura
-        end
-    end
-end)
+GameTab:CreateButton({
+    Name = "Unlock All Badges / Classes",
+    Callback = function()
+        print("Tentando desbloquear badges")
+    end,
+    HoverText = "Tenta desbloquear badges e classes (pode precisar de restart)"
+})
 
--- ESP System
-task.spawn(function()
-    while true do
-        task.wait(0.05)
-        if not Features.PlayerESP and not Features.FruitESP and not Features.ChestESP and not Features.NPCESP then
-            continue
-        end
-        -- Implementar lógica de ESP
-    end
-end)
+GameTab:CreateToggle({
+    Name = "God Mode (Invencível)",
+    CurrentValue = false,
+    Flag = "GodMode",
+    Callback = function(Value)
+        print("God Mode:", Value)
+    end,
+    HoverText = "Fica invencível contra dano"
+})
 
--- Anti-AFK
-task.spawn(function()
-    while Features.AntiAFK do
-        task.wait(60)
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new())
-    end
-end)
+GameTab:CreateToggle({
+    Name = "Anti-Infected",
+    CurrentValue = false,
+    Flag = "AntiInfected",
+    Callback = function(Value)
+        print("Anti-Infected:", Value)
+    end,
+    HoverText = "Reduz ou remove infecção"
+})
 
--- Remover Fog
-if Features.RemoveFog then
-    game:GetService("Lighting").FogEnd = 100000
-    game:GetService("Lighting").FogStart = 100000
-end
+-- ==================== MISC ====================
 
--- Interface da Aba HOME
-local homeCard = createCard(contentFrames["HOME"], "Informações do Jogador", 1)
-homeCard:AddToggle("Watermark", "Watermark", true)
-homeCard:AddButton("Refresh Info", function()
-    NotificationSystem:Show("Info", "Informações atualizadas!", 2, "🔄")
-end)
+MiscTab:CreateSection("Miscelâneas")
 
--- Interface da Aba AUTO FARM
-local autoFarmCard = createCard(contentFrames["AUTO FARM"], "Configurações de Auto Farm", 1)
-autoFarmCard:AddToggle("Auto Farm Nível", "AutoFarmLevel", false)
-autoFarmCard:AddToggle("Auto Quest", "AutoQuest", false)
-autoFarmCard:AddToggle("Auto Farm Mob Selecionado", "AutoFarmSelectedMob", false)
-autoFarmCard:AddToggle("Auto Farm Bosses", "AutoFarmBosses", false)
-autoFarmCard:AddToggle("Auto Farm Chests", "AutoFarmChests", false)
-autoFarmCard:AddToggle("Auto Farm Factory/Raid", "AutoFarmFactory", false)
-autoFarmCard:AddToggle("Auto Farm Sea Events", "AutoFarmSeaEvents", false)
+MiscTab:CreateButton({
+    Name = "Teleport to Sector 2",
+    Callback = function()
+        print("Teleportando para Sector 2")
+    end,
+    HoverText = "Teleporta para áreas avançadas do mapa"
+})
 
--- Interface da Aba COMBAT
-local combatCard = createCard(contentFrames["COMBAT"], "Configurações de Combate", 1)
-combatCard:AddToggle("Auto Kill Aura", "AutoKillAura", false)
-combatCard:AddSlider("Kill Aura Range", "KillAuraRange", 10, 150, 50)
-combatCard:AddToggle("Aimbot/Silent Aim", "Aimbot", false)
-combatCard:AddSlider("Aimbot FOV", "AimbotFOV", 30, 360, 120)
-combatCard:AddToggle("Team Check", "TeamCheck", true)
-combatCard:AddToggle("Auto Skill Z", "AutoSkillZ", false)
-combatCard:AddToggle("Auto Skill X", "AutoSkillX", false)
-combatCard:AddToggle("Auto Skill C", "AutoSkillC", false)
-combatCard:AddToggle("Auto Skill V", "AutoSkillV", false)
-combatCard:AddToggle("Auto Skill F", "AutoSkillF", false)
-combatCard:AddToggle("God Mode", "GodMode", false)
-combatCard:AddToggle("Infinite Observation", "InfiniteObservation", false)
+MiscTab:CreateButton({
+    Name = "Server Hop",
+    Callback = function()
+        print("Procurando novo servidor")
+    end,
+    HoverText = "Muda de servidor"
+})
 
--- Interface da Aba ESP
-local espCard = createCard(contentFrames["ESP"], "Configurações de ESP", 1)
-espCard:AddToggle("Player ESP", "PlayerESP", false)
-espCard:AddToggle("Fruit ESP", "FruitESP", false)
-espCard:AddToggle("Chest ESP", "ChestESP", false)
-espCard:AddToggle("NPC/Mob ESP", "NPCESP", false)
-espCard:AddToggle("Island ESP", "IslandESP", false)
-espCard:AddToggle("Tracers/Snaplines", "Tracers", false)
-espCard:AddToggle("Chams", "Chams", false)
+MiscTab:CreateToggle({
+    Name = "Remove Fall Damage",
+    CurrentValue = false,
+    Flag = "NoFall",
+    Callback = function(Value)
+        print("No Fall Damage:", Value)
+    end,
+    HoverText = "Remove dano de queda"
+})
 
--- Interface da Aba SEA
-local seaCard = createCard(contentFrames["SEA"], "Configurações de Viagem", 1)
-seaCard:AddToggle("Auto Next Sea", "AutoNextSea", false)
-seaCard:AddToggle("Auto Sail/Auto Boat", "AutoSail", false)
-seaCard:AddToggle("Fast Boat Speed", "FastBoat", false)
-seaCard:AddSlider("Boat Speed", "BoatSpeed", 50, 500, 150)
-seaCard:AddDropdown("Teleport to Island", "TeleportIsland", {"Marine Starter", "Jungle", "Pirate Village", "Desert", "Frozen Village", "Marine Fortress", "Sky Islands", "Prison", "Colosseum", "Magma Village", "Underwater City", "Fountain City", "Sea of Treats"}, "Marine Starter")
-seaCard:AddButton("Teleport", function()
-    NotificationSystem:Show("Teleport", "Teleportando para " .. Features.TeleportIsland, 2, "🚀")
-end)
+MiscTab:CreateButton({
+    Name = "Destroy GUI",
+    Callback = function()
+        Rayfield:Destroy()
+    end,
+    HoverText = "Fecha completamente a interface"
+})
 
--- Interface da Aba FRUITS
-local fruitsCard = createCard(contentFrames["FRUITS"], "Configurações de Frutas", 1)
-fruitsCard:AddToggle("Auto Fruit Finder/Collect", "AutoFruitFinder", false)
-fruitsCard:AddToggle("Auto Store Fruit", "AutoStoreFruit", false)
-fruitsCard:AddToggle("Auto Eat Fruit", "AutoEatFruit", false)
-fruitsCard:AddToggle("Fruit Notifier", "FruitNotifier", false)
-fruitsCard:AddToggle("Bring Fruits", "BringFruits", false)
-
--- Interface da Aba MISC
-local miscCard = createCard(contentFrames["MISC"], "Configurações Diversas", 1)
-miscCard:AddToggle("Auto Race V4", "AutoRaceV4", false)
-miscCard:AddToggle("Auto Haki", "AutoHaki", false)
-miscCard:AddSlider("WalkSpeed", "WalkSpeed", 16, 250, 16)
-miscCard:AddSlider("JumpPower", "JumpPower", 50, 500, 50)
-miscCard:AddToggle("Fly/Noclip", "Fly", false)
-miscCard:AddToggle("Infinite Stamina", "InfiniteStamina", false)
-miscCard:AddToggle("Remove Fog", "RemoveFog", false)
-miscCard:AddToggle("FPS Booster", "FPSBooster", false)
-miscCard:AddToggle("Anti-AFK", "AntiAFK", false)
-miscCard:AddToggle("Server Hop", "ServerHop", false)
-miscCard:AddDropdown("Spawn Items", "SpawnItem", {"Rocket", "Katana", "Fruit", "Money", "Gem"}, "Rocket")
-miscCard:AddButton("Spawn", function()
-    NotificationSystem:Show("Spawn", "Item spawnado: " .. Features.SpawnItem, 2, "✨")
-end)
-miscCard:AddButton("Teleport to Player", function()
-    NotificationSystem:Show("Teleport", "Teleportando para jogador", 2, "👤")
-end)
-
--- Keybind para abrir/fechar GUI
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Settings.GUIKey then
-        guiMain.Visible = not guiMain.Visible
-        if guiMain.Visible then
-            NotificationSystem:Show("GUI", "Menu aberto - " .. Settings.GUIKey.Name, 1.5, "💜")
-        end
-    end
-end)
-
--- Sistema de salvamento de configurações
-local function SaveSettings()
-    local data = HttpService:JSONEncode(Features)
-    writefile("BloxHub_Config.json", data)
-end
-
-local function LoadSettings()
-    if isfile("BloxHub_Config.json") then
-        local data = readfile("BloxHub_Config.json")
-        local loaded = HttpService:JSONDecode(data)
-        for k, v in pairs(loaded) do
-            if Features[k] ~= nil then
-                Features[k] = v
-            end
-        end
-    end
-end
-
--- Auto-save
-LoadSettings()
-if Settings.AutoSave then
-    task.spawn(function()
-        while true do
-            task.wait(300)
-            SaveSettings()
-        end
-    end)
-end
-
--- Inicialização
-NotificationSystem:Show("Blox Fruits Hub", "Script carregado com sucesso! Pressione " .. Settings.GUIKey.Name .. " para abrir", 3, "🎮")
-guiMain.Visible = true
-task.wait(2)
-guiMain.Visible = false
+Rayfield:Notify({
+    Title = "Examination Hub",
+    Content = "GUI carregada com sucesso! Divirta-se com cuidado.",
+    Duration = 6,
+})
