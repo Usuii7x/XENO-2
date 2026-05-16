@@ -1,9 +1,14 @@
 --[[
-    SCRIPT: Sniper Arena Advanced GUI
-    FUNÇÕES: Aimbot (ativar com botão direito), Munição Infinita, Configuração de teclas
-    INTERFACE: Moderna e bonita com gradiente
+    SCRIPT: Sniper Arena - Rayfield GUI
+    BIBLIOTECA: Rayfield (Interface Moderna)
+    FUNÇÕES: Aimbot (Botão Direito/Tecla Personalizada), Munição Infinita
+    AUTOR: Sniper Arena Script
 ]]
 
+-- Carregar Rayfield (certifique-se de ter a biblioteca instalada)
+local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
+
+-- Variáveis globais
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -13,333 +18,154 @@ local Mouse = LocalPlayer:GetMouse()
 -- Configurações
 local Settings = {
     AimbotEnabled = false,
-    AimbotKey = Enum.UserInputType.MouseButton2, -- Botão direito padrão
-    InfiniteAmmo = true,
+    AimbotKey = "RightClick", -- Padrão: botão direito
     CustomKey = nil,
     UseCustomKey = false,
     FOVRadius = 200,
-    Smoothness = 0.3
+    Smoothness = 0.3,
+    InfiniteAmmo = true,
+    ShowFOV = true,
+    TeamCheck = false,
+    VisibleCheck = true,
+    AimPart = "Head" -- Head, HumanoidRootPart, Torso
 }
 
--- Variáveis
+-- Variáveis de controle
 local currentTarget = nil
+local fovCircle = nil
 local isAiming = false
 
--- Função para criar GUI moderna
-local function CreateModernGUI()
-    -- ScreenGui principal
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "SniperArenaGUI"
-    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screenGui.Parent = game:GetService("CoreGui")
+-- Função para criar círculo de FOV
+local function CreateFOVCircle()
+    if fovCircle then fovCircle:Destroy() end
     
-    -- Frame principal com fundo translúcido e blur
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 350, 0, 500)
-    mainFrame.Position = UDim2.new(0.5, -175, 0.5, -250)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-    mainFrame.BackgroundTransparency = 0.15
-    mainFrame.BorderSizePixel = 0
-    mainFrame.ClipsDescendants = true
-    mainFrame.Parent = screenGui
+    local circle = Drawing.new("Circle")
+    circle.Thickness = 2
+    circle.Radius = Settings.FOVRadius
+    circle.Color = Color3.fromRGB(255, 50, 100)
+    circle.Filled = false
+    circle.Visible = Settings.ShowFOV
+    circle.Transparency = 1
+    circle.NumSides = 64
+    circle.Position = Vector2.new(Mouse.X, Mouse.Y)
     
-    -- Efeito de blur
-    local blurEffect = Instance.new("BlurEffect")
-    blurEffect.Size = 8
-    blurEffect.Parent = mainFrame
-    
-    -- Borda gradiente
-    local gradientBorder = Instance.new("UIGradient")
-    gradientBorder.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 50, 100)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 50, 255))
-    }
-    gradientBorder.Parent = mainFrame
-    
-    -- Título
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, 0, 0, 50)
-    titleLabel.Position = UDim2.new(0, 0, 0, 0)
-    titleLabel.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-    titleLabel.BackgroundTransparency = 0.3
-    titleLabel.Text = "SNIPER ARENA PRO"
-    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    titleLabel.TextSize = 22
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.TextStrokeTransparency = 0.5
-    titleLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    titleLabel.Parent = mainFrame
-    
-    -- Botão fechar
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0, 10)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(255, 70, 70)
-    closeBtn.Text = "X"
-    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    closeBtn.TextSize = 16
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.Parent = mainFrame
-    closeBtn.MouseButton1Click:Connect(function()
-        screenGui:Destroy()
-    end)
-    
-    -- Frame rolável para conteúdo
-    local scrollingFrame = Instance.new("ScrollingFrame")
-    scrollingFrame.Size = UDim2.new(1, 0, 1, -50)
-    scrollingFrame.Position = UDim2.new(0, 0, 0, 50)
-    scrollingFrame.BackgroundTransparency = 1
-    scrollingFrame.ScrollBarThickness = 4
-    scrollingFrame.ScrollBarImageColor3 = Color3.fromRGB(255, 50, 100)
-    scrollingFrame.Parent = mainFrame
-    
-    local uiList = Instance.new("UIListLayout")
-    uiList.Padding = UDim.new(0, 10)
-    uiList.Parent = scrollingFrame
-    
-    local uiPadding = Instance.new("UIPadding")
-    uiPadding.PaddingLeft = UDim.new(0, 15)
-    uiPadding.PaddingRight = UDim.new(0, 15)
-    uiPadding.PaddingTop = UDim.new(0, 10)
-    uiPadding.PaddingBottom = UDim.new(0, 10)
-    uiPadding.Parent = scrollingFrame
-    
-    -- Função para criar toggle moderno
-    local function CreateToggle(title, defaultValue, callback)
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(1, 0, 0, 50)
-        frame.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-        frame.BackgroundTransparency = 0.3
-        frame.BorderSizePixel = 0
-        frame.Parent = scrollingFrame
-        
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(0.7, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.Text = title
-        label.TextColor3 = Color3.fromRGB(220, 220, 220)
-        label.TextSize = 14
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Font = Enum.Font.Gotham
-        label.Parent = frame
-        
-        local toggleBtn = Instance.new("TextButton")
-        toggleBtn.Size = UDim2.new(0, 60, 0, 30)
-        toggleBtn.Position = UDim2.new(1, -70, 0.5, -15)
-        toggleBtn.BackgroundColor3 = defaultValue and Color3.fromRGB(76, 175, 80) or Color3.fromRGB(244, 67, 54)
-        toggleBtn.Text = defaultValue and "ON" or "OFF"
-        toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        toggleBtn.TextSize = 12
-        toggleBtn.Font = Enum.Font.GothamBold
-        toggleBtn.Parent = frame
-        
-        local isOn = defaultValue
-        toggleBtn.MouseButton1Click:Connect(function()
-            isOn = not isOn
-            toggleBtn.BackgroundColor3 = isOn and Color3.fromRGB(76, 175, 80) or Color3.fromRGB(244, 67, 54)
-            toggleBtn.Text = isOn and "ON" or "OFF"
-            callback(isOn)
-        end)
-        
-        return frame
-    end
-    
-    -- Função para criar slider
-    local function CreateSlider(title, min, max, defaultValue, callback)
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(1, 0, 0, 70)
-        frame.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-        frame.BackgroundTransparency = 0.3
-        frame.BorderSizePixel = 0
-        frame.Parent = scrollingFrame
-        
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, 0, 0, 25)
-        label.BackgroundTransparency = 1
-        label.Text = title .. ": " .. defaultValue
-        label.TextColor3 = Color3.fromRGB(220, 220, 220)
-        label.TextSize = 13
-        label.Font = Enum.Font.Gotham
-        label.Parent = frame
-        
-        local sliderFrame = Instance.new("Frame")
-        sliderFrame.Size = UDim2.new(1, 0, 0, 20)
-        sliderFrame.Position = UDim2.new(0, 0, 0, 30)
-        sliderFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-        sliderFrame.BorderSizePixel = 0
-        sliderFrame.Parent = frame
-        
-        local sliderBtn = Instance.new("TextButton")
-        sliderBtn.Size = UDim2.new(0, 20, 1, 0)
-        sliderBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 100)
-        sliderBtn.Text = ""
-        sliderBtn.AutoButtonColor = false
-        sliderBtn.Parent = sliderFrame
-        
-        local value = (defaultValue - min) / (max - min)
-        sliderBtn.Position = UDim2.new(value, -10, 0, 0)
-        
-        local dragging = false
-        sliderBtn.MouseButton1Down:Connect(function()
-            dragging = true
-        end)
-        
-        UserInputService.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = false
-            end
-        end)
-        
-        RunService.RenderStepped:Connect(function()
-            if dragging then
-                local mousePos = UserInputService:GetMouseLocation().X
-                local sliderAbsPos = sliderFrame.AbsolutePosition.X
-                local sliderWidth = sliderFrame.AbsoluteSize.X
-                local newValue = math.clamp((mousePos - sliderAbsPos) / sliderWidth, 0, 1)
-                sliderBtn.Position = UDim2.new(newValue, -10, 0, 0)
-                local actualValue = min + (newValue * (max - min))
-                label.Text = title .. ": " .. math.floor(actualValue)
-                callback(actualValue)
-            end
-        end)
-        
-        return frame
-    end
-    
-    -- Função para criar input de tecla
-    local function CreateKeybind(title, currentKey, callback)
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(1, 0, 0, 50)
-        frame.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-        frame.BackgroundTransparency = 0.3
-        frame.BorderSizePixel = 0
-        frame.Parent = scrollingFrame
-        
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(0.5, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.Text = title
-        label.TextColor3 = Color3.fromRGB(220, 220, 220)
-        label.TextSize = 13
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Font = Enum.Font.Gotham
-        label.Parent = frame
-        
-        local keyBtn = Instance.new("TextButton")
-        keyBtn.Size = UDim2.new(0, 100, 0, 35)
-        keyBtn.Position = UDim2.new(1, -110, 0.5, -17.5)
-        keyBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-        keyBtn.Text = currentKey and tostring(currentKey) or "None"
-        keyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        keyBtn.TextSize = 12
-        keyBtn.Font = Enum.Font.Gotham
-        keyBtn.Parent = frame
-        
-        local listening = false
-        keyBtn.MouseButton1Click:Connect(function()
-            listening = true
-            keyBtn.Text = "Press any key..."
-            keyBtn.BackgroundColor3 = Color3.fromRGB(100, 50, 50)
-            
-            local connection
-            connection = UserInputService.InputBegan:Connect(function(input)
-                if listening then
-                    if input.UserInputType == Enum.UserInputType.Keyboard then
-                        callback(input.KeyCode)
-                        keyBtn.Text = tostring(input.KeyCode)
-                        listening = false
-                        keyBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-                        connection:Disconnect()
-                    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-                        callback(Enum.UserInputType.MouseButton2)
-                        keyBtn.Text = "Right Click"
-                        listening = false
-                        keyBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-                        connection:Disconnect()
-                    end
-                end
-            end)
-        end)
-        
-        return frame
-    end
-    
-    -- Criar componentes da GUI
-    CreateToggle("Munição Infinita", Settings.InfiniteAmmo, function(value)
-        Settings.InfiniteAmmo = value
-    end)
-    
-    CreateToggle("Usar tecla personalizada", false, function(value)
-        Settings.UseCustomKey = value
-        if not value then
-            Settings.AimbotEnabled = false
-        end
-    end)
-    
-    CreateKeybind("Tecla do Aimbot", nil, function(key)
-        Settings.CustomKey = key
-        Settings.UseCustomKey = true
-    end)
-    
-    CreateSlider("Raio de Mira (FOV)", 50, 500, Settings.FOVRadius, function(value)
-        Settings.FOVRadius = value
-    end)
-    
-    CreateSlider("Suavidade da Mira", 0, 1, Settings.Smoothness, function(value)
-        Settings.Smoothness = value
-    end)
-    
-    -- Texto informativo
-    local infoLabel = Instance.new("TextLabel")
-    infoLabel.Size = UDim2.new(1, 0, 0, 40)
-    infoLabel.BackgroundTransparency = 1
-    infoLabel.Text = "▶ Clique com botão direito para mirar\n▶ '[' e ']' para abrir/fechar GUI"
-    infoLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-    infoLabel.TextSize = 11
-    infoLabel.TextWrapped = true
-    infoLabel.Font = Enum.Font.Gotham
-    infoLabel.Parent = scrollingFrame
-    
-    return screenGui
+    return circle
 end
 
--- Função de munição infinita
+-- Atualizar círculo de FOV
+local function UpdateFOVCircle()
+    if fovCircle and Settings.ShowFOV then
+        fovCircle.Position = Vector2.new(Mouse.X, Mouse.Y)
+        fovCircle.Radius = Settings.FOVRadius
+    end
+end
+
+-- Sistema de munição infinita
 local function SetupInfiniteAmmo()
-    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-    if playerGui then
-        local ammoGui = playerGui:FindFirstChild("Ammo")
-        if ammoGui then
-            local ammoText = ammoGui:FindFirstChild("TextLabel")
-            if ammoText then
-                ammoText:GetPropertyChangedSignal("Text"):Connect(function()
-                    if Settings.InfiniteAmmo then
-                        ammoText.Text = "∞"
+    -- Procurar GUI de munição no jogo
+    local function FindAndModifyAmmo()
+        local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+        if playerGui then
+            -- Tentar encontrar diferentes estruturas de munição
+            local possibleAmmoLocations = {
+                playerGui:FindFirstChild("Ammo"),
+                playerGui:FindFirstChild("WeaponGUI"),
+                playerGui:FindFirstChild("HUD"),
+                LocalPlayer.Character:FindFirstChild("Humanoid"),
+                workspace.CurrentCamera:FindFirstChild("AmmoDisplay")
+            }
+            
+            for _, location in pairs(possibleAmmoLocations) do
+                if location then
+                    local ammoText = location:FindFirstChildWhichIsA("TextLabel") or 
+                                   location:FindFirstChildWhichIsA("TextBox") or
+                                   location:FindFirstChild("Text")
+                    
+                    if ammoText then
+                        if Settings.InfiniteAmmo then
+                            ammoText.Text = "∞"
+                            if ammoText:IsA("TextLabel") then
+                                ammoText.TextColor3 = Color3.fromRGB(0, 255, 0)
+                            end
+                        end
+                        
+                        -- Monitorar mudanças
+                        if not ammoText.Changed:IsConnected(ammoConnection) then
+                            local conn
+                            conn = ammoText:GetPropertyChangedSignal("Text"):Connect(function()
+                                if Settings.InfiniteAmmo and ammoText.Text ~= "∞" then
+                                    ammoText.Text = "∞"
+                                end
+                            end)
+                        end
                     end
-                end)
-                if Settings.InfiniteAmmo then
-                    ammoText.Text = "∞"
                 end
             end
         end
     end
+    
+    FindAndModifyAmmo()
+    
+    -- Monitorar mudanças de personagem
+    LocalPlayer.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        FindAndModifyAmmo()
+    end)
 end
 
--- Função para encontrar o melhor alvo
+-- Verificar se o alvo é visível
+local function IsVisible(targetPart)
+    if not Settings.VisibleCheck then return true end
+    
+    local origin = workspace.CurrentCamera.CFrame.Position
+    local direction = (targetPart.Position - origin).Unit
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    
+    local raycastResult = workspace:Raycast(origin, direction * 1000, raycastParams)
+    
+    if raycastResult and raycastResult.Instance:IsDescendantOf(targetPart.Parent) then
+        return true
+    end
+    return false
+end
+
+-- Encontrar o melhor alvo
 local function GetClosestPlayer()
     local closestDistance = Settings.FOVRadius
     local closestPlayer = nil
     local mousePos = UserInputService:GetMouseLocation()
     
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-            local head = player.Character:FindFirstChild("Head")
-            if head then
-                local headPos, onScreen = workspace.CurrentCamera:WorldToScreenPoint(head.Position)
-                if onScreen then
-                    local distance = (Vector2.new(headPos.X, headPos.Y) - mousePos).Magnitude
-                    if distance < closestDistance then
-                        closestDistance = distance
-                        closestPlayer = player
+        -- Verificar se não é o próprio jogador
+        if player ~= LocalPlayer then
+            -- Verificar time se necessário
+            if Settings.TeamCheck and LocalPlayer.Team and player.Team == LocalPlayer.Team then
+                continue
+            end
+            
+            -- Verificar se o personagem existe e está vivo
+            local character = player.Character
+            if character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
+                local aimPart = character:FindFirstChild(Settings.AimPart)
+                if not aimPart then
+                    aimPart = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+                end
+                
+                if aimPart then
+                    local aimPos, onScreen = workspace.CurrentCamera:WorldToScreenPoint(aimPart.Position)
+                    
+                    if onScreen then
+                        -- Verificar visibilidade
+                        if IsVisible(aimPart) then
+                            local distance = (Vector2.new(aimPos.X, aimPos.Y) - mousePos).Magnitude
+                            
+                            if distance < closestDistance then
+                                closestDistance = distance
+                                closestPlayer = player
+                            end
+                        end
                     end
                 end
             end
@@ -357,21 +183,31 @@ local function UpdateAimbot()
     end
     
     local target, distance = GetClosestPlayer()
+    
     if target and distance <= Settings.FOVRadius then
         currentTarget = target
-        if target.Character and target.Character:FindFirstChild("Head") then
-            local headPos = target.Character.Head.Position
-            local camera = workspace.CurrentCamera
+        
+        if target.Character then
+            local aimPart = target.Character:FindFirstChild(Settings.AimPart)
+            if not aimPart then
+                aimPart = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
+            end
             
-            -- Movimento suave
-            local currentCFrame = camera.CFrame
-            local lookAt = CFrame.new(camera.CFrame.Position, headPos)
-            
-            if Settings.Smoothness > 0 then
-                local newCFrame = currentCFrame:Lerp(lookAt, Settings.Smoothness)
-                camera.CFrame = newCFrame
-            else
-                camera.CFrame = lookAt
+            if aimPart then
+                local targetPos = aimPart.Position
+                local camera = workspace.CurrentCamera
+                
+                -- Calcular nova posição da câmera
+                local newCFrame = CFrame.new(camera.CFrame.Position, targetPos)
+                
+                -- Aplicar suavidade
+                if Settings.Smoothness > 0 then
+                    local currentCFrame = camera.CFrame
+                    local lerpAlpha = math.min(1, Settings.Smoothness)
+                    camera.CFrame = currentCFrame:Lerp(newCFrame, lerpAlpha)
+                else
+                    camera.CFrame = newCFrame
+                end
             end
         end
     else
@@ -379,80 +215,317 @@ local function UpdateAimbot()
     end
 end
 
--- Detectar tecla para aimbot
+-- Configurar Rayfield
+local Window = Rayfield:CreateWindow({
+    Name = "Sniper Arena | Advanced GUI",
+    LoadingTitle = "Carregando Sniper Arena Script",
+    LoadingSubtitle = "by Script Developer",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "SniperArena", -- Pasta para salvar configurações
+        FileName = "Settings"
+    },
+    Discord = {
+        Enabled = false,
+        Invite = "noinvite", -- Coloque o invite do seu Discord aqui se quiser
+        RememberJoins = true
+    },
+    KeySystem = false, -- Desative se não quiser sistema de chave
+    KeySettings = {
+        Title = "Sniper Arena",
+        Subtitle = "Sistema de Chave",
+        Note = "Entre no Discord para pegar a chave",
+        FileName = "Key",
+        SaveKey = true,
+        GrabKeyFromSite = false,
+        Key = {"Hello"} -- Mude para sua chave se ativar o sistema
+    }
+})
+
+-- Criar Tabs
+local MainTab = Window:CreateTab("Principal", 4483362458) -- Ícone de mira
+local SettingsTab = Window:CreateTab("Configurações", 4483362458)
+local VisualsTab = Window:CreateTab("Visuais", 4483362458)
+local CreditsTab = Window:CreateTab("Créditos", 4483362458)
+
+-- Seção: Aimbot Principal
+local AimbotSection = MainTab:CreateSection("Aimbot")
+
+-- Toggle para ativar/desativar aimbot
+MainTab:CreateToggle({
+    Name = "Aimbot (Botão Direito)",
+    CurrentValue = false,
+    Flag = "AimbotToggle",
+    Callback = function(Value)
+        Settings.AimbotEnabled = Value
+        if not Value then
+            currentTarget = nil
+        end
+    end,
+})
+
+-- Dropdown para parte do corpo
+MainTab:CreateDropdown({
+    Name = "Parte do Corpo para Mirar",
+    Options = {"Head", "HumanoidRootPart", "Torso"},
+    CurrentOption = "Head",
+    Flag = "AimPart",
+    Callback = function(Option)
+        Settings.AimPart = Option
+    end,
+})
+
+-- Slider para raio do FOV
+MainTab:CreateSlider({
+    Name = "Raio do FOV",
+    Range = {50, 500},
+    Increment = 5,
+    Suffix = "px",
+    CurrentValue = 200,
+    Flag = "FOVRadius",
+    Callback = function(Value)
+        Settings.FOVRadius = Value
+        if fovCircle then
+            fovCircle.Radius = Value
+        end
+    end,
+})
+
+-- Slider para suavidade
+MainTab:CreateSlider({
+    Name = "Suavidade da Mira",
+    Range = {0, 1},
+    Increment = 0.05,
+    Suffix = "",
+    CurrentValue = 0.3,
+    Flag = "Smoothness",
+    Callback = function(Value)
+        Settings.Smoothness = Value
+    end,
+})
+
+-- Seção: Configurações de Mira
+local AimSettingsSection = SettingsTab:CreateSection("Configurações de Mira")
+
+-- Toggle para verificação de time
+SettingsTab:CreateToggle({
+    Name = "Verificar Time (Não mira em aliados)",
+    CurrentValue = false,
+    Flag = "TeamCheck",
+    Callback = function(Value)
+        Settings.TeamCheck = Value
+    end,
+})
+
+-- Toggle para verificação de visibilidade
+SettingsTab:CreateToggle({
+    Name = "Verificar Visibilidade (Só mira se visível)",
+    CurrentValue = true,
+    Flag = "VisibleCheck",
+    Callback = function(Value)
+        Settings.VisibleCheck = Value
+    end,
+})
+
+-- Seção: Configuração de Teclas
+local KeybindSection = SettingsTab:CreateSection("Configuração de Teclas")
+
+-- Dropdown para tecla do aimbot
+SettingsTab:CreateDropdown({
+    Name = "Tecla para Ativar Aimbot",
+    Options = {"Botão Direito", "Botão Esquerdo", "Botão do Meio", "Q", "E", "R", "F", "C", "X", "Z", "ALT", "CTRL", "SHIFT"},
+    CurrentOption = "Botão Direito",
+    Flag = "AimbotKeySelect",
+    Callback = function(Option)
+        Settings.AimbotKey = Option
+        Settings.UseCustomKey = Option ~= "Botão Direito"
+    end,
+})
+
+-- Seção: Munição
+local AmmoSection = SettingsTab:CreateSection("Munição")
+
+-- Toggle para munição infinita
+SettingsTab:CreateToggle({
+    Name = "Munição Infinita",
+    CurrentValue = true,
+    Flag = "InfiniteAmmo",
+    Callback = function(Value)
+        Settings.InfiniteAmmo = Value
+        SetupInfiniteAmmo()
+    end,
+})
+
+-- Seção: Visuais
+local FOVSection = VisualsTab:CreateSection("Círculo de Mira (FOV)")
+
+-- Toggle para mostrar círculo de FOV
+VisualsTab:CreateToggle({
+    Name = "Mostrar Círculo de Mira (FOV)",
+    CurrentValue = true,
+    Flag = "ShowFOV",
+    Callback = function(Value)
+        Settings.ShowFOV = Value
+        if fovCircle then
+            fovCircle.Visible = Value
+        end
+        if Value and not fovCircle then
+            fovCircle = CreateFOVCircle()
+        end
+    end,
+})
+
+-- Seletor de cor do círculo
+VisualsTab:CreateColorPicker({
+    Name = "Cor do Círculo",
+    Color = Color3.fromRGB(255, 50, 100),
+    Flag = "FOVColor",
+    Callback = function(Color)
+        if fovCircle then
+            fovCircle.Color = Color
+        end
+    end,
+})
+
+-- Slider para transparência
+VisualsTab:CreateSlider({
+    Name = "Transparência do Círculo",
+    Range = {0, 1},
+    Increment = 0.1,
+    Suffix = "",
+    CurrentValue = 1,
+    Flag = "FOVTransparency",
+    Callback = function(Value)
+        if fovCircle then
+            fovCircle.Transparency = Value
+        end
+    end,
+})
+
+-- Seção: Créditos
+CreditsTab:CreateParagraph({
+    Title = "Sniper Arena Advanced GUI",
+    Content = "Versão: 2.0.0\n\nDesenvolvido por: Script Community\n\nCaracterísticas:\n✓ Aimbot avançado\n✓ Munição infinita\n✓ Interface moderna (Rayfield)\n✓ Configurações personalizáveis\n✓ Sistema de salvamento\n\nUse com responsabilidade!"
+})
+
+-- Botão de informação
+CreditsTab:CreateButton({
+    Name = "Como Usar",
+    Callback = function()
+        Rayfield:Notify({
+            Title = "Instruções de Uso",
+            Content = "1. Ative o aimbot no menu\n2. Segure o botão direito (ou tecla configurada)\n3. Mire automaticamente nos inimigos\n4. Configure FOV e suavidade\n5. Munição infinita ativa automaticamente",
+            Duration = 5,
+        })
+    end,
+})
+
+-- Sistema de teclas
+local function GetKeyCode(keyName)
+    local keyMap = {
+        ["Botão Direito"] = Enum.UserInputType.MouseButton2,
+        ["Botão Esquerdo"] = Enum.UserInputType.MouseButton1,
+        ["Botão do Meio"] = Enum.UserInputType.MouseButton3,
+        ["Q"] = Enum.KeyCode.Q,
+        ["E"] = Enum.KeyCode.E,
+        ["R"] = Enum.KeyCode.R,
+        ["F"] = Enum.KeyCode.F,
+        ["C"] = Enum.KeyCode.C,
+        ["X"] = Enum.KeyCode.X,
+        ["Z"] = Enum.KeyCode.Z,
+        ["ALT"] = Enum.KeyCode.LeftAlt,
+        ["CTRL"] = Enum.KeyCode.LeftControl,
+        ["SHIFT"] = Enum.KeyCode.LeftShift,
+    }
+    return keyMap[keyName] or Enum.UserInputType.MouseButton2
+end
+
+-- Detectar entrada do usuário
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     
-    -- Abrir/fechar GUI com '[' e ']'
-    if input.KeyCode == Enum.KeyCode.LeftBracket then
-        local gui = game:GetService("CoreGui"):FindFirstChild("SniperArenaGUI")
-        if gui then
-            gui.Visible = not gui.Visible
-        end
+    local aimbotKey = GetKeyCode(Settings.AimbotKey)
+    
+    -- Verificar se a tecla pressionada é a configurada
+    local isAimKey = false
+    
+    if Settings.AimbotKey:find("Botão") then
+        isAimKey = input.UserInputType == aimbotKey
+    else
+        isAimKey = input.KeyCode == aimbotKey
     end
     
-    -- Ativar aimbot
-    local shouldActivate = false
-    
-    if Settings.UseCustomKey and Settings.CustomKey then
-        if input.KeyCode == Settings.CustomKey then
-            shouldActivate = true
+    if isAimKey then
+        if Window.Flags.AimbotToggle then
+            Settings.AimbotEnabled = true
+            isAiming = true
         end
-    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-        shouldActivate = true
-    end
-    
-    if shouldActivate then
-        Settings.AimbotEnabled = true
-        isAiming = true
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if (Settings.UseCustomKey and input.KeyCode == Settings.CustomKey) or 
-       (not Settings.UseCustomKey and input.UserInputType == Enum.UserInputType.MouseButton2) then
+    local aimbotKey = GetKeyCode(Settings.AimbotKey)
+    
+    local isAimKey = false
+    
+    if Settings.AimbotKey:find("Botão") then
+        isAimKey = input.UserInputType == aimbotKey
+    else
+        isAimKey = input.KeyCode == aimbotKey
+    end
+    
+    if isAimKey then
         Settings.AimbotEnabled = false
         isAiming = false
         currentTarget = nil
     end
 end)
 
--- Atualizar aimbot constantemente
+-- Criar círculo de FOV
+fovCircle = CreateFOVCircle()
+
+-- Atualizar posição do mouse
 RunService.RenderStepped:Connect(function()
+    UpdateFOVCircle()
     if Settings.AimbotEnabled then
         UpdateAimbot()
     end
 end)
 
--- Configurar munição infinita
-local ammoConnection = game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(1)
-    SetupInfiniteAmmo()
-end)
+-- Inicializar munição infinita
+SetupInfiniteAmmo()
 
-if LocalPlayer.Character then
-    SetupInfiniteAmmo()
-end
-
--- Criar GUI
-CreateModernGUI()
-
--- Mensagem de ativação
-game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "Sniper Arena Pro",
-    Text = "GUI carregada com sucesso! Pressione '[' para abrir.",
-    Duration = 3
+-- Notificação de inicialização
+Rayfield:Notify({
+    Title = "Sniper Arena Script",
+    Content = "Script carregado com sucesso!\nPressione Insert para abrir o menu.",
+    Duration = 3,
 })
 
--- Anti-kick simples
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local args = {...}
-    local method = getnamecallmethod()
-    if method == "Kick" or method == "Remove" then
-        return nil
+-- Sistema de salvamento automático
+local function SaveSettings()
+    -- Salvar configurações automaticamente (Rayfield já faz isso)
+    print("Configurações salvas")
+end
+
+-- Limpeza ao sair
+game:GetService("Players").LocalPlayer.OnTeleport:Connect(function()
+    if fovCircle then
+        fovCircle:Destroy()
     end
-    return oldNamecall(self, ...)
 end)
 
-print("Sniper Arena Advanced GUI - Carregado com sucesso!")
+-- Loop de verificação de integridade
+task.spawn(function()
+    while task.wait(5) do
+        if Settings.InfiniteAmmo then
+            SetupInfiniteAmmo()
+        end
+        if Settings.ShowFOV and (not fovCircle or not fovCircle.Visible) then
+            if fovCircle then fovCircle:Destroy() end
+            fovCircle = CreateFOVCircle()
+        end
+    end
+end)
+
+print("Sniper Arena Script - Carregado com sucesso usando Rayfield!")
