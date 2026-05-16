@@ -1,406 +1,555 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+--[[
+    KEYLESS RAYFIELD SCRIPT - COMPLETO
+    Para uso no Roblox Examination
+]]
 
-local Window = Rayfield:CreateWindow({
-    Name = "Examination | GUI Avançada",
-    LoadingTitle = "Carregando Examination Hub",
-    LoadingSubtitle = "by Grok (Full Functional)",
-    ConfigurationSaving = { Enabled = true, FolderName = "ExaminationHub", FileName = "ExaminationConfig" },
-    Discord = { Enabled = false },
-    KeySystem = false,
-})
-
-local MainTab = Window:CreateTab("Principal", 4483362458)
-local CombatTab = Window:CreateTab("Combate", 4483362458)
-local VisualTab = Window:CreateTab("Visual", 4483362458)
-local MovementTab = Window:CreateTab("Movimento", 4483362458)
-local GameTab = Window:CreateTab("Gameplay", 4483362458)
-local MiscTab = Window:CreateTab("Misc", 4483362458)
-
--- ==================== VARIÁVEIS GLOBAIS ====================
-local player = game.Players.LocalPlayer
-local mouse = player:GetMouse()
-local cam = workspace.CurrentCamera
-local running = true
-
--- Controle de loops
-local espActive = false
-local aimbotActive = false
-local silentAimActive = false
-local infiniteJumpActive = false
-local flyActive = false
-local godModeActive = false
-local noRecoilActive = false
-local infAmmoActive = false
-local noFallActive = false
-local antiInfectedActive = false
-
--- ==================== NOTIFICAÇÃO INICIAL ====================
-Rayfield:Notify({ Title = "Examination Hub", Content = "GUI totalmente funcional carregada!", Duration = 5 })
-
--- ==================== MAIN ====================
-MainTab:CreateSection("Bem-vindo ao Examination Hub")
-MainTab:CreateButton({
-    Name = "Notificação de Teste",
-    Callback = function()
-        Rayfield:Notify({ Title = "Examination", Content = "GUI funcionando!", Duration = 5 })
-    end
-})
-
--- ==================== COMBATE ====================
-CombatTab:CreateSection("Combate")
-
--- Silent Aim (mira magnética sem mover tela)
-CombatTab:CreateToggle({
-    Name = "Silent Aim",
-    CurrentValue = false,
-    Flag = "SilentAim",
-    Callback = function(Value)
-        silentAimActive = Value
-        if Value then
-            game:GetService("RunService").RenderStepped:Connect(function()
-                if not silentAimActive then return end
-                local target = getClosestEnemy()
-                if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                    local hrp = target.Character.HumanoidRootPart
-                    local direction = (hrp.Position - cam.CFrame.p).unit
-                    local newCF = CFrame.new(cam.CFrame.p, cam.CFrame.p + direction)
-                    cam.CFrame = newCF
-                end
-            end)
-        end
-    end
-})
-
--- Aimbot (lock na cabeça)
-CombatTab:CreateToggle({
-    Name = "Aimbot (Aimlock)",
-    CurrentValue = false,
-    Flag = "Aimbot",
-    Callback = function(Value)
-        aimbotActive = Value
-        if Value then
-            local target = getClosestEnemy()
-            if target and target.Character and target.Character:FindFirstChild("Head") then
-                local head = target.Character.Head
-                game:GetService("RunService").RenderStepped:Connect(function()
-                    if not aimbotActive then return end
-                    cam.CFrame = CFrame.new(cam.CFrame.p, head.Position)
-                end)
-            end
-        end
-    end
-})
-
--- Função auxiliar para pegar inimigo mais próximo
-function getClosestEnemy()
-    local closest = nil
-    local shortestDist = math.huge
-    for _, v in pairs(game:GetService("Players"):GetPlayers()) do
-        if v ~= player and v.Character and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
-            local dist = (v.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).magnitude
-            if dist < shortestDist then
-                shortestDist = dist
-                closest = v
-            end
-        end
-    end
-    return closest
+-- Verificar se o Rayfield está carregado
+if not game:GetService("CoreGui"):FindFirstChild("Rayfield") then
+    -- Carregar Rayfield automaticamente
+    local RayfieldLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source"))()
+    window = RayfieldLib:CreateWindow({
+        Name = "Examination Script",
+        LoadingTitle = "Carregando Script...",
+        LoadingSubtitle = "By Script Hub",
+        ConfigurationSaving = {
+            Enabled = true,
+            FolderName = "ExaminationScript",
+            FileName = "Settings"
+        },
+        Discord = {
+            Enabled = false,
+            Invite = "noinvite",
+            RememberJoins = true
+        },
+        KeySystem = false
+    })
+else
+    window = RayfieldLib:CreateWindow({
+        Name = "Examination Script",
+        LoadingTitle = "Carregando Script...",
+        LoadingSubtitle = "By Script Hub",
+        ConfigurationSaving = {
+            Enabled = true,
+            FolderName = "ExaminationScript",
+            FileName = "Settings"
+        },
+        KeySystem = false
+    })
 end
 
--- Aimbot Smoothness (placeholder de exemplo)
-CombatTab:CreateSlider({
-    Name = "Aimbot Smoothness",
-    Range = {0, 100}, Increment = 1, CurrentValue = 50, Flag = "AimbotSmooth",
-    Callback = function(Value)
-        print("Smoothness ajustado para", Value)
-    end
-})
+-- Criar Tabs
+local MainTab = window:CreateTab("Principal", 4483362458)
+local CombatTab = window:CreateTab("Combate", 4483362458)
+local MovementTab = window:CreateTab("Movimento", 4483362458)
+local VisualTab = window:CreateTab("Visuais", 4483362458)
+local MiscTab = window:CreateTab("Extras", 4483362458)
 
--- No Recoil
-CombatTab:CreateToggle({
-    Name = "No Recoil",
-    CurrentValue = false, Flag = "NoRecoil",
-    Callback = function(Value)
-        noRecoilActive = Value
-        if Value then
-            local oldRecoil = game:GetService("Players").LocalPlayer.Character:FindFirstChild("Humanoid").CameraMaxZoomDistance
-            game:GetService("Players").LocalPlayer.Character:FindFirstChild("Humanoid").CameraMaxZoomDistance = 0
-        else
-            game:GetService("Players").LocalPlayer.Character:FindFirstChild("Humanoid").CameraMaxZoomDistance = 50
+-- Variáveis Globais
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+-- Status das funções
+local FullBrightEnabled = false
+local KillAuraEnabled = false
+local AutoCompleteTaskEnabled = false
+local InfiniteBreathEnabled = false
+local InfiniteAmmoEnabled = false
+local SpeedEnabled = false
+local JumpPowerEnabled = false
+local ESPEnabled = false
+local AutoCollectEnabled = false
+local NoClipEnabled = false
+local FlyEnabled = false
+local TeleportEnabled = false
+
+-- Configurações
+local KillAuraRange = 15
+local WalkSpeedValue = 50
+local JumpPowerValue = 100
+local FlySpeed = 50
+local TeleportTarget = nil
+
+-- Função FullBright
+local function SetFullBright(Enabled)
+    if Enabled then
+        game:GetService("Lighting").Brightness = 2
+        game:GetService("Lighting").ClockTime = 12
+        game:GetService("Lighting").FogEnd = 100000
+        game:GetService("Lighting").GlobalShadows = false
+        game:GetService("Lighting").OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+    else
+        game:GetService("Lighting").Brightness = 0.5
+        game:GetService("Lighting").ClockTime = 0
+        game:GetService("Lighting").FogEnd = 100
+        game:GetService("Lighting").GlobalShadows = true
+        game:GetService("Lighting").OutdoorAmbient = Color3.fromRGB(0, 0, 0)
+    end
+end
+
+-- Função KillAura
+local function GetNearestEnemy()
+    local Nearest = nil
+    local ShortestDistance = KillAuraRange
+    
+    for _, Player in pairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer and Player.Character and Player.Character:FindFirstChild("Humanoid") and Player.Character.Humanoid.Health > 0 then
+            local Distance = (LocalPlayer.Character.HumanoidRootPart.Position - Player.Character.HumanoidRootPart.Position).Magnitude
+            if Distance < ShortestDistance then
+                ShortestDistance = Distance
+                Nearest = Player
+            end
         end
     end
-})
+    
+    return Nearest
+end
 
--- Infinite Ammo (simples)
-CombatTab:CreateToggle({
-    Name = "Infinite Ammo",
-    CurrentValue = false, Flag = "InfAmmo",
-    Callback = function(Value)
-        infAmmoActive = Value
-        if Value then
-            game:GetService("Players").LocalPlayer.Character:FindFirstChild("Humanoid"):FindFirstChild("Ammo").Value = 9999
-        end
-    end
-})
-
--- ==================== VISUAL / ESP ====================
-VisualTab:CreateSection("Visual / ESP")
-
--- ESP Inimigos (caixa + nome + distância)
-VisualTab:CreateToggle({
-    Name = "ESP Inimigos",
-    CurrentValue = false, Flag = "ESPEnemies",
-    Callback = function(Value)
-        espActive = Value
-        if Value then
-            spawnESP()
-        else
-            removeESP()
-        end
-    end
-})
-
-function spawnESP()
-    for _, v in pairs(game:GetService("Players"):GetPlayers()) do
-        if v ~= player then
-            local box = Instance.new("BoxHandleAdornment")
-            box.Name = "ESP_BOX"
-            box.Adornee = v.Character
-            box.Size = Vector3.new(3, 5, 3)
-            box.Color3 = Color3.new(1, 0, 0)
-            box.AlwaysOnTop = true
-            box.Parent = v.Character
-            
-            local text = Instance.new("BillboardGui")
-            text.Name = "ESP_TEXT"
-            text.Adornee = v.Character.Head
-            text.Size = UDim2.new(0, 200, 0, 50)
-            text.StudsOffset = Vector3.new(0, 2, 0)
-            local label = Instance.new("TextLabel", text)
-            label.Text = v.Name .. " | " .. math.floor((v.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).magnitude) .. "m"
-            label.TextColor3 = Color3.new(1, 1, 1)
-            label.BackgroundTransparency = 1
-            text.Parent = v.Character.Head
+local function KillAuraAttack()
+    if not KillAuraEnabled then return end
+    
+    local Target = GetNearestEnemy()
+    if Target and Target.Character then
+        local Humanoid = Target.Character:FindFirstChild("Humanoid")
+        if Humanoid and Humanoid.Health > 0 then
+            -- Simular ataque (ajustar conforme o jogo)
+            game:GetService("ReplicatedStorage"):FindFirstChild("AttackEvent"):FireServer(Target.Character)
+            -- Ou usar VirtualInputManager
+            VirtualInputManager:SendMouseButtonEvent(Vector2.new(500, 300), 0, true, Enum.UserInputType.MouseButton1, 0)
+            task.wait(0.1)
+            VirtualInputManager:SendMouseButtonEvent(Vector2.new(500, 300), 0, false, Enum.UserInputType.MouseButton1, 0)
         end
     end
 end
 
-function removeESP()
-    for _, v in pairs(game:GetService("Players"):GetPlayers()) do
-        if v.Character then
-            for _, obj in pairs(v.Character:GetDescendants()) do
-                if obj.Name == "ESP_BOX" or obj.Name == "ESP_TEXT" then
-                    obj:Destroy()
-                end
+-- Função Auto Complete Task
+local function CompleteTasks()
+    if not AutoCompleteTaskEnabled then return end
+    
+    -- Procurar por tasks no jogo (ajustar conforme necessário)
+    for _, Object in pairs(workspace:GetDescendants()) do
+        if Object.Name:find("Task") or Object.Name:find("Mission") or Object.Name:find("Quest") then
+            if Object:FindFirstChild("ProximityPrompt") then
+                fireproximityprompt(Object.ProximityPrompt)
+            elseif Object:IsA("ClickDetector") then
+                Object:Click()
             end
         end
     end
 end
 
--- ESP Itens (exemplo genérico para keycards/geradores)
-VisualTab:CreateToggle({
-    Name = "ESP Itens / Keycards",
-    CurrentValue = false, Flag = "ESPItems",
-    Callback = function(Value)
-        if Value then
-            for _, item in pairs(workspace:GetDescendants()) do
-                if item.Name:lower():find("keycard") or item.Name:lower():find("gerador") then
-                    local highlight = Instance.new("Highlight")
-                    highlight.Name = "ESP_ITEM"
-                    highlight.Adornee = item
-                    highlight.FillColor = Color3.fromRGB(0, 255, 0)
-                    highlight.Parent = item
-                end
+-- Função Infinite Breath
+local function SetInfiniteBreath(Enabled)
+    if Enabled then
+        local Humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+        if Humanoid then
+            Humanoid:SetAttribute("Breath", 100)
+        end
+    end
+end
+
+-- Função Infinite Ammo
+local function SetInfiniteAmmo(Enabled)
+    if Enabled then
+        -- Procurar pelo inventário/arma do jogador
+        local Backpack = LocalPlayer.Backpack
+        local Character = LocalPlayer.Character
+        
+        for _, Item in pairs(Backpack:GetChildren()) do
+            if Item:IsA("Tool") and Item:FindFirstChild("Ammo") then
+                Item.Ammo.Value = math.huge
             end
-        else
-            for _, item in pairs(workspace:GetDescendants()) do
-                if item:FindFirstChild("ESP_ITEM") then
-                    item.ESP_ITEM:Destroy()
-                end
+        end
+        
+        for _, Item in pairs(Character:GetChildren()) do
+            if Item:IsA("Tool") and Item:FindFirstChild("Ammo") then
+                Item.Ammo.Value = math.huge
             end
         end
     end
-})
+end
 
--- Fullbright
-VisualTab:CreateToggle({
-    Name = "Fullbright",
-    CurrentValue = false, Flag = "Fullbright",
-    Callback = function(Value)
-        if Value then
-            game:GetService("Lighting").Brightness = 2
-            game:GetService("Lighting").Ambient = Color3.new(1, 1, 1)
-        else
-            game:GetService("Lighting").Brightness = 0.5
-            game:GetService("Lighting").Ambient = Color3.new(0.5, 0.5, 0.5)
+-- Função ESP
+local function CreateESP(Player)
+    if not Player or Player == LocalPlayer then return end
+    
+    local function CreateBillboard(Char)
+        if not Char or Char:FindFirstChild("Head") then return end
+        
+        local Billboard = Instance.new("BillboardGui")
+        Billboard.Name = "ESP_" .. Player.Name
+        Billboard.Adornee = Char.Head
+        Billboard.Size = UDim2.new(0, 200, 0, 50)
+        Billboard.StudsOffset = Vector3.new(0, 2, 0)
+        Billboard.AlwaysOnTop = true
+        
+        local TextLabel = Instance.new("TextLabel")
+        TextLabel.Size = UDim2.new(1, 0, 1, 0)
+        TextLabel.BackgroundTransparency = 1
+        TextLabel.Text = Player.Name .. " (" .. math.floor((Char.Head.Position - LocalPlayer.Character.Head.Position).Magnitude) .. "m)"
+        TextLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+        TextLabel.TextScaled = true
+        TextLabel.Parent = Billboard
+        
+        Billboard.Parent = Char.Head
+        return Billboard
+    end
+    
+    Player.CharacterAdded:Connect(function(Char)
+        task.wait(0.5)
+        CreateBillboard(Char)
+    end)
+    
+    if Player.Character then
+        CreateBillboard(Player.Character)
+    end
+end
+
+-- Função Auto Collect
+local function AutoCollect()
+    if not AutoCollectEnabled then return end
+    
+    for _, Item in pairs(workspace:GetDescendants()) do
+        if Item:IsA("Model") and (Item.Name:find("Coin") or Item.Name:find("Item") or Item.Name:find("Collect")) then
+            if Item:FindFirstChild("TouchInterest") then
+                LocalPlayer.Character.HumanoidRootPart.CFrame = Item.PrimaryPart.CFrame
+                task.wait(0.1)
+            end
         end
     end
-})
+end
 
--- No Fog
-VisualTab:CreateToggle({
-    Name = "No Fog",
-    CurrentValue = false, Flag = "NoFog",
-    Callback = function(Value)
-        game:GetService("Lighting").FogEnd = Value and 100000 or 500
-    end
-})
-
--- ==================== MOVIMENTO ====================
-MovementTab:CreateSection("Movimento")
-
-MovementTab:CreateSlider({
-    Name = "WalkSpeed",
-    Range = {16, 300}, Increment = 1, CurrentValue = 16, Flag = "WalkSpeed",
-    Callback = function(Value)
-        if player.Character and player.Character:FindFirstChild("Humanoid") then
-            player.Character.Humanoid.WalkSpeed = Value
-        end
-    end
-})
-
-MovementTab:CreateSlider({
-    Name = "JumpPower",
-    Range = {50, 300}, Increment = 1, CurrentValue = 50, Flag = "JumpPower",
-    Callback = function(Value)
-        if player.Character and player.Character:FindFirstChild("Humanoid") then
-            player.Character.Humanoid.JumpPower = Value
-        end
-    end
-})
-
--- Infinite Jump
-MovementTab:CreateToggle({
-    Name = "Infinite Jump",
-    CurrentValue = false, Flag = "InfJump",
-    Callback = function(Value)
-        infiniteJumpActive = Value
-        local char = player.Character
-        if char and char:FindFirstChild("Humanoid") then
-            local hum = char.Humanoid
-            game:GetService("UserInputService").JumpRequest:Connect(function()
-                if infiniteJumpActive then
-                    hum:ChangeState("Jumping")
-                end
-            end)
-        end
-    end
-})
-
--- Fly (modo voo com tecla F)
-MovementTab:CreateToggle({
-    Name = "Fly (Voo)",
-    CurrentValue = false, Flag = "Fly",
-    Callback = function(Value)
-        flyActive = Value
-        if Value then
-            local bodyVelocity = Instance.new("BodyVelocity")
-            bodyVelocity.MaxForce = Vector3.new(1, 1, 1) * 100000
-            player.Character.HumanoidRootPart:FindFirstChild("HumanoidRootPart").Anchored = false
-            bodyVelocity.Parent = player.Character.HumanoidRootPart
-            game:GetService("UserInputService").InputBegan:Connect(function(input)
-                if flyActive then
-                    if input.KeyCode == Enum.KeyCode.F then
-                        bodyVelocity.Velocity = cam.CFrame.lookVector * 100
+-- Função NoClip
+local function SetNoClip(Enabled)
+    if Enabled then
+        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
+        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+        
+        RunService.Stepped:Connect(function()
+            if NoClipEnabled and LocalPlayer.Character then
+                for _, Part in pairs(LocalPlayer.Character:GetDescendants()) do
+                    if Part:IsA("BasePart") then
+                        Part.CanCollide = false
                     end
                 end
+            end
+        end)
+    else
+        for _, Part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if Part:IsA("BasePart") then
+                Part.CanCollide = true
+            end
+        end
+    end
+end
+
+-- Função Fly
+local FlyConnection
+local FlyBodyVelocity
+
+local function SetFly(Enabled)
+    if Enabled then
+        FlyBodyVelocity = Instance.new("BodyVelocity")
+        FlyBodyVelocity.MaxForce = Vector3.new(10000, 10000, 10000)
+        FlyBodyVelocity.P = 10000
+        FlyBodyVelocity.Parent = LocalPlayer.Character.HumanoidRootPart
+        
+        FlyConnection = RunService.RenderStepped:Connect(function()
+            local Camera = workspace.CurrentCamera
+            local MoveDirection = Vector3.new()
+            
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                MoveDirection = MoveDirection + Camera.CFrame.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                MoveDirection = MoveDirection - Camera.CFrame.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                MoveDirection = MoveDirection + Camera.CFrame.RightVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                MoveDirection = MoveDirection - Camera.CFrame.RightVector
+            end
+            
+            FlyBodyVelocity.Velocity = MoveDirection * FlySpeed
+        end)
+    else
+        if FlyConnection then FlyConnection:Disconnect() end
+        if FlyBodyVelocity then FlyBodyVelocity:Destroy() end
+    end
+end
+
+-- Função Teleport
+local function TeleportToPlayer(Player)
+    if Player and Player.Character then
+        LocalPlayer.Character.HumanoidRootPart.CFrame = Player.Character.HumanoidRootPart.CFrame
+    end
+end
+
+-- Criar UI Elements
+MainTab:CreateButton({
+    Name = "Reconectar",
+    Callback = function()
+        game:GetService("TeleportService"):Teleport(game.PlaceId)
+    end
+})
+
+MainTab:CreateSlider({
+    Name = "WalkSpeed",
+    Range = {16, 250},
+    Increment = 1,
+    Suffix = "Speed",
+    CurrentValue = 16,
+    Flag = "WalkSpeed",
+    Callback = function(Value)
+        WalkSpeedValue = Value
+        if SpeedEnabled then
+            LocalPlayer.Character.Humanoid.WalkSpeed = Value
+        end
+    end
+})
+
+MainTab:CreateSlider({
+    Name = "JumpPower",
+    Range = {50, 500},
+    Increment = 5,
+    Suffix = "Power",
+    CurrentValue = 50,
+    Flag = "JumpPower",
+    Callback = function(Value)
+        JumpPowerValue = Value
+        if JumpPowerEnabled then
+            LocalPlayer.Character.Humanoid.JumpPower = Value
+        end
+    end
+})
+
+-- Combat Tab
+CombatTab:CreateToggle({
+    Name = "Kill Aura",
+    CurrentValue = false,
+    Flag = "KillAura",
+    Callback = function(Value)
+        KillAuraEnabled = Value
+        while KillAuraEnabled do
+            KillAuraAttack()
+            task.wait(0.1)
+        end
+    end
+})
+
+CombatTab:CreateSlider({
+    Name = "Kill Aura Range",
+    Range = {5, 50},
+    Increment = 1,
+    Suffix = "Studs",
+    CurrentValue = 15,
+    Flag = "KillAuraRange",
+    Callback = function(Value)
+        KillAuraRange = Value
+    end
+})
+
+-- Movement Tab
+MovementTab:CreateToggle({
+    Name = "Speed Hack",
+    CurrentValue = false,
+    Flag = "SpeedHack",
+    Callback = function(Value)
+        SpeedEnabled = Value
+        if Value then
+            LocalPlayer.Character.Humanoid.WalkSpeed = WalkSpeedValue
+        else
+            LocalPlayer.Character.Humanoid.WalkSpeed = 16
+        end
+    end
+})
+
+MovementTab:CreateToggle({
+    Name = "Jump Power Hack",
+    CurrentValue = false,
+    Flag = "JumpPowerHack",
+    Callback = function(Value)
+        JumpPowerEnabled = Value
+        if Value then
+            LocalPlayer.Character.Humanoid.JumpPower = JumpPowerValue
+        else
+            LocalPlayer.Character.Humanoid.JumpPower = 50
+        end
+    end
+})
+
+MovementTab:CreateToggle({
+    Name = "No Clip",
+    CurrentValue = false,
+    Flag = "NoClip",
+    Callback = function(Value)
+        NoClipEnabled = Value
+        SetNoClip(Value)
+    end
+})
+
+MovementTab:CreateToggle({
+    Name = "Fly",
+    CurrentValue = false,
+    Flag = "Fly",
+    Callback = function(Value)
+        FlyEnabled = Value
+        SetFly(Value)
+    end
+})
+
+MovementTab:CreateSlider({
+    Name = "Fly Speed",
+    Range = {10, 200},
+    Increment = 5,
+    Suffix = "Speed",
+    CurrentValue = 50,
+    Flag = "FlySpeed",
+    Callback = function(Value)
+        FlySpeed = Value
+    end
+})
+
+-- Visual Tab
+VisualTab:CreateToggle({
+    Name = "FullBright",
+    CurrentValue = false,
+    Flag = "FullBright",
+    Callback = function(Value)
+        FullBrightEnabled = Value
+        SetFullBright(Value)
+    end
+})
+
+VisualTab:CreateToggle({
+    Name = "ESP Players",
+    CurrentValue = false,
+    Flag = "ESP",
+    Callback = function(Value)
+        ESPEnabled = Value
+        if Value then
+            for _, Player in pairs(Players:GetPlayers()) do
+                CreateESP(Player)
+            end
+            
+            Players.PlayerAdded:Connect(function(Player)
+                if ESPEnabled then
+                    CreateESP(Player)
+                end
             end)
         end
     end
 })
 
--- ==================== GAMEPLAY ====================
-GameTab:CreateSection("Gameplay & Objetivos")
-
-GameTab:CreateButton({
-    Name = "Auto Complete Objectives (Geradores + Valve)",
-    Callback = function()
-        for _, obj in pairs(workspace:GetDescendants()) do
-            if obj.Name:lower():find("gerador") or obj.Name:lower():find("valve") then
-                fireclickdetector(obj:FindFirstChild("ClickDetector"))
-            end
-        end
-    end
-})
-
-GameTab:CreateButton({
-    Name = "Unlock All Badges / Classes",
-    Callback = function()
-        for _, badge in pairs(game:GetService("ReplicatedStorage"):GetDescendants()) do
-            if badge:IsA("RemoteEvent") and badge.Name:lower():find("badge") then
-                badge:FireServer()
-            end
-        end
-    end
-})
-
--- God Mode (invencível)
-GameTab:CreateToggle({
-    Name = "God Mode (Invencível)",
-    CurrentValue = false, Flag = "GodMode",
-    Callback = function(Value)
-        godModeActive = Value
-        if Value then
-            player.Character.Humanoid:FindFirstChild("Humanoid").BreakJointsOnDeath = false
-            player.Character.Humanoid:FindFirstChild("Humanoid").MaxHealth = math.huge
-        else
-            player.Character.Humanoid:FindFirstChild("Humanoid").MaxHealth = 100
-        end
-    end
-})
-
--- Anti-Infected (exemplo genérico)
-GameTab:CreateToggle({
-    Name = "Anti-Infected",
-    CurrentValue = false, Flag = "AntiInfected",
-    Callback = function(Value)
-        antiInfectedActive = Value
-        if Value then
-            player.Character:FindFirstChild("Infection").Value = 0
-        end
-    end
-})
-
--- ==================== MISC ====================
-MiscTab:CreateSection("Miscelâneas")
-
-MiscTab:CreateButton({
-    Name = "Teleport to Sector 2",
-    Callback = function()
-        local sector2 = workspace:FindFirstChild("Sector2")
-        if sector2 then
-            player.Character.HumanoidRootPart.CFrame = sector2.CFrame
-        end
-    end
-})
-
-MiscTab:CreateButton({
-    Name = "Server Hop",
-    Callback = function()
-        local servers = game:GetService("TeleportService"):GetServerInstance()
-        game:GetService("TeleportService"):Teleport(game.PlaceId, servers)
-    end
-})
-
--- Remove Fall Damage
+-- Misc Tab
 MiscTab:CreateToggle({
-    Name = "Remove Fall Damage",
-    CurrentValue = false, Flag = "NoFall",
+    Name = "Auto Complete Tasks",
+    CurrentValue = false,
+    Flag = "AutoComplete",
     Callback = function(Value)
-        noFallActive = Value
-        if Value then
-            player.Character.Humanroid:FindFirstChild("Humanoid").UseJumpPower = true
-            player.Character.Humanoid:FindFirstChild("Humanoid").JumpPower = 0
-        else
-            player.Character.Humanoid:FindFirstChild("Humanoid").JumpPower = 50
+        AutoCompleteTaskEnabled = Value
+        while AutoCompleteTaskEnabled do
+            CompleteTasks()
+            task.wait(1)
         end
     end
 })
 
--- Destroy GUI
-MiscTab:CreateButton({
-    Name = "Destroy GUI",
-    Callback = function()
-        Rayfield:Destroy()
+MiscTab:CreateToggle({
+    Name = "Infinite Breath",
+    CurrentValue = false,
+    Flag = "InfiniteBreath",
+    Callback = function(Value)
+        InfiniteBreathEnabled = Value
+        while InfiniteBreathEnabled do
+            SetInfiniteBreath(Value)
+            task.wait(0.5)
+        end
     end
 })
+
+MiscTab:CreateToggle({
+    Name = "Infinite Ammo",
+    CurrentValue = false,
+    Flag = "InfiniteAmmo",
+    Callback = function(Value)
+        InfiniteAmmoEnabled = Value
+        while InfiniteAmmoEnabled do
+            SetInfiniteAmmo(Value)
+            task.wait(0.5)
+        end
+    end
+})
+
+MiscTab:CreateToggle({
+    Name = "Auto Collect Items",
+    CurrentValue = false,
+    Flag = "AutoCollect",
+    Callback = function(Value)
+        AutoCollectEnabled = Value
+        while AutoCollectEnabled do
+            AutoCollect()
+            task.wait(0.5)
+        end
+    end
+})
+
+-- Dropdown para Teleport
+local PlayersList = {}
+local function UpdatePlayerList()
+    PlayersList = {}
+    for _, Player in pairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer then
+            table.insert(PlayersList, Player.Name)
+        end
+    end
+end
+
+MiscTab:CreateDropdown({
+    Name = "Teleport to Player",
+    Options = {},
+    CurrentOption = "",
+    Flag = "TeleportDropdown",
+    Callback = function(Option)
+        if Option ~= "" then
+            for _, Player in pairs(Players:GetPlayers()) do
+                if Player.Name == Option then
+                    TeleportToPlayer(Player)
+                end
+            end
+        end
+    end
+})
+
+-- Atualizar lista de players
+Players.PlayerAdded:Connect(function()
+    task.wait(1)
+    UpdatePlayerList()
+    local Dropdown = RayfieldLib:Get("TeleportDropdown")
+    if Dropdown then
+        Dropdown:SetOptions(PlayersList)
+    end
+end)
+
+Players.PlayerRemoving:Connect(function()
+    task.wait(1)
+    UpdatePlayerList()
+    local Dropdown = RayfieldLib:Get("TeleportDropdown")
+    if Dropdown then
+        Dropdown:SetOptions(PlayersList)
+    end
+end)
+
+-- Inicializar
+UpdatePlayerList()
+local Dropdown = RayfieldLib:Get("TeleportDropdown")
+if Dropdown then
+    Dropdown:SetOptions(PlayersList)
+end
+
+print("Script carregado com sucesso!")
