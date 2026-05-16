@@ -1,41 +1,27 @@
---[[
-    KEYLESS RAYFIELD SCRIPT - COMPLETO
-    Para uso no Roblox Examination
-]]
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 
--- Verificar se o Rayfield está carregado
-if not game:GetService("CoreGui"):FindFirstChild("Rayfield") then
-    -- Carregar Rayfield automaticamente
-    local RayfieldLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source"))()
-    window = RayfieldLib:CreateWindow({
-        Name = "Examination Script",
-        LoadingTitle = "Carregando Script...",
-        LoadingSubtitle = "By Script Hub",
-        ConfigurationSaving = {
-            Enabled = true,
-            FolderName = "ExaminationScript",
-            FileName = "Settings"
-        },
-        Discord = {
-            Enabled = false,
-            Invite = "noinvite",
-            RememberJoins = true
-        },
-        KeySystem = false
-    })
-else
-    window = RayfieldLib:CreateWindow({
-        Name = "Examination Script",
-        LoadingTitle = "Carregando Script...",
-        LoadingSubtitle = "By Script Hub",
-        ConfigurationSaving = {
-            Enabled = true,
-            FolderName = "ExaminationScript",
-            FileName = "Settings"
-        },
-        KeySystem = false
-    })
-end
+-- Load Rayfield UI Library
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- UI Window Configuration
+local Window = Rayfield:CreateWindow({
+    Name = "XENO HUB | POLY-Z",
+    Icon = 71338090068856,
+    LoadingTitle = "Carregnando...",
+    LoadingSubtitle = "Autor: @alyssonzkn",
+    Theme = "BlackWhite",
+    ToggleUIKeybind = Enum.KeyCode.K,
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "ZombieHub",
+        FileName = "Config"
+    }
+})
 
 -- Criar Tabs
 local MainTab = window:CreateTab("Principal", 4483362458)
