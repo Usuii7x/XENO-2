@@ -1,18 +1,26 @@
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+
+-- Load Rayfield UI Library
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
+-- UI Window Configuration
 local Window = Rayfield:CreateWindow({
-    Name = "Sniper Arena - Alysson Hub",
-    LoadingTitle = "Carregando script...",
-    LoadingSubtitle = "by Grok",
+    Name = "XENO HUB | POLY-Z",
+    Icon = 71338090068856,
+    LoadingTitle = "Carregnando...",
+    LoadingSubtitle = "Autor: @alyssonzkn",
+    Theme = "BlackWhite",
+    ToggleUIKeybind = Enum.KeyCode.K,
     ConfigurationSaving = {
         Enabled = true,
-        FolderName = "SniperArenaHub",
-        FileName = "AlyssonConfig"
-    },
-    Discord = {
-        Enabled = false,
-    },
-    KeySystem = false
+        FolderName = "ZombieHub",
+        FileName = "Config"
+    }
 })
 
 local MainTab = Window:CreateTab("Principal", 4483362458)
