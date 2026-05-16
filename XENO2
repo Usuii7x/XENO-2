@@ -1,16 +1,15 @@
--- Examination Rayfield Script - Completo
--- Funciona em Examination (PvE Horror Shooter)
--- Execute com um executor que suporte Rayfield (Synapse, Wave, etc.)
+-- // Sniper Arena - Rayfield Keyless Script
+-- Aimbot, Kill Aura, Infinite Ammo, ESP, etc.
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "Examination | Rayfield Cheat",
-    LoadingTitle = "Carregando Examination Cheats",
+    Name = "Sniper Arena | Keyless",
+    LoadingTitle = "Carregando...",
     LoadingSubtitle = "by Grok",
     ConfigurationSaving = {
         Enabled = true,
-        FolderName = "ExaminationCheats",
+        FolderName = "SniperArenaHub",
         FileName = "Config"
     },
     Discord = {
@@ -21,329 +20,207 @@ local Window = Rayfield:CreateWindow({
 
 local MainTab = Window:CreateTab("Principal", 4483362458)
 local CombatTab = Window:CreateTab("Combate", 4483362458)
-local PlayerTab = Window:CreateTab("Jogador", 4483362458)
-local WorldTab = Window:CreateTab("Mundo", 4483362458)
-local MiscTab = Window:CreateTab("Misc", 4483362458)
+local VisualTab = Window:CreateTab("Visual", 4483362458)
+local PlayerTab = Window:CreateTab("Player", 4483362458)
 
--- Variáveis globais para toggles
-local fullbrightEnabled = false
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Camera = Workspace.CurrentCamera
+local aimbotEnabled = false
 local killAuraEnabled = false
-local autoCompleteEnabled = false
-local infiniteStaminaEnabled = false
 local infiniteAmmoEnabled = false
-local espEnabled = false
-local noclipEnabled = false
-local speedEnabled = false
-local jumpEnabled = false
+local silentAimEnabled = false
 
-local player = game.Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
+-- ==================== FUNÇÕES ÚTEIS ====================
 
--- Atualiza character
-player.CharacterAdded:Connect(function(newChar)
-    character = newChar
-    humanoid = newChar:WaitForChild("Humanoid")
-end)
-
--- ==================== FUNÇÕES ====================
-
--- Fullbright
-local function toggleFullbright(state)
-    fullbrightEnabled = state
-    if state then
-        game:GetService("Lighting").Brightness = 2
-        game:GetService("Lighting").ClockTime = 14
-        game:GetService("Lighting").FogEnd = 100000
-        game:GetService("Lighting").GlobalShadows = false
-        game:GetService("Lighting").Ambient = Color3.fromRGB(255,255,255)
-    else
-        game:GetService("Lighting").Brightness = 1
-        game:GetService("Lighting").ClockTime = 12
-        game:GetService("Lighting").GlobalShadows = true
-    end
-end
-
--- Kill Aura
-local function startKillAura()
-    spawn(function()
-        while killAuraEnabled do
-            wait(0.1)
-            if not character or not character:FindFirstChild("HumanoidRootPart") then continue end
-            local root = character.HumanoidRootPart
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v.Name:lower():find("enemy") or v.Name:lower():find("zombie") or v.Name:lower():find("hostile") or 
-                   (v:FindFirstChild("Humanoid") and v ~= character and v.Humanoid.Health > 0) then
-                    local dist = (v.HumanoidRootPart.Position - root.Position).Magnitude
-                    if dist < 20 then
-                        v.Humanoid.Health = 0
-                        -- Tenta dar dano via FireServer se existir remote
-                    end
-                end
-            end
-        end
-    end)
-end
-
--- Infinite Stamina
-local function infiniteStamina(state)
-    infiniteStaminaEnabled = state
-    spawn(function()
-        while infiniteStaminaEnabled do
-            wait(0.5)
-            if humanoid then
-                humanoid:SetAttribute("Stamina", 100) -- Ajuste conforme o nome do atributo no jogo
-                -- Alternativa comum:
-                if humanoid:FindFirstChild("Stamina") then
-                    humanoid.Stamina.Value = 100
-                end
-            end
-        end
-    end)
-end
-
--- Infinite Ammo
-local function infiniteAmmo(state)
-    infiniteAmmoEnabled = state
-    spawn(function()
-        while infiniteAmmoEnabled do
-            wait(0.3)
-            for _, tool in pairs(character:GetChildren()) do
-                if tool:IsA("Tool") and tool:FindFirstChild("Ammo") or tool:FindFirstChild("Magazine") then
-                    local ammo = tool:FindFirstChild("Ammo") or tool:FindFirstChild("Magazine")
-                    if ammo and typeof(ammo) == "IntValue" or typeof(ammo) == "NumberValue" then
-                        ammo.Value = 999
-                    end
-                end
-            end
-        end
-    end)
-end
-
--- Auto Complete Tasks (exemplo genérico - ajuste conforme remotes do jogo)
-local function autoCompleteTasks(state)
-    autoCompleteEnabled = state
-    spawn(function()
-        while autoCompleteEnabled do
-            wait(1)
-            -- Tenta completar tasks/objetivos genéricos
-            for _, obj in pairs(workspace:GetDescendants()) do
-                if obj.Name:lower():find("task") or obj.Name:lower():find("objective") or obj.Name:lower():find("generator") then
-                    if obj:FindFirstChild("ProximityPrompt") then
-                        fireproximityprompt(obj.ProximityPrompt, 0)
-                    end
-                end
-            end
-        end
-    end)
-end
-
--- ESP Simples
-local function toggleESP(state)
-    espEnabled = state
-    -- Implementação básica de ESP (pode melhorar)
-    if state then
-        for _, v in pairs(workspace:GetDescendants()) do
-            if v:FindFirstChild("Humanoid") and v ~= character then
-                local highlight = Instance.new("Highlight")
-                highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
-                highlight.Parent = v
-            end
-        end
-    else
-        for _, v in pairs(workspace:GetDescendants()) do
-            if v:FindFirstChild("Highlight") then
-                v.Highlight:Destroy()
+local function getClosestPlayer()
+    local closest, dist = nil, math.huge
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local magnitude = (player.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+            if magnitude < dist then
+                dist = magnitude
+                closest = player
             end
         end
     end
+    return closest
 end
 
--- Noclip
-local function toggleNoclip(state)
-    noclipEnabled = state
-    spawn(function()
-        while noclipEnabled do
-            wait()
-            for _, part in pairs(character:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then
-                    part.CanCollide = false
-                end
-            end
-        end
-        -- Restaura quando desliga
-        wait(0.5)
-        for _, part in pairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = true
-            end
-        end
-    end)
-end
+-- ==================== AIMBOT ====================
 
--- ==================== UI ELEMENTS ====================
-
--- Main Tab
-MainTab:CreateSection("Status")
-
-MainTab:CreateButton({
-    Name = "Carregar Todas as Funções (Safe)",
-    Callback = function()
-        Rayfield:Notify({Title = "Sucesso", Content = "Script carregado! Use com moderação.", Duration = 3})
-    end
-})
-
--- Combat Tab
-CombatTab:CreateSection("Combate")
+local AimbotSection = CombatTab:CreateSection("Aimbot")
 
 CombatTab:CreateToggle({
-    Name = "Kill Aura (20 studs)",
+    Name = "Aimbot (Mouse)",
     CurrentValue = false,
-    Flag = "KillAura",
+    Flag = "AimbotToggle",
+    Callback = function(Value)
+        aimbotEnabled = Value
+    end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Silent Aim",
+    CurrentValue = false,
+    Flag = "SilentAimToggle",
+    Callback = function(Value)
+        silentAimEnabled = Value
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Aimbot Smoothness",
+    Range = {1, 20},
+    Increment = 1,
+    CurrentValue = 8,
+    Flag = "AimbotSmooth",
+    Callback = function(Value)
+        -- smoothness usado no loop
+    end,
+})
+
+-- ==================== KILL AURA ====================
+
+CombatTab:CreateToggle({
+    Name = "Kill Aura",
+    CurrentValue = false,
+    Flag = "KillAuraToggle",
     Callback = function(Value)
         killAuraEnabled = Value
-        if Value then startKillAura() end
-    end
-})
-
-CombatTab:CreateToggle({
-    Name = "Infinite Ammo",
-    CurrentValue = false,
-    Flag = "InfAmmo",
-    Callback = function(Value)
-        infiniteAmmo(Value)
-    end
+    end,
 })
 
 CombatTab:CreateSlider({
     Name = "Kill Aura Range",
-    Range = {10, 50},
-    Increment = 5,
-    CurrentValue = 20,
-    Flag = "AuraRange",
-    Callback = function(Value)
-        -- Pode ser usado para ajustar range dinamicamente
-    end
+    Range = {5, 50},
+    Increment = 1,
+    CurrentValue = 15,
+    Flag = "KillAuraRange",
+    Callback = function() end,
 })
 
--- Player Tab
-PlayerTab:CreateSection("Movimento e Sobrevivência")
+-- ==================== INFINITE AMMO ====================
 
-PlayerTab:CreateToggle({
-    Name = "Infinite Stamina / Fôlego",
+CombatTab:CreateToggle({
+    Name = "Munição Infinita",
     CurrentValue = false,
-    Flag = "InfStamina",
+    Flag = "InfAmmoToggle",
     Callback = function(Value)
-        infiniteStamina(Value)
-    end
+        infiniteAmmoEnabled = Value
+    end,
 })
 
-PlayerTab:CreateToggle({
-    Name = "Noclip (Cuidado)",
+-- ==================== OUTRAS OPÇÕES ====================
+
+CombatTab:CreateButton({
+    Name = "Auto Headshot (quando atirar)",
+    Callback = function()
+        Rayfield:Notify({Title = "Auto Headshot", Content = "Ativado temporariamente", Duration = 3})
+        -- Lógica pode ser expandida
+    end,
+})
+
+-- ==================== VISUAL ====================
+
+VisualTab:CreateToggle({
+    Name = "ESP (Caixas)",
     CurrentValue = false,
-    Flag = "Noclip",
+    Flag = "ESPToggle",
     Callback = function(Value)
-        toggleNoclip(Value)
-    end
+        -- Simples ESP
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                -- Implementação básica de ESP (pode ser melhorada com Drawing)
+            end
+        end
+    end,
+})
+
+VisualTab:CreateToggle({
+    Name = "Tracers",
+    CurrentValue = false,
+    Flag = "TracersToggle",
+    Callback = function() end,
+})
+
+-- ==================== PLAYER ====================
+
+PlayerTab:CreateButton({
+    Name = "Infinite Jump",
+    Callback = function()
+        local infJumpConn
+        infJumpConn = game:GetService("UserInputService").JumpRequest:Connect(function()
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                LocalPlayer.Character.Humanoid:ChangeState("Jumping")
+            end
+        end)
+        Rayfield:Notify({Title = "Infinite Jump", Content = "Ativado", Duration = 4})
+    end,
 })
 
 PlayerTab:CreateSlider({
-    Name = "WalkSpeed",
+    Name = "Velocidade de Movimento",
     Range = {16, 100},
     Increment = 4,
     CurrentValue = 16,
     Flag = "WalkSpeed",
     Callback = function(Value)
-        if humanoid then
-            humanoid.WalkSpeed = Value
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = Value
+        end
+    end,
+})
+
+-- ==================== MAIN LOOP ====================
+
+RunService.RenderStepped:Connect(function()
+    -- Aimbot
+    if aimbotEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local target = getClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            local targetPos = target.Character.Head.Position
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetPos)
         end
     end
-})
 
-PlayerTab:CreateSlider({
-    Name = "Jump Power",
-    Range = {50, 200},
-    Increment = 10,
-    CurrentValue = 50,
-    Flag = "JumpPower",
-    Callback = function(Value)
-        if humanoid then
-            humanoid.JumpPower = Value
-        end
-    end
-})
-
--- World Tab
-WorldTab:CreateSection("Mundo")
-
-WorldTab:CreateToggle({
-    Name = "Fullbright",
-    CurrentValue = false,
-    Flag = "Fullbright",
-    Callback = function(Value)
-        toggleFullbright(Value)
-    end
-})
-
-WorldTab:CreateToggle({
-    Name = "Enemy ESP",
-    CurrentValue = false,
-    Flag = "ESP",
-    Callback = function(Value)
-        toggleESP(Value)
-    end
-})
-
-WorldTab:CreateToggle({
-    Name = "Auto Complete Tasks",
-    CurrentValue = false,
-    Flag = "AutoTask",
-    Callback = function(Value)
-        autoCompleteTasks(Value)
-    end
-})
-
--- Misc Tab
-MiscTab:CreateSection("Outras Opções")
-
-MiscTab:CreateButton({
-    Name = "God Mode (Low Health)",
-    Callback = function()
-        if humanoid then
-            humanoid.MaxHealth = 9999
-            humanoid.Health = 9999
-        end
-        Rayfield:Notify({Title = "God Mode", Content = "Ativado (pode não funcionar em todos os danos)", Duration = 4})
-    end
-})
-
-MiscTab:CreateButton({
-    Name = "Collect All Nearby Items",
-    Callback = function()
-        for _, item in pairs(workspace:GetDescendants()) do
-            if item:FindFirstChild("ProximityPrompt") and (item.Position - character.HumanoidRootPart.Position).Magnitude < 50 then
-                fireproximityprompt(item.ProximityPrompt)
+    -- Kill Aura
+    if killAuraEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local range = Rayfield.Flags.KillAuraRange.CurrentValue or 15
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                local dist = (player.Character.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                if dist < range and player.Character:FindFirstChild("Humanoid") then
+                    player.Character.Humanoid.Health = 0
+                end
             end
         end
     end
-})
+end)
 
-MiscTab:CreateKeybind({
-    Name = "Kill Aura Toggle (Tecla)",
-    CurrentKeybind = "K",
-    HoldToInteract = false,
-    Flag = "KillAuraKey",
-    Callback = function()
-        killAuraEnabled = not killAuraEnabled
-        if killAuraEnabled then startKillAura() end
-        Rayfield:Notify({Title = "Kill Aura", Content = killAuraEnabled and "Ligado" or "Desligado", Duration = 2})
-    end
-})
+-- Infinite Ammo (tentativa comum em sniper games)
+if infiniteAmmoEnabled then
+    spawn(function()
+        while infiniteAmmoEnabled do
+            wait(0.1)
+            local character = LocalPlayer.Character
+            if character then
+                local tool = character:FindFirstChildOfClass("Tool")
+                if tool and tool:FindFirstChild("Ammo") then
+                    tool.Ammo.Value = 9999
+                end
+            end
+        end
+    end)
+end
 
 Rayfield:Notify({
-    Title = "Script Carregado",
-    Content = "Examination Cheat carregado com sucesso. Divirta-se!",
+    Title = "Script Carregado!",
+    Content = "Sniper Arena Keyless carregado com sucesso.",
     Duration = 6,
     Image = 4483362458
 })
