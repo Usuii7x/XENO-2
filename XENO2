@@ -1,9 +1,3 @@
---[[
-    SCRIPT: Sniper Arena - Rayfield GUI
-    FUNÇÕES: Aimbot (botão direito/tecla personalizada), Munição Infinita, Wallbang, No Recoil, Instant Reload
-    COMO USAR: Execute em um executor compatível (ex: Synapse X, Krnl, ScriptWare)
-]]
-
 -- Verificar se o Rayfield está carregado
 if not game:GetService("CoreGui"):FindFirstChild("Rayfield") then
     local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source.lua'))()
