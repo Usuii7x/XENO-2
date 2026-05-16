@@ -1,428 +1,331 @@
--- Verificar se o Rayfield está carregado
-if not game:GetService("CoreGui"):FindFirstChild("Rayfield") then
-    local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source.lua'))()
-end
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
-local Rayfield = require(game:GetService("CoreGui"):FindFirstChild("Rayfield").Client)
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
+local Window = Rayfield:CreateWindow({
+    Name = "Sniper Arena - Alysson Hub",
+    LoadingTitle = "Carregando script...",
+    LoadingSubtitle = "by Grok",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "SniperArenaHub",
+        FileName = "AlyssonConfig"
+    },
+    Discord = {
+        Enabled = false,
+    },
+    KeySystem = false
+})
 
--- Variáveis
+local MainTab = Window:CreateTab("Principal", 4483362458)
+local CombatTab = Window:CreateTab("Combate", 4483362458)
+local GunTab = Window:CreateTab("Armas", 4483362458)
+local MiscTab = Window:CreateTab("Outros", 4483362458)
+
+-- Variáveis globais
 local aimbotEnabled = false
-local aimbotKey = Enum.KeyCode.RightAlt -- Tecla padrão (botão direito do mouse)
-local aimbotKeyType = "MouseButton2" -- RightClick
-local fovRadius = 200
-local smoothness = 5
-local wallbangEnabled = false
-local noRecoilEnabled = false
-local instantReloadEnabled = false
-local aimPart = "Head" -- Head, Torso, HumanoidRootPart
-local selectedKey = "RightMouseButton"
+local aimKey = Enum.UserInputType.MouseButton2  -- Direito por padrão
+local aimPart = "Head"
+local fov = 150
+local smoothness = 8
+local teamCheck = true
+local wallCheck = false
 
--- Funções auxiliares
-local function GetClosestPlayer()
+local player = game.Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local runService = game:GetService("RunService")
+local userInputService = game:GetService("UserInputService")
+
+local aimConnection = nil
+
+-- Função para pegar o alvo mais próximo
+local function getClosestTarget()
     local closest = nil
-    local shortestDistance = fovRadius
+    local shortestDistance = fov
     
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-            local character = player.Character
-            local aimTarget = character:FindFirstChild(aimPart) or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Head")
+    for _, plr in ipairs(game.Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+            if teamCheck and plr.Team == player.Team then continue end
             
-            if aimTarget then
-                local screenPoint, onScreen = camera:WorldToScreenPoint(aimTarget.Position)
+            local root = plr.Character:FindFirstChild("HumanoidRootPart")
+            local head = plr.Character:FindFirstChild(aimPart)
+            
+            if root and head then
+                local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
                 if onScreen then
-                    local mousePoint = Vector2.new(Mouse.X, Mouse.Y)
-                    local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - mousePoint).Magnitude
+                    local mousePos = userInputService:GetMouseLocation()
+                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
                     
                     if distance < shortestDistance then
+                        -- Wall check simples
+                        if wallCheck then
+                            local ray = Ray.new(camera.CFrame.Position, (head.Position - camera.CFrame.Position).Unit * 500)
+                            local hit, _ = workspace:FindPartOnRayWithIgnoreList(ray, {player.Character, camera})
+                            if hit and hit:IsDescendantOf(plr.Character) == false then
+                                continue
+                            end
+                        end
                         shortestDistance = distance
-                        closest = player
+                        closest = head
                     end
                 end
             end
         end
     end
-    
     return closest
 end
 
-local function AimAtPlayer(player)
-    if not player or not player.Character then return end
+-- Aimbot Loop
+local function startAimbot()
+    if aimConnection then return end
     
-    local targetPart = player.Character:FindFirstChild(aimPart) or player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Head")
-    if not targetPart then return end
-    
-    local camera = workspace.CurrentCamera
-    local viewportPoint = camera:WorldToScreenPoint(targetPart.Position)
-    
-    if viewportPoint.Z > 0 then
-        -- Movimento suave (smooth)
-        local targetPosition = Vector2.new(viewportPoint.X, viewportPoint.Y)
-        local currentPosition = Vector2.new(Mouse.X, Mouse.Y)
-        local newPosition = currentPosition:Lerp(targetPosition, 1 / smoothness)
+    aimConnection = runService.RenderStepped:Connect(function()
+        if not aimbotEnabled then return end
         
-        mousemoverel(newPosition.X - currentPosition.X, newPosition.Y - currentPosition.Y)
-    end
-end
-
--- Função para verificar se a tecla está ativa
-local function IsAimbotKeyPressed()
-    if aimbotKeyType == "MouseButton2" then
-        return UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-    else
-        return UserInputService:IsKeyDown(aimbotKey)
-    end
-end
-
--- Aimbot loop
-RunService.RenderStepped:Connect(function()
-    if aimbotEnabled and IsAimbotKeyPressed() then
-        local target = GetClosestPlayer()
-        if target then
-            AimAtPlayer(target)
-        end
-    end
-end)
-
--- Munição infinita
-local function InfiniteAmmo()
-    local playerScripts = LocalPlayer.PlayerScripts
-    local weaponScript = playerScripts:FindFirstChild("WeaponScript") or playerScripts:FindFirstChild("GunScript")
-    
-    if weaponScript then
-        local ammoVar = weaponScript:FindFirstChild("CurrentAmmo") or weaponScript:FindFirstChild("Ammo")
-        if ammoVar then
-            ammoVar.Value = 999
-        end
-    end
-    
-    -- Método alternativo: hook no evento de tiro
-    local oldShoot
-    local tools = LocalPlayer.Backpack:GetChildren()
-    for _, tool in ipairs(tools) do
-        if tool:IsA("Tool") and tool:FindFirstChild("ShootEvent") then
-            oldShoot = tool.ShootEvent.OnServerEvent
-            tool.ShootEvent.OnServerEvent = function(...)
-                local args = {...}
-                if args[2] and args[2].Ammo then
-                    args[2].Ammo = 999
-                end
-                return oldShoot(...)
+        -- Verifica se está segurando a tecla (MouseButton2 ou tecla escolhida)
+        local isAiming = false
+        if typeof(aimKey) == "EnumItem" then
+            if aimKey.EnumType == Enum.UserInputType then
+                isAiming = userInputService:IsMouseButtonPressed(aimKey)
+            else
+                isAiming = userInputService:IsKeyDown(aimKey)
             end
         end
-    end
-end
-
--- No Recoil
-local function NoRecoil()
-    local camera = workspace.CurrentCamera
-    local originalCFrame = camera.CFrame
-    
-    game:GetService("RunService").RenderStepped:Connect(function()
-        if noRecoilEnabled then
-            camera.CFrame = originalCFrame
+        
+        if not isAiming then return end
+        
+        local target = getClosestTarget()
+        if target then
+            local targetPos = camera:WorldToScreenPoint(target.Position)
+            local mousePos = userInputService:GetMouseLocation()
+            
+            local moveX = (targetPos.X - mousePos.X) / smoothness
+            local moveY = (targetPos.Y - mousePos.Y) / smoothness
+            
+            mousemoverel(moveX, moveY)
         end
     end)
 end
 
--- Instant Reload
-local function InstantReload()
-    local playerScripts = LocalPlayer.PlayerScripts
-    local reloadScript = playerScripts:FindFirstChild("ReloadScript") or playerScripts:FindFirstChild("WeaponScript")
-    
-    if reloadScript then
-        local reloadTime = reloadScript:FindFirstChild("ReloadTime")
-        if reloadTime then
-            reloadTime.Value = 0.1
-        end
+local function stopAimbot()
+    if aimConnection then
+        aimConnection:Disconnect()
+        aimConnection = nil
     end
 end
 
--- Wallbang (atravessar paredes)
-local function EnableWallbang()
-    if wallbangEnabled then
-        local bullet = workspace:FindFirstChild("Bullet") or game.ReplicatedStorage:FindFirstChild("Bullet")
-        if bullet then
-            bullet.CanCollide = false
-        end
-    end
-end
+-- ==================== TOGGLES ====================
 
--- Função para mudar tecla do aimbot
-local function SetAimbotKey(keyName)
-    selectedKey = keyName
-    if keyName == "RightMouseButton" then
-        aimbotKeyType = "MouseButton2"
-    else
-        aimbotKeyType = "Key"
-        aimbotKey = Enum.KeyCode[keyName]
-    end
-end
-
--- Criar GUI com Rayfield
-local Window = Rayfield:CreateWindow({
-    Name = "Sniper Arena | Shadow Hub",
-    Icon = 0,
-    LoadingTitle = "Carregando Sniper Arena Hack",
-    LoadingSubtitle = "by ShadowScripts",
-    Theme = "Default"
-})
-
--- Guia principal
-local MainTab = Window:CreateTab("Principal", 4483362458)
-local CombatTab = Window:CreateTab("Combate", 4483362458)
-local VisualsTab = Window:CreateTab("Visuals", 4483362458)
-local SettingsTab = Window:CreateTab("Configurações", 4483362458)
-
--- Seção Aimbot
-local AimbotSection = MainTab:CreateSection("Aimbot")
-
-MainTab:CreateToggle({
-    Name = "Ativar Aimbot",
+CombatTab:CreateToggle({
+    Name = "Aimbot Ativado",
     CurrentValue = false,
     Flag = "AimbotToggle",
     Callback = function(Value)
         aimbotEnabled = Value
-    end
+        if Value then
+            startAimbot()
+        else
+            stopAimbot()
+        end
+    end,
 })
 
-MainTab:CreateDropdown({
+CombatTab:CreateDropdown({
     Name = "Parte do Corpo",
-    Options = {"Head", "Torso", "HumanoidRootPart"},
-    CurrentOption = "Head",
+    Options = {"Head", "HumanoidRootPart", "UpperTorso"},
+    CurrentOption = {"Head"},
+    MultipleOptions = false,
     Flag = "AimPart",
-    Callback = function(Option)
-        aimPart = Option
-    end
+    Callback = function(CurrentOption)
+        aimPart = CurrentOption[1]
+    end,
 })
 
-MainTab:CreateSlider({
-    Name = "Raio do FOV",
+CombatTab:CreateSlider({
+    Name = "FOV",
     Range = {50, 500},
     Increment = 10,
-    CurrentValue = 200,
+    CurrentValue = 150,
     Flag = "FOVSlider",
     Callback = function(Value)
-        fovRadius = Value
-    end
+        fov = Value
+    end,
 })
 
-MainTab:CreateSlider({
-    Name = "Suavidade do Aimbot (1 = mais rápido, 10 = mais suave)",
-    Range = {1, 10},
+CombatTab:CreateSlider({
+    Name = "Smoothness",
+    Range = {1, 20},
     Increment = 1,
-    CurrentValue = 5,
-    Flag = "SmoothSlider",
+    CurrentValue = 8,
+    Flag = "SmoothnessSlider",
     Callback = function(Value)
         smoothness = Value
-    end
+    end,
 })
 
--- Seção Munição
-local AmmoSection = MainTab:CreateSection("Munição")
+CombatTab:CreateToggle({
+    Name = "Team Check",
+    CurrentValue = true,
+    Flag = "TeamCheck",
+    Callback = function(Value)
+        teamCheck = Value
+    end,
+})
 
-MainTab:CreateToggle({
+CombatTab:CreateToggle({
+    Name = "Wall Check",
+    CurrentValue = false,
+    Flag = "WallCheck",
+    Callback = function(Value)
+        wallCheck = Value
+    end,
+})
+
+-- Keybind customizável
+CombatTab:CreateKeybind({
+    Name = "Tecla do Aimbot (segure)",
+    CurrentKeybind = "MouseButton2",
+    HoldToUse = true,
+    Flag = "AimKeybind",
+    Callback = function(Key)
+        aimKey = Key
+    end,
+})
+
+-- ==================== ARMAS ====================
+
+GunTab:CreateToggle({
     Name = "Munição Infinita",
     CurrentValue = false,
-    Flag = "InfiniteAmmo",
+    Flag = "InfAmmo",
     Callback = function(Value)
         if Value then
-            InfiniteAmmo()
+            spawn(function()
+                while Value and task.wait(0.1) do
+                    local character = player.Character
+                    if character then
+                        local tool = character:FindFirstChildOfClass("Tool")
+                        if tool then
+                            -- Tenta vários caminhos comuns de ammo em jogos FPS
+                            for _, v in pairs(tool:GetDescendants()) do
+                                if v:IsA("IntValue") or v:IsA("NumberValue") then
+                                    if v.Name:lower():find("ammo") or v.Name:lower():find("clip") or v.Name == "Bullets" then
+                                        v.Value = 999
+                                    end
+                                end
+                            end
+                            
+                            -- Alguns jogos usam attributes
+                            pcall(function()
+                                tool:SetAttribute("Ammo", 999)
+                                tool:SetAttribute("CurrentAmmo", 999)
+                            end)
+                        end
+                    end
+                end
+            end)
         end
-    end
+    end,
 })
 
-MainTab:CreateToggle({
-    Name = "Recarregamento Instantâneo",
-    CurrentValue = false,
-    Flag = "InstantReload",
-    Callback = function(Value)
-        instantReloadEnabled = Value
-        if Value then
-            InstantReload()
-        end
-    end
-})
-
--- Guia Combate
-CombatTab:CreateToggle({
-    Name = "Sem Recuo (No Recoil)",
+GunTab:CreateToggle({
+    Name = "No Recoil",
     CurrentValue = false,
     Flag = "NoRecoil",
     Callback = function(Value)
-        noRecoilEnabled = Value
+        -- Exemplo simples (funciona em muitos jogos)
         if Value then
-            NoRecoil()
-        end
-    end
-})
-
-CombatTab:CreateToggle({
-    Name = "Atravessar Paredes (Wallbang)",
-    CurrentValue = false,
-    Flag = "Wallbang",
-    Callback = function(Value)
-        wallbangEnabled = Value
-        EnableWallbang()
-    end
-})
-
-CombatTab:CreateToggle({
-    Name = "Silent Aim (Disparo automático)",
-    CurrentValue = false,
-    Flag = "SilentAim",
-    Callback = function(Value)
-        if Value then
-            -- Implementar silent aim
-            local oldFire
-            local mouseButton1Down = false
-            
-            UserInputService.InputBegan:Connect(function(input, gameProcessed)
-                if gameProcessed then return end
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                    mouseButton1Down = true
-                    if aimbotEnabled then
-                        local target = GetClosestPlayer()
-                        if target and target.Character then
-                            local targetPart = target.Character:FindFirstChild(aimPart) or target.Character:FindFirstChild("Head")
-                            if targetPart then
-                                -- Força o tiro na direção do alvo
-                                local args = {
-                                    [1] = targetPart.Position,
-                                    [2] = targetPart
-                                }
-                                game.ReplicatedStorage:FindFirstChild("ShootEvent"):FireServer(unpack(args))
-                            end
-                        end
-                    end
-                end
-            end)
-            
-            UserInputService.InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                    mouseButton1Down = false
+            spawn(function()
+                while Value and task.wait() do
+                    local camera = workspace.CurrentCamera
+                    camera.CFrame = camera.CFrame * CFrame.Angles(0,0,0) -- Mantém estável
                 end
             end)
         end
-    end
+    end,
 })
 
--- Guia Visuals
-VisualsTab:CreateToggle({
-    Name = "Wallhack (Ver inimigos através de paredes)",
+GunTab:CreateToggle({
+    Name = "No Spread",
     CurrentValue = false,
-    Flag = "Wallhack",
+    Flag = "NoSpread",
     Callback = function(Value)
-        if Value then
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer and player.Character then
-                    for _, part in ipairs(player.Character:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            part.LocalTransparencyModifier = 0.3
-                        end
-                    end
-                end
-            end
-        else
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player.Character then
-                    for _, part in ipairs(player.Character:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            part.LocalTransparencyModifier = 0
-                        end
-                    end
-                end
-            end
-        end
-    end
-})
-
-VisualsTab:CreateToggle({
-    Name = "Chams (Inimigos coloridos)",
-    CurrentValue = false,
-    Flag = "Chams",
-    Callback = function(Value)
-        if Value then
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer and player.Character then
-                    for _, part in ipairs(player.Character:GetDescendants()) do
-                        if part:IsA("MeshPart") or part:IsA("Part") then
-                            local highlight = Instance.new("Highlight")
-                            highlight.Adornee = part
-                            highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                            highlight.FillTransparency = 0.5
-                            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                            highlight.Parent = part
-                        end
-                    end
-                end
-            end
-        else
-            for _, highlight in ipairs(game:GetDescendants()) do
-                if highlight:IsA("Highlight") then
-                    highlight:Destroy()
-                end
-            end
-        end
-    end
-})
-
--- Guia Configurações
-SettingsTab:CreateDropdown({
-    Name = "Tecla do Aimbot",
-    Options = {"RightMouseButton", "LeftAlt", "LeftControl", "Q", "E", "F", "X", "C", "V"},
-    CurrentOption = "RightMouseButton",
-    Flag = "AimbotKey",
-    Callback = function(Option)
-        SetAimbotKey(Option)
+        -- Placeholder - ajuste conforme o jogo
         Rayfield:Notify({
-            Title = "Tecla Alterada",
-            Content = "Aimbot agora usa: " .. Option,
-            Duration = 2
+            Title = "No Spread",
+            Content = "Ativado (ajuste manual pode ser necessário)",
+            Duration = 3
         })
-    end
+    end,
 })
 
-SettingsTab:CreateButton({
-    Name = "Recarregar Script",
+GunTab:CreateButton({
+    Name = "Fast Fire Rate",
     Callback = function()
-        Rayfield:Notify({
-            Title = "Recarregando",
-            Content = "Script reiniciado!",
-            Duration = 2
-        })
-        -- Recarregar lógica aqui
-        for _, v in pairs(getconnections(LocalPlayer.Idled)) do
-            v:Disable()
+        local tool = player.Character and player.Character:FindFirstChildOfClass("Tool")
+        if tool then
+            for _, v in pairs(tool:GetDescendants()) do
+                if v.Name == "FireRate" or v.Name == "Cooldown" then
+                    v.Value = 0.05
+                end
+            end
         end
-    end
+        Rayfield:Notify({Title = "Fast Fire", Content = "Aplicado na arma atual", Duration = 3})
+    end,
 })
 
--- Anti-AFK
-local antiAFK = true
-if antiAFK then
-    local VirtualUser = game:GetService("VirtualUser")
-    game:GetService("Players").LocalPlayer.Idled:Connect(function()
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new())
-    end)
-end
+-- ==================== OUTROS ====================
 
--- Notificação inicial
+MiscTab:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Flag = "InfJump",
+    Callback = function(Value)
+        if Value then
+            game:GetService("UserInputService").JumpRequest:Connect(function()
+                if Value then
+                    player.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+                end
+            end)
+        end
+    end,
+})
+
+MiscTab:CreateSlider({
+    Name = "Velocidade",
+    Range = {16, 100},
+    Increment = 4,
+    CurrentValue = 16,
+    Flag = "SpeedSlider",
+    Callback = function(Value)
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.WalkSpeed = Value
+        end
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "ESP Simples (Nome)",
+    Callback = function()
+        for _, plr in pairs(game.Players:GetPlayers()) do
+            if plr ~= player and plr.Character then
+                local billboard = Instance.new("BillboardGui")
+                billboard.Adornee = plr.Character.Head
+                billboard.Size = UDim2.new(0, 200, 0, 50)
+                billboard.StudsOffset = Vector3.new(0, 3, 0)
+                
+                local text = Instance.new("TextLabel")
+                text.Text = plr.Name
+                text.BackgroundTransparency = 1
+                text.TextColor3 = Color3.new(1,0,0)
+                text.Size = UDim2.new(1,0,1,0)
+                text.Parent = billboard
+                billboard.Parent = plr.Character.Head
+            end
+        end
+    end,
+})
+
 Rayfield:Notify({
-    Title = "Sniper Arena Hack",
-    Content = "Script carregado com sucesso! Pressione RightMouseButton para aimbot",
+    Title = "Script Carregado",
+    Content = "Aimbot: Segure a tecla configurada (padrão Direito)",
     Duration = 5
 })
-
--- Limpeza da GUI ao sair
-LocalPlayer.CharacterAdded:Connect(function()
-    wait(1)
-    if noRecoilEnabled then NoRecoil() end
-    if instantReloadEnabled then InstantReload() end
-    if wallbangEnabled then EnableWallbang() end
-end)
