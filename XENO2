@@ -1,23 +1,23 @@
 --[[
-    🌊 Blox Fruits | Rayfield Sexiest Hub
-    Script completo e moderno para Blox Fruits
+    🌊 Blox Fruits | Vulcan UI Hub
+    Interface moderna e completa para Blox Fruits
     Versão: 2026
-    Biblioteca: Rayfield (The Sexiest UI Suite)
+    Biblioteca: Vulcan UI (Versão mais recente)
     
     Instruções: Execute o script em um executor compatível
-    Recomendado: Synapse X, Scriptware, Krnl, Fluxus
+    Requer: Synapse X, Scriptware, Krnl, Fluxus ou similar
 ]]
 
--- Verificar se a Rayfield está carregada
+-- Verificar se o jogo está carregado
 if not game:IsLoaded() then
     game.Loaded:Wait()
 end
 
--- Carregar Rayfield (versão mais recente)
-local Rayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source.lua"))()
+-- Carregar Vulcan UI
+local Vulcan = loadstring(game:HttpGet("https://raw.githubusercontent.com/your-vulcan-ui/source/main.lua"))() -- Substitua pelo link oficial da Vulcan UI
 
 -- Variáveis globais para configurações
-getgenv().BloxFruitsConfig = getgenv().BloxFruitsConfig or {
+getgenv().BloxFruitsVulcanConfig = getgenv().BloxFruitsVulcanConfig or {
     -- Auto Farm
     AutoFarm = false,
     AutoQuest = false,
@@ -89,40 +89,35 @@ getgenv().BloxFruitsConfig = getgenv().BloxFruitsConfig or {
     WhiteScreen = false,
 }
 
--- Criar janela principal
-local Window = Rayfield:CreateWindow({
-    Name = "🌊 Blox Fruits | Rayfield Sexiest Hub",
-    Icon = 0,
-    LoadingTitle = "Carregando Hub...",
-    LoadingSubtitle = "By Expert Developer",
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = "BloxFruitsHub",
-        FileName = "Config"
-    },
-    KeySystem = false,
-    Discord = {
-        Enabled = false,
-        Invite = "noinvitelink",
-        RememberJoins = true
-    }
-})
-
 -- Função para criar notificações
 local function Notify(Title, Content, Duration)
-    Rayfield:Notify({
-        Title = Title,
-        Content = Content,
-        Duration = Duration or 3,
-        Image = 0,
-        Actions = {}
-    })
+    if Vulcan and Vulcan.Notify then
+        Vulcan:Notify({
+            Title = Title,
+            Content = Content,
+            Duration = Duration or 3,
+        })
+    else
+        game.StarterGui:SetCore("SendNotification", {
+            Title = Title,
+            Text = Content,
+            Duration = Duration or 3,
+        })
+    end
 end
+
+-- Criar janela principal
+local Window = Vulcan:CreateWindow({
+    Name = "🌊 Blox Fruits | Vulcan Hub",
+    Icon = "rbxassetid://1234567890", -- Substitua por um ID de ícone válido
+    Theme = "Dark",
+    SaveSettings = true, -- Ativar salvamento de configurações
+})
 
 Notify("🌊 Blox Fruits Hub", "Carregado com sucesso! Versão 2026", 5)
 
 -- ==================== TAB 1: MAIN ====================
-local MainTab = Window:CreateTab("🏠 Main", 0)
+local MainTab = Window:CreateTab("🏠 Main")
 local MainSection = MainTab:CreateSection("📊 Status")
 
 MainTab:CreateLabel("🎮 Bem-vindo ao Blox Fruits Hub")
@@ -134,49 +129,52 @@ local PlayerInfo = MainTab:CreateLabel("👤 Carregando informações...")
 spawn(function()
     while task.wait(1) do
         local player = game.Players.LocalPlayer
-        local level = player.Data.Level.Value
-        local fruit = player.Data.DevilFruit.Value or "None"
-        local race = player.Data.Race.Value or "None"
-        PlayerInfo:Set("👤 Nível: " .. level .. " | Fruta: " .. fruit .. " | Raça: " .. race)
+        if player and player.Data then
+            local level = player.Data.Level and player.Data.Level.Value or "?"
+            local fruit = player.Data.DevilFruit and player.Data.DevilFruit.Value or "None"
+            local race = player.Data.Race and player.Data.Race.Value or "None"
+            PlayerInfo:Set("👤 Nível: " .. tostring(level) .. " | Fruta: " .. tostring(fruit) .. " | Raça: " .. tostring(race))
+        end
     end
 end)
 
 -- ==================== TAB 2: AUTO FARM ====================
-local FarmTab = Window:CreateTab("🌾 Auto Farm", 1)
+local FarmTab = Window:CreateTab("🌾 Auto Farm")
 local FarmSection = FarmTab:CreateSection("🤖 Configurações de Farm")
 
 -- Toggles principais
 FarmTab:CreateToggle({
     Name = "🔄 Auto Farm (Nível)",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoFarm,
-    Flag = "AutoFarm",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoFarm,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoFarm = Value
+        getgenv().BloxFruitsVulcanConfig.AutoFarm = Value
         if Value then
             Notify("Auto Farm", "Ativado - Farmando nível automaticamente", 2)
-            -- Colocar lógica do Auto Farm aqui
-            -- Exemplo: while getgenv().BloxFruitsConfig.AutoFarm do ... end
+            -- Colocar lógica principal do Auto Farm aqui
+            -- Exemplo: 
+            -- while getgenv().BloxFruitsVulcanConfig.AutoFarm do
+            --     -- Código de farm
+            --     task.wait()
+            -- end
         end
     end,
 })
 
 FarmTab:CreateToggle({
     Name = "📋 Auto Quest",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoQuest,
-    Flag = "AutoQuest",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoQuest,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoQuest = Value
-        -- Colocar lógica do Auto Quest
+        getgenv().BloxFruitsVulcanConfig.AutoQuest = Value
+        -- Colocar lógica para pegar e entregar quests automaticamente
     end,
 })
 
 FarmTab:CreateToggle({
     Name = "👑 Auto Farm Boss",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoFarmBoss,
-    Flag = "AutoFarmBoss",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoFarmBoss,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoFarmBoss = Value
-        -- Colocar lógica do Auto Farm Boss
+        getgenv().BloxFruitsVulcanConfig.AutoFarmBoss = Value
+        -- Colocar lógica para farmar bosses específicos
     end,
 })
 
@@ -185,41 +183,37 @@ FarmTab:CreateDivider()
 -- Configurações avançadas
 FarmTab:CreateToggle({
     Name = "⚡ Fast Attack",
-    CurrentValue = getgenv().BloxFruitsConfig.FastAttack,
-    Flag = "FastAttack",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.FastAttack,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.FastAttack = Value
-        -- Colocar lógica do Fast Attack
+        getgenv().BloxFruitsVulcanConfig.FastAttack = Value
+        -- Colocar lógica para aumentar velocidade de ataque
     end,
 })
 
 FarmTab:CreateToggle({
     Name = "📈 Auto Mastery",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoMastery,
-    Flag = "AutoMastery",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoMastery,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoMastery = Value
-        -- Colocar lógica do Auto Mastery
+        getgenv().BloxFruitsVulcanConfig.AutoMastery = Value
+        -- Colocar lógica para farmar maestria
     end,
 })
 
 FarmTab:CreateToggle({
     Name = "✨ Auto Aura",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoAura,
-    Flag = "AutoAura",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoAura,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoAura = Value
-        -- Colocar lógica do Auto Aura
+        getgenv().BloxFruitsVulcanConfig.AutoAura = Value
+        -- Colocar lógica para manter Aura sempre ativa
     end,
 })
 
 FarmTab:CreateToggle({
     Name = "📦 Auto Collect Chests",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoCollectChests,
-    Flag = "AutoCollectChests",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoCollectChests,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoCollectChests = Value
-        -- Colocar lógica do Auto Collect Chests
+        getgenv().BloxFruitsVulcanConfig.AutoCollectChests = Value
+        -- Colocar lógica para coletar baús automaticamente
     end,
 })
 
@@ -228,38 +222,32 @@ FarmTab:CreateDivider()
 -- Sliders
 FarmTab:CreateSlider({
     Name = "📏 Distância de Farm",
-    Range = {50, 500},
-    Increment = 10,
-    Suffix = "Estudos",
-    CurrentValue = getgenv().BloxFruitsConfig.FarmDistance,
-    Flag = "FarmDistance",
+    Min = 50,
+    Max = 500,
+    Default = getgenv().BloxFruitsVulcanConfig.FarmDistance,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.FarmDistance = Value
+        getgenv().BloxFruitsVulcanConfig.FarmDistance = Value
     end,
 })
 
 FarmTab:CreateSlider({
     Name = "🎯 Alcance do Kill Aura",
-    Range = {50, 400},
-    Increment = 10,
-    Suffix = "Estudos",
-    CurrentValue = getgenv().BloxFruitsConfig.KillAuraRange,
-    Flag = "KillAuraRange",
+    Min = 50,
+    Max = 400,
+    Default = getgenv().BloxFruitsVulcanConfig.KillAuraRange,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.KillAuraRange = Value
+        getgenv().BloxFruitsVulcanConfig.KillAuraRange = Value
     end,
 })
 
 FarmTab:CreateSlider({
     Name = "⚡ Velocidade de Ataque",
-    Range = {0.05, 1},
-    Increment = 0.05,
-    Suffix = "seg",
-    CurrentValue = getgenv().BloxFruitsConfig.AttackSpeed,
-    Flag = "AttackSpeed",
+    Min = 0.05,
+    Max = 1,
+    Default = getgenv().BloxFruitsVulcanConfig.AttackSpeed,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AttackSpeed = Value
-        -- Colocar lógica de velocidade de ataque
+        getgenv().BloxFruitsVulcanConfig.AttackSpeed = Value
+        -- Colocar lógica para modificar velocidade de ataque
     end,
 })
 
@@ -269,10 +257,9 @@ FarmTab:CreateDivider()
 FarmTab:CreateDropdown({
     Name = "🎮 Modo de Farm",
     Options = {"Mobs", "Chests", "Boss", "Sea Events"},
-    CurrentOption = getgenv().BloxFruitsConfig.FarmMode,
-    Flag = "FarmMode",
+    CurrentOption = getgenv().BloxFruitsVulcanConfig.FarmMode,
     Callback = function(Option)
-        getgenv().BloxFruitsConfig.FarmMode = Option
+        getgenv().BloxFruitsVulcanConfig.FarmMode = Option
         Notify("Modo de Farm", "Alterado para: " .. Option, 2)
     end,
 })
@@ -280,63 +267,58 @@ FarmTab:CreateDropdown({
 FarmTab:CreateDropdown({
     Name = "⚔️ Arma Preferida",
     Options = {"Melee", "Sword", "Gun", "Fruit"},
-    CurrentOption = getgenv().BloxFruitsConfig.PreferredWeapon,
-    Flag = "PreferredWeapon",
+    CurrentOption = getgenv().BloxFruitsVulcanConfig.PreferredWeapon,
     Callback = function(Option)
-        getgenv().BloxFruitsConfig.PreferredWeapon = Option
+        getgenv().BloxFruitsVulcanConfig.PreferredWeapon = Option
     end,
 })
 
 FarmTab:CreateDropdown({
     Name = "🍎 Fruta Preferida",
     Options = {"None", "Dragon", "Leopard", "Kitsune", "Mammoth", "Dough", "Venom"},
-    CurrentOption = getgenv().BloxFruitsConfig.PreferredFruit,
-    Flag = "PreferredFruit",
+    CurrentOption = getgenv().BloxFruitsVulcanConfig.PreferredFruit,
     Callback = function(Option)
-        getgenv().BloxFruitsConfig.PreferredFruit = Option
+        getgenv().BloxFruitsVulcanConfig.PreferredFruit = Option
     end,
 })
 
 -- ==================== TAB 3: COMBAT ====================
-local CombatTab = Window:CreateTab("⚔️ Combat", 2)
+local CombatTab = Window:CreateTab("⚔️ Combat")
 
 CombatTab:CreateToggle({
     Name = "💀 Kill Aura",
-    CurrentValue = getgenv().BloxFruitsConfig.KillAura,
-    Flag = "KillAura",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.KillAura,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.KillAura = Value
+        getgenv().BloxFruitsVulcanConfig.KillAura = Value
         -- Colocar lógica do Kill Aura
+        -- Loop para atacar inimigos próximos
     end,
 })
 
 CombatTab:CreateToggle({
     Name = "💨 Auto Dodge",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoDodge,
-    Flag = "AutoDodge",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoDodge,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoDodge = Value
-        -- Colocar lógica do Auto Dodge
+        getgenv().BloxFruitsVulcanConfig.AutoDodge = Value
+        -- Colocar lógica para desviar automaticamente
     end,
 })
 
 CombatTab:CreateToggle({
     Name = "🛡️ Auto Block",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoBlock,
-    Flag = "AutoBlock",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoBlock,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoBlock = Value
-        -- Colocar lógica do Auto Block
+        getgenv().BloxFruitsVulcanConfig.AutoBlock = Value
+        -- Colocar lógica para bloquear ataques
     end,
 })
 
 CombatTab:CreateToggle({
     Name = "🔄 Auto Parry",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoParry,
-    Flag = "AutoParry",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoParry,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoParry = Value
-        -- Colocar lógica do Auto Parry
+        getgenv().BloxFruitsVulcanConfig.AutoParry = Value
+        -- Colocar lógica para aparar ataques
     end,
 })
 
@@ -347,46 +329,41 @@ CombatTab:CreateLabel("🎮 Auto Skills Individuais")
 
 CombatTab:CreateToggle({
     Name = "🔴 Auto Skill Z",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoSkillZ,
-    Flag = "AutoSkillZ",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoSkillZ,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoSkillZ = Value
+        getgenv().BloxFruitsVulcanConfig.AutoSkillZ = Value
     end,
 })
 
 CombatTab:CreateToggle({
     Name = "🟠 Auto Skill X",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoSkillX,
-    Flag = "AutoSkillX",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoSkillX,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoSkillX = Value
+        getgenv().BloxFruitsVulcanConfig.AutoSkillX = Value
     end,
 })
 
 CombatTab:CreateToggle({
     Name = "🟡 Auto Skill C",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoSkillC,
-    Flag = "AutoSkillC",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoSkillC,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoSkillC = Value
+        getgenv().BloxFruitsVulcanConfig.AutoSkillC = Value
     end,
 })
 
 CombatTab:CreateToggle({
     Name = "🟢 Auto Skill V",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoSkillV,
-    Flag = "AutoSkillV",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoSkillV,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoSkillV = Value
+        getgenv().BloxFruitsVulcanConfig.AutoSkillV = Value
     end,
 })
 
 CombatTab:CreateToggle({
     Name = "🔵 Auto Skill F",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoSkillF,
-    Flag = "AutoSkillF",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoSkillF,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoSkillF = Value
+        getgenv().BloxFruitsVulcanConfig.AutoSkillF = Value
     end,
 })
 
@@ -394,59 +371,55 @@ CombatTab:CreateDivider()
 
 CombatTab:CreateToggle({
     Name = "✨ Auto Awakened Skills",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoAwakenedSkills,
-    Flag = "AutoAwakenedSkills",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoAwakenedSkills,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoAwakenedSkills = Value
+        getgenv().BloxFruitsVulcanConfig.AutoAwakenedSkills = Value
     end,
 })
 
 CombatTab:CreateDropdown({
     Name = "🎯 Seleção de Alvo",
     Options = {"Nearest", "Lowest HP", "Highest Level", "Player", "Boss"},
-    CurrentOption = getgenv().BloxFruitsConfig.TargetSelection,
-    Flag = "TargetSelection",
+    CurrentOption = getgenv().BloxFruitsVulcanConfig.TargetSelection,
     Callback = function(Option)
-        getgenv().BloxFruitsConfig.TargetSelection = Option
+        getgenv().BloxFruitsVulcanConfig.TargetSelection = Option
     end,
 })
 
 -- ==================== TAB 4: FRUITS ====================
-local FruitsTab = Window:CreateTab("🍎 Fruits", 3)
+local FruitsTab = Window:CreateTab("🍎 Fruits")
 
 FruitsTab:CreateToggle({
     Name = "🍽️ Auto Eat Fruit",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoEatFruit,
-    Flag = "AutoEatFruit",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoEatFruit,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoEatFruit = Value
+        getgenv().BloxFruitsVulcanConfig.AutoEatFruit = Value
+        -- Colocar lógica para comer frutas automaticamente
     end,
 })
 
 FruitsTab:CreateToggle({
     Name = "🎯 Fruit Sniper",
-    CurrentValue = getgenv().BloxFruitsConfig.FruitSniper,
-    Flag = "FruitSniper",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.FruitSniper,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.FruitSniper = Value
+        getgenv().BloxFruitsVulcanConfig.FruitSniper = Value
+        -- Colocar lógica para coletar frutas raras no mapa
     end,
 })
 
 FruitsTab:CreateToggle({
     Name = "💾 Auto Store Fruit",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoStoreFruit,
-    Flag = "AutoStoreFruit",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoStoreFruit,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoStoreFruit = Value
+        getgenv().BloxFruitsVulcanConfig.AutoStoreFruit = Value
     end,
 })
 
 FruitsTab:CreateToggle({
     Name = "🛒 Auto Buy Fruit",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoBuyFruit,
-    Flag = "AutoBuyFruit",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoBuyFruit,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoBuyFruit = Value
+        getgenv().BloxFruitsVulcanConfig.AutoBuyFruit = Value
     end,
 })
 
@@ -456,65 +429,62 @@ FruitsTab:CreateDropdown({
     Name = "⭐ Prioridade de Frutas",
     Options = {"Dragon", "Leopard", "Kitsune", "Mammoth", "Dough", "Venom", "Spirit", "Control", "Shadow"},
     CurrentOption = "Dragon",
-    Flag = "FruitPriority1",
     Callback = function(Option)
-        table.insert(getgenv().BloxFruitsConfig.FruitPriority, Option)
+        if not table.find(getgenv().BloxFruitsVulcanConfig.FruitPriority, Option) then
+            table.insert(getgenv().BloxFruitsVulcanConfig.FruitPriority, Option)
+        end
     end,
 })
 
 FruitsTab:CreateButton({
     Name = "🗑️ Limpar Prioridades",
     Callback = function()
-        getgenv().BloxFruitsConfig.FruitPriority = {}
+        getgenv().BloxFruitsVulcanConfig.FruitPriority = {}
         Notify("Prioridades", "Lista de prioridades limpa!", 2)
     end,
 })
 
 -- ==================== TAB 5: RAID & EVENTS ====================
-local RaidTab = Window:CreateTab("🏴‍☠️ Raid & Events", 4)
+local RaidTab = Window:CreateTab("🏴‍☠️ Raid & Events")
 
 RaidTab:CreateToggle({
     Name = "⚡ Auto Raid (Completo)",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoRaid,
-    Flag = "AutoRaid",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoRaid,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoRaid = Value
+        getgenv().BloxFruitsVulcanConfig.AutoRaid = Value
+        -- Colocar lógica completa para raids
     end,
 })
 
 RaidTab:CreateToggle({
     Name = "🌊 Auto Sea Event",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoSeaEvent,
-    Flag = "AutoSeaEvent",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoSeaEvent,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoSeaEvent = Value
+        getgenv().BloxFruitsVulcanConfig.AutoSeaEvent = Value
     end,
 })
 
 RaidTab:CreateToggle({
     Name = "🏭 Auto Factory",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoFactory,
-    Flag = "AutoFactory",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoFactory,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoFactory = Value
+        getgenv().BloxFruitsVulcanConfig.AutoFactory = Value
     end,
 })
 
 RaidTab:CreateToggle({
     Name = "🏴 Auto Pirate Raid",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoPirateRaid,
-    Flag = "AutoPirateRaid",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoPirateRaid,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoPirateRaid = Value
+        getgenv().BloxFruitsVulcanConfig.AutoPirateRaid = Value
     end,
 })
 
 RaidTab:CreateToggle({
     Name = "🚢 Auto Ship Raid",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoShipRaid,
-    Flag = "AutoShipRaid",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoShipRaid,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoShipRaid = Value
+        getgenv().BloxFruitsVulcanConfig.AutoShipRaid = Value
     end,
 })
 
@@ -522,85 +492,77 @@ RaidTab:CreateDivider()
 
 RaidTab:CreateToggle({
     Name = "🍰 Auto Cake Prince",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoCakePrince,
-    Flag = "AutoCakePrince",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoCakePrince,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoCakePrince = Value
+        getgenv().BloxFruitsVulcanConfig.AutoCakePrince = Value
     end,
 })
 
 RaidTab:CreateToggle({
     Name = "⚡ Auto Rip Indra",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoRipIndra,
-    Flag = "AutoRipIndra",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoRipIndra,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoRipIndra = Value
+        getgenv().BloxFruitsVulcanConfig.AutoRipIndra = Value
     end,
 })
 
 RaidTab:CreateToggle({
     Name = "🦈 Auto Terrorshark",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoTerrorshark,
-    Flag = "AutoTerrorshark",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoTerrorshark,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoTerrorshark = Value
+        getgenv().BloxFruitsVulcanConfig.AutoTerrorshark = Value
     end,
 })
 
 -- ==================== TAB 6: ESP & VISUALS ====================
-local ESPTab = Window:CreateTab("👁️ ESP & Visuals", 5)
+local ESPTab = Window:CreateTab("👁️ ESP & Visuals")
 
 ESPTab:CreateToggle({
     Name = "👤 ESP Players",
-    CurrentValue = getgenv().BloxFruitsConfig.ESPPlayers,
-    Flag = "ESPPlayers",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.ESPPlayers,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.ESPPlayers = Value
+        getgenv().BloxFruitsVulcanConfig.ESPPlayers = Value
+        -- Colocar lógica de ESP para players
     end,
 })
 
 ESPTab:CreateToggle({
     Name = "🍎 ESP Fruits",
-    CurrentValue = getgenv().BloxFruitsConfig.ESPFruits,
-    Flag = "ESPFruits",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.ESPFruits,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.ESPFruits = Value
+        getgenv().BloxFruitsVulcanConfig.ESPFruits = Value
     end,
 })
 
 ESPTab:CreateToggle({
     Name = "📦 ESP Chests",
-    CurrentValue = getgenv().BloxFruitsConfig.ESPChests,
-    Flag = "ESPChests",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.ESPChests,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.ESPChests = Value
+        getgenv().BloxFruitsVulcanConfig.ESPChests = Value
     end,
 })
 
 ESPTab:CreateToggle({
     Name = "👾 ESP Mobs",
-    CurrentValue = getgenv().BloxFruitsConfig.ESPMobs,
-    Flag = "ESPMobs",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.ESPMobs,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.ESPMobs = Value
+        getgenv().BloxFruitsVulcanConfig.ESPMobs = Value
     end,
 })
 
 ESPTab:CreateToggle({
     Name = "👑 ESP Boss",
-    CurrentValue = getgenv().BloxFruitsConfig.ESPBoss,
-    Flag = "ESPBoss",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.ESPBoss,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.ESPBoss = Value
+        getgenv().BloxFruitsVulcanConfig.ESPBoss = Value
     end,
 })
 
 ESPTab:CreateToggle({
     Name = "🏝️ ESP Islands",
-    CurrentValue = getgenv().BloxFruitsConfig.ESPIslands,
-    Flag = "ESPIslands",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.ESPIslands,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.ESPIslands = Value
+        getgenv().BloxFruitsVulcanConfig.ESPIslands = Value
     end,
 })
 
@@ -608,40 +570,35 @@ ESPTab:CreateDivider()
 
 ESPTab:CreateSlider({
     Name = "📏 Distância do ESP",
-    Range = {100, 2000},
-    Increment = 50,
-    Suffix = "Estudos",
-    CurrentValue = getgenv().BloxFruitsConfig.ESPDistance,
-    Flag = "ESPDistance",
+    Min = 100,
+    Max = 2000,
+    Default = getgenv().BloxFruitsVulcanConfig.ESPDistance,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.ESPDistance = Value
+        getgenv().BloxFruitsVulcanConfig.ESPDistance = Value
     end,
 })
 
 ESPTab:CreateToggle({
     Name = "📈 Tracers",
-    CurrentValue = getgenv().BloxFruitsConfig.ESPTracers,
-    Flag = "ESPTracers",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.ESPTracers,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.ESPTracers = Value
+        getgenv().BloxFruitsVulcanConfig.ESPTracers = Value
     end,
 })
 
 ESPTab:CreateToggle({
     Name = "🏷️ Mostrar Nome",
-    CurrentValue = getgenv().BloxFruitsConfig.ESPName,
-    Flag = "ESPName",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.ESPName,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.ESPName = Value
+        getgenv().BloxFruitsVulcanConfig.ESPName = Value
     end,
 })
 
 ESPTab:CreateToggle({
     Name = "❤️ Mostrar Vida",
-    CurrentValue = getgenv().BloxFruitsConfig.ESPHealth,
-    Flag = "ESPHealth",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.ESPHealth,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.ESPHealth = Value
+        getgenv().BloxFruitsVulcanConfig.ESPHealth = Value
     end,
 })
 
@@ -649,31 +606,28 @@ ESPTab:CreateToggle({
 ESPTab:CreateColorPicker({
     Name = "🎨 Cor Players",
     Color = Color3.fromRGB(255, 0, 0),
-    Flag = "ESPPlayerColor",
     Callback = function(Color)
-        -- Aplicar cor
+        -- Aplicar cor aos ESPs de players
     end,
 })
 
 ESPTab:CreateColorPicker({
     Name = "🎨 Cor Fruits",
     Color = Color3.fromRGB(255, 165, 0),
-    Flag = "ESPFruitColor",
     Callback = function(Color)
-        -- Aplicar cor
+        -- Aplicar cor aos ESPs de frutas
     end,
 })
 
 -- ==================== TAB 7: TELEPORTS ====================
-local TeleportTab = Window:CreateTab("🚀 Teleports", 6)
+local TeleportTab = Window:CreateTab("🚀 Teleports")
 
 TeleportTab:CreateDropdown({
     Name = "🏝️ Ilhas (First Sea)",
     Options = {"Starter Island", "Jungle", "Pirate Village", "Desert", "Frozen Village", "Marine Fortress", "Skylands", "Prison", "Colosseum", "Magma Village"},
     CurrentOption = "Starter Island",
-    Flag = "TeleportIsland1",
     Callback = function(Option)
-        -- Lógica de teleporte
+        -- Lógica de teleporte para First Sea
         Notify("Teleporte", "Teleportando para " .. Option, 2)
     end,
 })
@@ -682,7 +636,6 @@ TeleportTab:CreateDropdown({
     Name = "🏝️ Ilhas (Second Sea)",
     Options = {"Kingdom of Rose", "Green Zone", "Graveyard", "Snow Mountain", "Hot and Cold", "Cursed Ship", "Ice Castle", "Forgotten Island"},
     CurrentOption = "Kingdom of Rose",
-    Flag = "TeleportIsland2",
     Callback = function(Option)
         Notify("Teleporte", "Teleportando para " .. Option, 2)
     end,
@@ -692,7 +645,6 @@ TeleportTab:CreateDropdown({
     Name = "🏝️ Ilhas (Third Sea)",
     Options = {"Port Town", "Hydra Island", "Great Tree", "Castle on the Sea", "Mansion", "Floating Turtle", "Sea of Treats"},
     CurrentOption = "Port Town",
-    Flag = "TeleportIsland3",
     Callback = function(Option)
         Notify("Teleporte", "Teleportando para " .. Option, 2)
     end,
@@ -704,6 +656,7 @@ TeleportTab:CreateButton({
     Name = "📍 Teleport para NPC da Quest",
     Callback = function()
         Notify("Teleporte", "Teleportando para NPC da Quest", 2)
+        -- Lógica para encontrar e teleportar para o NPC da quest atual
     end,
 })
 
@@ -729,12 +682,11 @@ TeleportTab:CreateButton({
 })
 
 -- ==================== TAB 8: AUTO SKILLS ====================
-local AutoSkillsTab = Window:CreateTab("⚡ Auto Skills", 7)
+local AutoSkillsTab = Window:CreateTab("⚡ Auto Skills")
 
 AutoSkillsTab:CreateToggle({
     Name = "🔄 Auto Buscar Maestria",
     CurrentValue = false,
-    Flag = "AutoMasteryFarm",
     Callback = function(Value)
         if Value then
             Notify("Auto Skills", "Farmando maestria automaticamente", 2)
@@ -745,7 +697,6 @@ AutoSkillsTab:CreateToggle({
 AutoSkillsTab:CreateToggle({
     Name = "🔮 Auto Desbloquear Estilos de Luta",
     CurrentValue = false,
-    Flag = "AutoUnlockFightingStyles",
     Callback = function(Value)
         if Value then
             Notify("Auto Skills", "Desbloqueando estilos de luta", 2)
@@ -756,7 +707,6 @@ AutoSkillsTab:CreateToggle({
 AutoSkillsTab:CreateToggle({
     Name = "⚔️ Auto Desbloquear Espadas",
     CurrentValue = false,
-    Flag = "AutoUnlockSwords",
     Callback = function(Value)
         if Value then
             Notify("Auto Skills", "Desbloqueando espadas", 2)
@@ -768,16 +718,16 @@ AutoSkillsTab:CreateButton({
     Name = "📚 Resetar Pontos de Estatística",
     Callback = function()
         Notify("Auto Skills", "Resetando pontos de estatística", 2)
+        -- Lógica para resetar stats
     end,
 })
 
 -- ==================== TAB 9: RACE ====================
-local RaceTab = Window:CreateTab("🧬 Race", 8)
+local RaceTab = Window:CreateTab("🧬 Race")
 
 RaceTab:CreateToggle({
     Name = "✨ Auto Race V4",
     CurrentValue = false,
-    Flag = "AutoRaceV4",
     Callback = function(Value)
         if Value then
             Notify("Race", "Iniciando Auto Race V4", 2)
@@ -788,7 +738,6 @@ RaceTab:CreateToggle({
 RaceTab:CreateToggle({
     Name = "🔄 Auto Evolution (Todas Raças)",
     CurrentValue = false,
-    Flag = "AutoEvo",
     Callback = function(Value)
         if Value then
             Notify("Race", "Auto Evolution ativado", 2)
@@ -799,7 +748,6 @@ RaceTab:CreateToggle({
 RaceTab:CreateToggle({
     Name = "💪 Auto Usar Habilidade da Raça",
     CurrentValue = false,
-    Flag = "AutoRaceAbility",
     Callback = function(Value)
         if Value then
             Notify("Race", "Usando habilidade da raça automaticamente", 2)
@@ -811,46 +759,47 @@ RaceTab:CreateButton({
     Name = "🧬 Verificar Raça Atual",
     Callback = function()
         local player = game.Players.LocalPlayer
-        local race = player.Data.Race.Value or "None"
-        Notify("Raça Atual", "Sua raça é: " .. race, 3)
+        local race = player.Data.Race and player.Data.Race.Value or "None"
+        Notify("Raça Atual", "Sua raça é: " .. tostring(race), 3)
     end,
 })
 
 -- ==================== TAB 10: MISC ====================
-local MiscTab = Window:CreateTab("🔧 Misc", 9)
+local MiscTab = Window:CreateTab("🔧 Misc")
 
 MiscTab:CreateSlider({
     Name = "💨 WalkSpeed",
-    Range = {16, 250},
-    Increment = 1,
-    Suffix = "Vel",
-    CurrentValue = getgenv().BloxFruitsConfig.WalkSpeed,
-    Flag = "WalkSpeed",
+    Min = 16,
+    Max = 250,
+    Default = getgenv().BloxFruitsVulcanConfig.WalkSpeed,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.WalkSpeed = Value
-        game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
+        getgenv().BloxFruitsVulcanConfig.WalkSpeed = Value
+        local player = game.Players.LocalPlayer
+        if player and player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.WalkSpeed = Value
+        end
     end,
 })
 
 MiscTab:CreateSlider({
     Name = "🦘 JumpPower",
-    Range = {50, 500},
-    Increment = 5,
-    Suffix = "Pwr",
-    CurrentValue = getgenv().BloxFruitsConfig.JumpPower,
-    Flag = "JumpPower",
+    Min = 50,
+    Max = 500,
+    Default = getgenv().BloxFruitsVulcanConfig.JumpPower,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.JumpPower = Value
-        game.Players.LocalPlayer.Character.Humanoid.JumpPower = Value
+        getgenv().BloxFruitsVulcanConfig.JumpPower = Value
+        local player = game.Players.LocalPlayer
+        if player and player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.JumpPower = Value
+        end
     end,
 })
 
 MiscTab:CreateToggle({
     Name = "♾️ Infinite Jump",
-    CurrentValue = getgenv().BloxFruitsConfig.InfiniteJump,
-    Flag = "InfiniteJump",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.InfiniteJump,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.InfiniteJump = Value
+        getgenv().BloxFruitsVulcanConfig.InfiniteJump = Value
         -- Lógica de infinite jump
         if Value then
             local player = game.Players.LocalPlayer
@@ -858,7 +807,7 @@ MiscTab:CreateToggle({
             local humanoid = char:WaitForChild("Humanoid")
             local jumping = false
             game:GetService("UserInputService").JumpRequest:Connect(function()
-                if getgenv().BloxFruitsConfig.InfiniteJump and humanoid and not jumping then
+                if getgenv().BloxFruitsVulcanConfig.InfiniteJump and humanoid and not jumping then
                     jumping = true
                     humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
                     task.wait(0.1)
@@ -871,20 +820,18 @@ MiscTab:CreateToggle({
 
 MiscTab:CreateToggle({
     Name = "🌀 NoClip",
-    CurrentValue = getgenv().BloxFruitsConfig.NoClip,
-    Flag = "NoClip",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.NoClip,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.NoClip = Value
-        -- Lógica de noclip
+        getgenv().BloxFruitsVulcanConfig.NoClip = Value
+        -- Colocar lógica de noclip
     end,
 })
 
 MiscTab:CreateToggle({
     Name = "💤 Anti AFK",
-    CurrentValue = getgenv().BloxFruitsConfig.AntiAFK,
-    Flag = "AntiAFK",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AntiAFK,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AntiAFK = Value
+        getgenv().BloxFruitsVulcanConfig.AntiAFK = Value
         if Value then
             local vu = game:GetService("VirtualUser")
             game:GetService("Players").LocalPlayer.Idled:Connect(function()
@@ -900,28 +847,25 @@ MiscTab:CreateDivider()
 
 MiscTab:CreateToggle({
     Name = "🗡️ Auto Comprar Todas Espadas",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoBuyAllSwords,
-    Flag = "AutoBuyAllSwords",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoBuyAllSwords,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoBuyAllSwords = Value
+        getgenv().BloxFruitsVulcanConfig.AutoBuyAllSwords = Value
     end,
 })
 
 MiscTab:CreateToggle({
     Name = "🥋 Auto Comprar Estilos de Luta",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoBuyStyles,
-    Flag = "AutoBuyStyles",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoBuyStyles,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoBuyStyles = Value
+        getgenv().BloxFruitsVulcanConfig.AutoBuyStyles = Value
     end,
 })
 
 MiscTab:CreateToggle({
     Name = "💍 Auto Comprar Acessórios",
-    CurrentValue = getgenv().BloxFruitsConfig.AutoBuyAccessories,
-    Flag = "AutoBuyAccessories",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.AutoBuyAccessories,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.AutoBuyAccessories = Value
+        getgenv().BloxFruitsVulcanConfig.AutoBuyAccessories = Value
     end,
 })
 
@@ -929,10 +873,9 @@ MiscTab:CreateDivider()
 
 MiscTab:CreateToggle({
     Name = "🌫️ Remover Fog",
-    CurrentValue = getgenv().BloxFruitsConfig.RemoveFog,
-    Flag = "RemoveFog",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.RemoveFog,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.RemoveFog = Value
+        getgenv().BloxFruitsVulcanConfig.RemoveFog = Value
         if Value then
             game.Lighting.FogEnd = 100000
             game.Lighting.FogStart = 100000
@@ -945,12 +888,11 @@ MiscTab:CreateToggle({
 
 MiscTab:CreateToggle({
     Name = "⚡ FPS Boost",
-    CurrentValue = getgenv().BloxFruitsConfig.FPSBoost,
-    Flag = "FPSBoost",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.FPSBoost,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.FPSBoost = Value
+        getgenv().BloxFruitsVulcanConfig.FPSBoost = Value
         if Value then
-            -- Remover decorações desnecessárias
+            -- Remover decorações desnecessárias para melhorar FPS
             for _, v in pairs(workspace:GetDescendants()) do
                 if v:IsA("Decal") or v:IsA("ParticleEmitter") then
                     v.Enabled = false
@@ -962,10 +904,9 @@ MiscTab:CreateToggle({
 
 MiscTab:CreateToggle({
     Name = "⬜ White Screen (Modo Performance)",
-    CurrentValue = getgenv().BloxFruitsConfig.WhiteScreen,
-    Flag = "WhiteScreen",
+    CurrentValue = getgenv().BloxFruitsVulcanConfig.WhiteScreen,
     Callback = function(Value)
-        getgenv().BloxFruitsConfig.WhiteScreen = Value
+        getgenv().BloxFruitsVulcanConfig.WhiteScreen = Value
         if Value then
             -- Criar tela branca (melhora FPS drasticamente)
             local ws = Instance.new("Frame")
@@ -984,12 +925,14 @@ MiscTab:CreateToggle({
 })
 
 -- ==================== TAB 11: SETTINGS ====================
-local SettingsTab = Window:CreateTab("⚙️ Settings", 10)
+local SettingsTab = Window:CreateTab("⚙️ Settings")
 
 SettingsTab:CreateButton({
     Name = "💾 Salvar Configuração",
     Callback = function()
-        Rayfield:SaveConfiguration()
+        if Vulcan and Vulcan.SaveConfig then
+            Vulcan:SaveConfig()
+        end
         Notify("Configuração", "Configuração salva com sucesso!", 2)
     end,
 })
@@ -997,7 +940,9 @@ SettingsTab:CreateButton({
 SettingsTab:CreateButton({
     Name = "📂 Carregar Configuração",
     Callback = function()
-        Rayfield:LoadConfiguration()
+        if Vulcan and Vulcan.LoadConfig then
+            Vulcan:LoadConfig()
+        end
         Notify("Configuração", "Configuração carregada!", 2)
     end,
 })
@@ -1005,7 +950,9 @@ SettingsTab:CreateButton({
 SettingsTab:CreateButton({
     Name = "🗑️ Destruir GUI",
     Callback = function()
-        Rayfield:Destroy()
+        if Window and Window.Destroy then
+            Window:Destroy()
+        end
         Notify("GUI", "Interface destruída. Recarregue o script para reabrir.", 3)
     end,
 })
@@ -1022,35 +969,36 @@ SettingsTab:CreateButton({
 SettingsTab:CreateButton({
     Name = "ℹ️ Informações do Script",
     Callback = function()
-        Notify("Sobre", "🌊 Blox Fruits Hub v2026\nDesenvolvido por Expert\nUsando Rayfield UI Suite", 5)
+        Notify("Sobre", "🌊 Blox Fruits Hub v2026\nDesenvolvido por Expert\nUsando Vulcan UI Suite", 5)
     end,
 })
 
 -- Notificação final
 Notify("✅ Setup Completo", "Todas as abas foram carregadas! Aproveite o hub!", 4)
 
--- Loop principal para atualizações
+-- Loop principal para atualizações constantes
 spawn(function()
     while task.wait(1) do
-        -- Atualizar estatísticas do player
+        -- Atualizar estatísticas do player e aplicar configurações persistentes
         pcall(function()
             local player = game.Players.LocalPlayer
             if player and player.Character and player.Character:FindFirstChild("Humanoid") then
                 local humanoid = player.Character.Humanoid
                 -- Aplicar WalkSpeed e JumpPower em caso de respawn
-                if getgenv().BloxFruitsConfig.WalkSpeed ~= 16 then
-                    humanoid.WalkSpeed = getgenv().BloxFruitsConfig.WalkSpeed
+                if getgenv().BloxFruitsVulcanConfig.WalkSpeed ~= 16 then
+                    humanoid.WalkSpeed = getgenv().BloxFruitsVulcanConfig.WalkSpeed
                 end
-                if getgenv().BloxFruitsConfig.JumpPower ~= 50 then
-                    humanoid.JumpPower = getgenv().BloxFruitsConfig.JumpPower
+                if getgenv().BloxFruitsVulcanConfig.JumpPower ~= 50 then
+                    humanoid.JumpPower = getgenv().BloxFruitsVulcanConfig.JumpPower
                 end
             end
         end)
     end
 end)
 
--- Retorno opcional para debugging
+-- Retorno opcional para debugging e acesso externo
 return {
     Window = Window,
-    Config = getgenv().BloxFruitsConfig
+    Config = getgenv().BloxFruitsVulcanConfig,
+    Vulcan = Vulcan
 }
