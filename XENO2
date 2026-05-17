@@ -1,531 +1,282 @@
---[[
-    SCRIPT: Sniper Arena - Rayfield GUI
-    BIBLIOTECA: Rayfield (Interface Moderna)
-    FUNÇÕES: Aimbot (Botão Direito/Tecla Personalizada), Munição Infinita
-    AUTOR: Sniper Arena Script
-]]
+-- =============================================
+-- XENO LORD - Poly's Zombies Script
+-- Autor: alyssonzkn
+-- Versão: 1.0
+-- UI: WindUI
+-- =============================================
 
--- Carregar Rayfield (certifique-se de ter a biblioteca instalada)
-local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/RedZircon/WindUI/main/source"))()
 
--- Variáveis globais
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
+local Window = WindUI:CreateWindow({
+    Title = "Xeno Lord | Poly's Zombies",
+    Icon = "rbxassetid://17789440466", -- ícone opcional
+    Size = UDim2.new(0, 620, 0, 460),
+    Theme = "Dark",
+    DefaultColor = Color3.fromRGB(170, 0, 0) -- Vermelho padrão
+})
 
--- Configurações
-local Settings = {
-    AimbotEnabled = false,
-    AimbotKey = "RightClick", -- Padrão: botão direito
-    CustomKey = nil,
-    UseCustomKey = false,
-    FOVRadius = 200,
-    Smoothness = 0.3,
-    InfiniteAmmo = true,
-    ShowFOV = true,
-    TeamCheck = false,
-    VisibleCheck = true,
-    AimPart = "Head" -- Head, HumanoidRootPart, Torso
+-- Variáveis globais de toggles
+getgenv().XenoSettings = {
+    KillAura = false,
+    AntiAFK = false,
+    AutoUnlockDoors = false,
+    AutoBuyPerks = false,
+    AutoUpgradeWeapons = false,
+    OneHitKill = false,
+    FreezeEnemies = false,
+    SafeTP = false,
 }
 
--- Variáveis de controle
-local currentTarget = nil
-local fovCircle = nil
-local isAiming = false
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
--- Função para criar círculo de FOV
-local function CreateFOVCircle()
-    if fovCircle then fovCircle:Destroy() end
-    
-    local circle = Drawing.new("Circle")
-    circle.Thickness = 2
-    circle.Radius = Settings.FOVRadius
-    circle.Color = Color3.fromRGB(255, 50, 100)
-    circle.Filled = false
-    circle.Visible = Settings.ShowFOV
-    circle.Transparency = 1
-    circle.NumSides = 64
-    circle.Position = Vector2.new(Mouse.X, Mouse.Y)
-    
-    return circle
-end
+-- ==================== FUNÇÕES DE EXPLOIT ====================
 
--- Atualizar círculo de FOV
-local function UpdateFOVCircle()
-    if fovCircle and Settings.ShowFOV then
-        fovCircle.Position = Vector2.new(Mouse.X, Mouse.Y)
-        fovCircle.Radius = Settings.FOVRadius
-    end
-end
-
--- Sistema de munição infinita
-local function SetupInfiniteAmmo()
-    -- Procurar GUI de munição no jogo
-    local function FindAndModifyAmmo()
-        local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-        if playerGui then
-            -- Tentar encontrar diferentes estruturas de munição
-            local possibleAmmoLocations = {
-                playerGui:FindFirstChild("Ammo"),
-                playerGui:FindFirstChild("WeaponGUI"),
-                playerGui:FindFirstChild("HUD"),
-                LocalPlayer.Character:FindFirstChild("Humanoid"),
-                workspace.CurrentCamera:FindFirstChild("AmmoDisplay")
-            }
-            
-            for _, location in pairs(possibleAmmoLocations) do
-                if location then
-                    local ammoText = location:FindFirstChildWhichIsA("TextLabel") or 
-                                   location:FindFirstChildWhichIsA("TextBox") or
-                                   location:FindFirstChild("Text")
-                    
-                    if ammoText then
-                        if Settings.InfiniteAmmo then
-                            ammoText.Text = "∞"
-                            if ammoText:IsA("TextLabel") then
-                                ammoText.TextColor3 = Color3.fromRGB(0, 255, 0)
-                            end
-                        end
-                        
-                        -- Monitorar mudanças
-                        if not ammoText.Changed:IsConnected(ammoConnection) then
-                            local conn
-                            conn = ammoText:GetPropertyChangedSignal("Text"):Connect(function()
-                                if Settings.InfiniteAmmo and ammoText.Text ~= "∞" then
-                                    ammoText.Text = "∞"
-                                end
-                            end)
-                        end
+local function KillAura()
+    while getgenv().XenoSettings.KillAura do
+        task.wait(0.1)
+        pcall(function()
+            for _, zombie in ipairs(Workspace.Zombies:GetChildren()) do
+                if zombie:FindFirstChild("Humanoid") and zombie.Humanoid.Health > 0 then
+                    local dist = (zombie.HumanoidRootPart.Position - Character.HumanoidRootPart.Position).Magnitude
+                    if dist < 25 then -- alcance da aura
+                        zombie.Humanoid:TakeDamage(9999)
                     end
                 end
             end
-        end
+        end)
     end
-    
-    FindAndModifyAmmo()
-    
-    -- Monitorar mudanças de personagem
-    LocalPlayer.CharacterAdded:Connect(function()
+end
+
+local function OneHitKill()
+    while getgenv().XenoSettings.OneHitKill do
+        task.wait(0.2)
+        pcall(function()
+            for _, zombie in ipairs(Workspace.Zombies:GetChildren()) do
+                if zombie:FindFirstChild("Humanoid") then
+                    zombie.Humanoid.Health = 1
+                end
+            end
+        end)
+    end
+end
+
+local function FreezeEnemies()
+    while getgenv().XenoSettings.FreezeEnemies do
         task.wait(0.5)
-        FindAndModifyAmmo()
+        pcall(function()
+            for _, zombie in ipairs(Workspace.Zombies:GetChildren()) do
+                if zombie:FindFirstChild("Humanoid") then
+                    zombie.Humanoid.WalkSpeed = 0
+                    zombie.Humanoid.JumpPower = 0
+                end
+            end
+        end)
+    end
+end
+
+local function AntiAFK()
+    while getgenv().XenoSettings.AntiAFK do
+        task.wait(30)
+        pcall(function()
+            game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+            task.wait(0.1)
+            game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+        end)
+    end
+end
+
+local function AutoUnlockDoors()
+    while getgenv().XenoSettings.AutoUnlockDoors do
+        task.wait(1)
+        pcall(function()
+            for _, door in ipairs(Workspace:GetDescendants()) do
+                if door.Name:lower():find("door") or door.Name == "Gate" then
+                    if door:FindFirstChild("Lock") then
+                        door.Lock:Destroy()
+                    end
+                    if door:FindFirstChild("Value") then
+                        door.Value.Value = false
+                    end
+                end
+            end
+        end)
+    end
+end
+
+local function AutoBuyPerks()
+    while getgenv().XenoSettings.AutoBuyPerks do
+        task.wait(2)
+        pcall(function()
+            -- Ajuste conforme os nomes reais do jogo
+            for _, perk in ipairs({"Juggernog", "SpeedCola", "QuickRevive", "DoubleTap"}) do
+                local buyPart = Workspace:FindFirstChild(perk, true)
+                if buyPart and buyPart:FindFirstChild("ProximityPrompt") then
+                    fireproximityprompt(buyPart.ProximityPrompt)
+                end
+            end
+        end)
+    end
+end
+
+local function AutoUpgradeWeapons()
+    while getgenv().XenoSettings.AutoUpgradeWeapons do
+        task.wait(3)
+        pcall(function()
+            -- Exemplo genérico - ajuste conforme o jogo
+            local upgradeMachine = Workspace:FindFirstChild("PackAPunch", true) or Workspace:FindFirstChild("UpgradeStation", true)
+            if upgradeMachine and upgradeMachine:FindFirstChild("ProximityPrompt") then
+                fireproximityprompt(upgradeMachine.ProximityPrompt)
+            end
+        end)
+    end
+end
+
+local function TeleportToSafe()
+    pcall(function()
+        local safeSpots = {
+            Vector3.new(0, 50, 0),   -- ajuste conforme mapa
+            Vector3.new(100, 20, 100),
+            Vector3.new(-150, 30, -80)
+        }
+        Character.HumanoidRootPart.CFrame = CFrame.new(safeSpots[math.random(1, #safeSpots)])
     end)
 end
 
--- Verificar se o alvo é visível
-local function IsVisible(targetPart)
-    if not Settings.VisibleCheck then return true end
-    
-    local origin = workspace.CurrentCamera.CFrame.Position
-    local direction = (targetPart.Position - origin).Unit
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
-    
-    local raycastResult = workspace:Raycast(origin, direction * 1000, raycastParams)
-    
-    if raycastResult and raycastResult.Instance:IsDescendantOf(targetPart.Parent) then
-        return true
+-- ==================== INTERFACE ====================
+
+local TabMain = Window:Tab({
+    Title = "Principal",
+    Icon = "home"
+})
+
+TabMain:Toggle({
+    Title = "Kill Aura",
+    Default = false,
+    Callback = function(v)
+        getgenv().XenoSettings.KillAura = v
+        if v then task.spawn(KillAura) end
     end
-    return false
-end
+})
 
--- Encontrar o melhor alvo
-local function GetClosestPlayer()
-    local closestDistance = Settings.FOVRadius
-    local closestPlayer = nil
-    local mousePos = UserInputService:GetMouseLocation()
-    
-    for _, player in pairs(Players:GetPlayers()) do
-        -- Verificar se não é o próprio jogador
-        if player ~= LocalPlayer then
-            -- Verificar time se necessário
-            if Settings.TeamCheck and LocalPlayer.Team and player.Team == LocalPlayer.Team then
-                continue
-            end
-            
-            -- Verificar se o personagem existe e está vivo
-            local character = player.Character
-            if character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
-                local aimPart = character:FindFirstChild(Settings.AimPart)
-                if not aimPart then
-                    aimPart = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-                end
-                
-                if aimPart then
-                    local aimPos, onScreen = workspace.CurrentCamera:WorldToScreenPoint(aimPart.Position)
-                    
-                    if onScreen then
-                        -- Verificar visibilidade
-                        if IsVisible(aimPart) then
-                            local distance = (Vector2.new(aimPos.X, aimPos.Y) - mousePos).Magnitude
-                            
-                            if distance < closestDistance then
-                                closestDistance = distance
-                                closestPlayer = player
-                            end
-                        end
-                    end
-                end
-            end
-        end
+TabMain:Toggle({
+    Title = "One Hit Kill",
+    Default = false,
+    Callback = function(v)
+        getgenv().XenoSettings.OneHitKill = v
+        if v then task.spawn(OneHitKill) end
     end
-    
-    return closestPlayer, closestDistance
-end
+})
 
--- Sistema de aimbot
-local function UpdateAimbot()
-    if not Settings.AimbotEnabled then
-        if currentTarget then currentTarget = nil end
-        return
+TabMain:Toggle({
+    Title = "Congelar Inimigos",
+    Default = false,
+    Callback = function(v)
+        getgenv().XenoSettings.FreezeEnemies = v
+        if v then task.spawn(FreezeEnemies) end
     end
-    
-    local target, distance = GetClosestPlayer()
-    
-    if target and distance <= Settings.FOVRadius then
-        currentTarget = target
-        
-        if target.Character then
-            local aimPart = target.Character:FindFirstChild(Settings.AimPart)
-            if not aimPart then
-                aimPart = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
-            end
-            
-            if aimPart then
-                local targetPos = aimPart.Position
-                local camera = workspace.CurrentCamera
-                
-                -- Calcular nova posição da câmera
-                local newCFrame = CFrame.new(camera.CFrame.Position, targetPos)
-                
-                -- Aplicar suavidade
-                if Settings.Smoothness > 0 then
-                    local currentCFrame = camera.CFrame
-                    local lerpAlpha = math.min(1, Settings.Smoothness)
-                    camera.CFrame = currentCFrame:Lerp(newCFrame, lerpAlpha)
-                else
-                    camera.CFrame = newCFrame
-                end
-            end
-        end
-    else
-        currentTarget = nil
-    end
-end
-
--- Configurar Rayfield
-local Window = Rayfield:CreateWindow({
-    Name = "Sniper Arena | Advanced GUI",
-    LoadingTitle = "Carregando Sniper Arena Script",
-    LoadingSubtitle = "by Script Developer",
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = "SniperArena", -- Pasta para salvar configurações
-        FileName = "Settings"
-    },
-    Discord = {
-        Enabled = false,
-        Invite = "noinvite", -- Coloque o invite do seu Discord aqui se quiser
-        RememberJoins = true
-    },
-    KeySystem = false, -- Desative se não quiser sistema de chave
-    KeySettings = {
-        Title = "Sniper Arena",
-        Subtitle = "Sistema de Chave",
-        Note = "Entre no Discord para pegar a chave",
-        FileName = "Key",
-        SaveKey = true,
-        GrabKeyFromSite = false,
-        Key = {"Hello"} -- Mude para sua chave se ativar o sistema
-    }
 })
 
--- Criar Tabs
-local MainTab = Window:CreateTab("Principal", 4483362458) -- Ícone de mira
-local SettingsTab = Window:CreateTab("Configurações", 4483362458)
-local VisualsTab = Window:CreateTab("Visuais", 4483362458)
-local CreditsTab = Window:CreateTab("Créditos", 4483362458)
-
--- Seção: Aimbot Principal
-local AimbotSection = MainTab:CreateSection("Aimbot")
-
--- Toggle para ativar/desativar aimbot
-MainTab:CreateToggle({
-    Name = "Aimbot (Botão Direito)",
-    CurrentValue = false,
-    Flag = "AimbotToggle",
-    Callback = function(Value)
-        Settings.AimbotEnabled = Value
-        if not Value then
-            currentTarget = nil
-        end
-    end,
-})
-
--- Dropdown para parte do corpo
-MainTab:CreateDropdown({
-    Name = "Parte do Corpo para Mirar",
-    Options = {"Head", "HumanoidRootPart", "Torso"},
-    CurrentOption = "Head",
-    Flag = "AimPart",
-    Callback = function(Option)
-        Settings.AimPart = Option
-    end,
-})
-
--- Slider para raio do FOV
-MainTab:CreateSlider({
-    Name = "Raio do FOV",
-    Range = {50, 500},
-    Increment = 5,
-    Suffix = "px",
-    CurrentValue = 200,
-    Flag = "FOVRadius",
-    Callback = function(Value)
-        Settings.FOVRadius = Value
-        if fovCircle then
-            fovCircle.Radius = Value
-        end
-    end,
-})
-
--- Slider para suavidade
-MainTab:CreateSlider({
-    Name = "Suavidade da Mira",
-    Range = {0, 1},
-    Increment = 0.05,
-    Suffix = "",
-    CurrentValue = 0.3,
-    Flag = "Smoothness",
-    Callback = function(Value)
-        Settings.Smoothness = Value
-    end,
-})
-
--- Seção: Configurações de Mira
-local AimSettingsSection = SettingsTab:CreateSection("Configurações de Mira")
-
--- Toggle para verificação de time
-SettingsTab:CreateToggle({
-    Name = "Verificar Time (Não mira em aliados)",
-    CurrentValue = false,
-    Flag = "TeamCheck",
-    Callback = function(Value)
-        Settings.TeamCheck = Value
-    end,
-})
-
--- Toggle para verificação de visibilidade
-SettingsTab:CreateToggle({
-    Name = "Verificar Visibilidade (Só mira se visível)",
-    CurrentValue = true,
-    Flag = "VisibleCheck",
-    Callback = function(Value)
-        Settings.VisibleCheck = Value
-    end,
-})
-
--- Seção: Configuração de Teclas
-local KeybindSection = SettingsTab:CreateSection("Configuração de Teclas")
-
--- Dropdown para tecla do aimbot
-SettingsTab:CreateDropdown({
-    Name = "Tecla para Ativar Aimbot",
-    Options = {"Botão Direito", "Botão Esquerdo", "Botão do Meio", "Q", "E", "R", "F", "C", "X", "Z", "ALT", "CTRL", "SHIFT"},
-    CurrentOption = "Botão Direito",
-    Flag = "AimbotKeySelect",
-    Callback = function(Option)
-        Settings.AimbotKey = Option
-        Settings.UseCustomKey = Option ~= "Botão Direito"
-    end,
-})
-
--- Seção: Munição
-local AmmoSection = SettingsTab:CreateSection("Munição")
-
--- Toggle para munição infinita
-SettingsTab:CreateToggle({
-    Name = "Munição Infinita",
-    CurrentValue = true,
-    Flag = "InfiniteAmmo",
-    Callback = function(Value)
-        Settings.InfiniteAmmo = Value
-        SetupInfiniteAmmo()
-    end,
-})
-
--- Seção: Visuais
-local FOVSection = VisualsTab:CreateSection("Círculo de Mira (FOV)")
-
--- Toggle para mostrar círculo de FOV
-VisualsTab:CreateToggle({
-    Name = "Mostrar Círculo de Mira (FOV)",
-    CurrentValue = true,
-    Flag = "ShowFOV",
-    Callback = function(Value)
-        Settings.ShowFOV = Value
-        if fovCircle then
-            fovCircle.Visible = Value
-        end
-        if Value and not fovCircle then
-            fovCircle = CreateFOVCircle()
-        end
-    end,
-})
-
--- Seletor de cor do círculo
-VisualsTab:CreateColorPicker({
-    Name = "Cor do Círculo",
-    Color = Color3.fromRGB(255, 50, 100),
-    Flag = "FOVColor",
-    Callback = function(Color)
-        if fovCircle then
-            fovCircle.Color = Color
-        end
-    end,
-})
-
--- Slider para transparência
-VisualsTab:CreateSlider({
-    Name = "Transparência do Círculo",
-    Range = {0, 1},
-    Increment = 0.1,
-    Suffix = "",
-    CurrentValue = 1,
-    Flag = "FOVTransparency",
-    Callback = function(Value)
-        if fovCircle then
-            fovCircle.Transparency = Value
-        end
-    end,
-})
-
--- Seção: Créditos
-CreditsTab:CreateParagraph({
-    Title = "Sniper Arena Advanced GUI",
-    Content = "Versão: 2.0.0\n\nDesenvolvido por: Script Community\n\nCaracterísticas:\n✓ Aimbot avançado\n✓ Munição infinita\n✓ Interface moderna (Rayfield)\n✓ Configurações personalizáveis\n✓ Sistema de salvamento\n\nUse com responsabilidade!"
-})
-
--- Botão de informação
-CreditsTab:CreateButton({
-    Name = "Como Usar",
+TabMain:Button({
+    Title = "Teleport para Local Seguro",
     Callback = function()
-        Rayfield:Notify({
-            Title = "Instruções de Uso",
-            Content = "1. Ative o aimbot no menu\n2. Segure o botão direito (ou tecla configurada)\n3. Mire automaticamente nos inimigos\n4. Configure FOV e suavidade\n5. Munição infinita ativa automaticamente",
-            Duration = 5,
-        })
-    end,
+        TeleportToSafe()
+    end
 })
 
--- Sistema de teclas
-local function GetKeyCode(keyName)
-    local keyMap = {
-        ["Botão Direito"] = Enum.UserInputType.MouseButton2,
-        ["Botão Esquerdo"] = Enum.UserInputType.MouseButton1,
-        ["Botão do Meio"] = Enum.UserInputType.MouseButton3,
-        ["Q"] = Enum.KeyCode.Q,
-        ["E"] = Enum.KeyCode.E,
-        ["R"] = Enum.KeyCode.R,
-        ["F"] = Enum.KeyCode.F,
-        ["C"] = Enum.KeyCode.C,
-        ["X"] = Enum.KeyCode.X,
-        ["Z"] = Enum.KeyCode.Z,
-        ["ALT"] = Enum.KeyCode.LeftAlt,
-        ["CTRL"] = Enum.KeyCode.LeftControl,
-        ["SHIFT"] = Enum.KeyCode.LeftShift,
-    }
-    return keyMap[keyName] or Enum.UserInputType.MouseButton2
-end
-
--- Detectar entrada do usuário
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    local aimbotKey = GetKeyCode(Settings.AimbotKey)
-    
-    -- Verificar se a tecla pressionada é a configurada
-    local isAimKey = false
-    
-    if Settings.AimbotKey:find("Botão") then
-        isAimKey = input.UserInputType == aimbotKey
-    else
-        isAimKey = input.KeyCode == aimbotKey
-    end
-    
-    if isAimKey then
-        if Window.Flags.AimbotToggle then
-            Settings.AimbotEnabled = true
-            isAiming = true
-        end
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    local aimbotKey = GetKeyCode(Settings.AimbotKey)
-    
-    local isAimKey = false
-    
-    if Settings.AimbotKey:find("Botão") then
-        isAimKey = input.UserInputType == aimbotKey
-    else
-        isAimKey = input.KeyCode == aimbotKey
-    end
-    
-    if isAimKey then
-        Settings.AimbotEnabled = false
-        isAiming = false
-        currentTarget = nil
-    end
-end)
-
--- Criar círculo de FOV
-fovCircle = CreateFOVCircle()
-
--- Atualizar posição do mouse
-RunService.RenderStepped:Connect(function()
-    UpdateFOVCircle()
-    if Settings.AimbotEnabled then
-        UpdateAimbot()
-    end
-end)
-
--- Inicializar munição infinita
-SetupInfiniteAmmo()
-
--- Notificação de inicialização
-Rayfield:Notify({
-    Title = "Sniper Arena Script",
-    Content = "Script carregado com sucesso!\nPressione Insert para abrir o menu.",
-    Duration = 3,
+local TabAuto = Window:Tab({
+    Title = "Automação",
+    Icon = "cpu"
 })
 
--- Sistema de salvamento automático
-local function SaveSettings()
-    -- Salvar configurações automaticamente (Rayfield já faz isso)
-    print("Configurações salvas")
-end
+TabAuto:Toggle({
+    Title = "Anti AFK",
+    Default = false,
+    Callback = function(v)
+        getgenv().XenoSettings.AntiAFK = v
+        if v then task.spawn(AntiAFK) end
+    end
+})
 
--- Limpeza ao sair
-game:GetService("Players").LocalPlayer.OnTeleport:Connect(function()
-    if fovCircle then
-        fovCircle:Destroy()
+TabAuto:Toggle({
+    Title = "Desbloqueio Automático de Portas",
+    Default = false,
+    Callback = function(v)
+        getgenv().XenoSettings.AutoUnlockDoors = v
+        if v then task.spawn(AutoUnlockDoors) end
+    end
+})
+
+TabAuto:Toggle({
+    Title = "Auto Comprar Vantagens (Perks)",
+    Default = false,
+    Callback = function(v)
+        getgenv().XenoSettings.AutoBuyPerks = v
+        if v then task.spawn(AutoBuyPerks) end
+    end
+})
+
+TabAuto:Toggle({
+    Title = "Auto Upgrade de Armas",
+    Default = false,
+    Callback = function(v)
+        getgenv().XenoSettings.AutoUpgradeWeapons = v
+        if v then task.spawn(AutoUpgradeWeapons) end
+    end
+})
+
+-- ==================== CONFIGURAÇÕES ====================
+
+local TabConfig = Window:Tab({
+    Title = "Configurações",
+    Icon = "settings"
+})
+
+TabConfig:Dropdown({
+    Title = "Cor do Menu",
+    Items = {"Vermelho e Preto", "Verde e Preto", "Azul e Preto", "Amarelo e Preto", "Rosa e Preto"},
+    Default = "Vermelho e Preto",
+    Callback = function(selected)
+        local colors = {
+            ["Vermelho e Preto"] = Color3.fromRGB(170, 0, 0),
+            ["Verde e Preto"] = Color3.fromRGB(0, 170, 0),
+            ["Azul e Preto"] = Color3.fromRGB(0, 100, 255),
+            ["Amarelo e Preto"] = Color3.fromRGB(255, 200, 0),
+            ["Rosa e Preto"] = Color3.fromRGB(255, 0, 150)
+        }
+        Window:SetAccent(colors[selected])
+    end
+})
+
+TabConfig:Button({
+    Title = "Minimizar Menu (Tecla K)",
+    Callback = function()
+        print("Pressione 'K' para minimizar")
+    end
+})
+
+-- ==================== HOTKEY MINIMIZAR ====================
+
+local minimized = false
+game:GetService("UserInputService").InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.K then
+        minimized = not minimized
+        if minimized then
+            Window:Minimize()
+        else
+            Window:Restore()
+        end
     end
 end)
 
--- Loop de verificação de integridade
-task.spawn(function()
-    while task.wait(5) do
-        if Settings.InfiniteAmmo then
-            SetupInfiniteAmmo()
-        end
-        if Settings.ShowFOV and (not fovCircle or not fovCircle.Visible) then
-            if fovCircle then fovCircle:Destroy() end
-            fovCircle = CreateFOVCircle()
-        end
-    end
-end)
+Window:Notify({
+    Title = "Xeno Lord",
+    Content = "Script carregado com sucesso!\nAutor: alyssonzkn\nPressione K para minimizar.",
+    Duration = 6
+})
 
-print("Sniper Arena Script - Carregado com sucesso usando Rayfield!")
+print("Xeno Lord carregado por alyssonzkn")
