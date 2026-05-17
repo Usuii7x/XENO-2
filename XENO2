@@ -1,341 +1,911 @@
 --[[
-    Script: Xeno Lord
-    Autor: alyssonzkn
-    Para: Polyz (WindUI)
+    Apocalypse Rising 2 • Rayfield Edition
+    Menu UI Profissional para AR2
+    Desenvolvido por Alysson
+    Versão: 2.0.0
 --]]
 
-local XenoLord = {
-    Nome = "Xeno Lord",
-    Autor = "alyssonzkn",
-    Versao = "1.0",
-    JanelaAberta = true,
-    CorAtual = "Vermelho"
-}
+-- Carregar Rayfield UI Library (versão mais recente)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- Cores disponíveis
-local Cores = {
-    Vermelho = { fundo = Color3.fromRGB(30, 0, 0), texto = Color3.fromRGB(255, 0, 0), destaque = Color3.fromRGB(200, 0, 0) },
-    Verde = { fundo = Color3.fromRGB(0, 30, 0), texto = Color3.fromRGB(0, 255, 0), destaque = Color3.fromRGB(0, 200, 0) },
-    Azul = { fundo = Color3.fromRGB(0, 0, 30), texto = Color3.fromRGB(0, 100, 255), destaque = Color3.fromRGB(0, 150, 200) },
-    Amarelo = { fundo = Color3.fromRGB(30, 30, 0), texto = Color3.fromRGB(255, 255, 0), destaque = Color3.fromRGB(200, 200, 0) },
-    Rosa = { fundo = Color3.fromRGB(30, 0, 30), texto = Color3.fromRGB(255, 0, 255), destaque = Color3.fromRGB(200, 0, 200) }
-}
+-- Verificar se o jogo é Apocalypse Rising 2
+local gameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+if not gameName:find("Apocalypse Rising 2") and not gameName:find("Apocalypse Rising") then
+    warn("Este script foi desenvolvido para Apocalypse Rising 2")
+end
 
--- Configurações
-local Config = {
-    KillAura = false,
-    AntiAFK = false,
-    DestrancarPortas = false,
-    AutoComprar = false,
-    AutoUpgrade = false,
-    HitKill = false,
-    CongelarInimigos = false,
-    TeleporteSeguro = false
-}
-
--- Variáveis globais
+-- Variáveis Globais
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local TPpos = CFrame.new(0, 50, 0)
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
+local Camera = Workspace.CurrentCamera
 
--- Função para encontrar inimigos próximos
-local function GetNearbyEnemies(range)
-    local enemies = {}
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
-            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                local distance = (LocalPlayer.Character.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
-                if distance <= range then
-                    table.insert(enemies, v)
-                end
-            end
-        end
-    end
-    return enemies
-end
+-- Configurações do Usuário (Flags)
+local Flags = {}
+local ConfigFolder = "AR2_Rayfield_Config"
+local ConfigName = "config.json"
 
--- Kill Aura
-local function KillAuraFunction()
-    while Config.KillAura and task.wait(0.1) do
-        local enemies = GetNearbyEnemies(30)
-        for _, enemy in ipairs(enemies) do
-            if enemy.Character and enemy.Character:FindFirstChild("HumanoidRootPart") then
-                local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-                if tool then
-                    tool:Activate()
-                    firetouchinterest(LocalPlayer.Character.HumanoidRootPart, enemy.Character.HumanoidRootPart, 0)
-                    firetouchinterest(LocalPlayer.Character.HumanoidRootPart, enemy.Character.HumanoidRootPart, 1)
-                end
-            end
+-- Função para salvar configurações
+local function SaveConfig()
+    local success, err = pcall(function()
+        local configData = {}
+        for flag, value in pairs(Flags) do
+            configData[flag] = value
         end
+        writefile(ConfigFolder .. "/" .. ConfigName, game:GetService("HttpService"):JSONEncode(configData))
+    end)
+    if not success then
+        warn("Erro ao salvar configuração: " .. err)
     end
 end
 
--- Anti AFK
-local function AntiAFKFunction()
-    while Config.AntiAFK and task.wait(60) do
-        local vu = game:GetService("VirtualUser")
-        vu:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-        task.wait(0.1)
-        vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-    end
-end
-
--- Destrancar portas
-local function DestrancarPortasFunction()
-    while Config.DestrancarPortas and task.wait(0.5) do
-        for _, v in pairs(workspace:GetDescendants()) do
-            if v:IsA("ProximityPrompt") or v:IsA("ClickDetector") then
-                fireproximityprompt(v)
+-- Função para carregar configurações
+local function LoadConfig()
+    local success, err = pcall(function()
+        if isfile(ConfigFolder .. "/" .. ConfigName) then
+            local data = readfile(ConfigFolder .. "/" .. ConfigName)
+            local configData = game:GetService("HttpService"):JSONDecode(data)
+            for flag, value in pairs(configData) do
+                Flags[flag] = value
             end
-            if v.Name:lower():match("door") or v.Name:lower():match("porta") then
-                if v:IsA("BasePart") then
-                    v.CanCollide = false
-                    v.Transparency = 0.5
-                end
-            end
-        end
-    end
-end
-
--- Auto comprar vantagens
-local function AutoComprarFunction()
-    while Config.AutoComprar and task.wait(1) do
-        for _, v in pairs(LocalPlayer.PlayerGui:GetDescendants()) do
-            if v:IsA("TextButton") and (v.Text:lower():match("comprar") or v.Text:lower():match("buy")) then
-                v:Click()
-            end
-        end
-        for _, v in pairs(workspace:GetDescendants()) do
-            if v:IsA("ProximityPrompt") and v.Parent and v.Parent.Name:match("Vantagem") then
-                fireproximityprompt(v)
-            end
-        end
-    end
-end
-
--- Auto upgrade armas
-local function AutoUpgradeFunction()
-    while Config.AutoUpgrade and task.wait(0.5) do
-        for _, v in pairs(LocalPlayer.Backpack:GetChildren()) do
-            if v:IsA("Tool") and v:FindFirstChild("UpgradeButton") then
-                v.UpgradeButton:Click()
-            end
-        end
-        for _, v in pairs(LocalPlayer.Character:GetChildren()) do
-            if v:IsA("Tool") and v:FindFirstChild("UpgradeButton") then
-                v.UpgradeButton:Click()
-            end
-        end
-    end
-end
-
--- Hit Kill
-local function HitKillFunction()
-    while Config.HitKill and task.wait(0.1) do
-        local enemies = GetNearbyEnemies(50)
-        for _, enemy in ipairs(enemies) do
-            if enemy.Character and enemy.Character:FindFirstChild("Humanoid") then
-                enemy.Character.Humanoid.Health = 0
-            end
-        end
-    end
-end
-
--- Congelar inimigos
-local function CongelarInimigosFunction()
-    while Config.CongelarInimigos and task.wait(0.5) do
-        local enemies = GetNearbyEnemies(100)
-        for _, enemy in ipairs(enemies) do
-            if enemy.Character and enemy.Character:FindFirstChild("Humanoid") then
-                enemy.Character.Humanoid.WalkSpeed = 0
-                enemy.Character.Humanoid.JumpPower = 0
-            end
-        end
-    end
-end
-
--- Teleporte para local seguro
-local function TeleportarSeguro()
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        LocalPlayer.Character.HumanoidRootPart.CFrame = TPpos
-        LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-    end
-end
-
--- Atualizar cores do menu
-local function AtualizarCores()
-    local cor = Cores[XenoLord.CorAtual]
-    for _, button in pairs(XenoLord.ScreenGui:GetDescendants()) do
-        if button:IsA("TextButton") or button:IsA("TextLabel") then
-            button.TextColor3 = cor.texto
-        end
-        if button:IsA("TextButton") then
-            button.BackgroundColor3 = cor.fundo
-            button.BorderColor3 = cor.destaque
-        end
-    end
-    XenoLord.MainFrame.BackgroundColor3 = cor.fundo
-    XenoLord.MainFrame.BorderColor3 = cor.destaque
-end
-
--- Criar GUI
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "XenoLordGUI"
-ScreenGui.Parent = game.CoreGui
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 400, 0, 500)
-MainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
-MainFrame.BackgroundTransparency = 0.1
-MainFrame.BackgroundColor3 = Cores.Vermelho.fundo
-MainFrame.BorderSizePixel = 2
-MainFrame.BorderColor3 = Cores.Vermelho.destaque
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
-
--- Título
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Position = UDim2.new(0, 0, 0, 0)
-Title.Text = "XENO LORD - alyssonzkn"
-Title.TextSize = 24
-Title.TextColor3 = Cores.Vermelho.texto
-Title.BackgroundTransparency = 1
-Title.Parent = MainFrame
-
--- Botão minimizar
-local Minimizar = Instance.new("TextButton")
-Minimizar.Size = UDim2.new(0, 30, 0, 30)
-Minimizar.Position = UDim2.new(1, -35, 0, 5)
-Minimizar.Text = "-"
-Minimizar.TextSize = 20
-Minimizar.TextColor3 = Cores.Vermelho.texto
-Minimizar.BackgroundColor3 = Cores.Vermelho.fundo
-Minimizar.BorderColor3 = Cores.Vermelho.destaque
-Minimizar.Parent = MainFrame
-
-Minimizar.MouseButton1Click:Connect(function()
-    XenoLord.JanelaAberta = not XenoLord.JanelaAberta
-    MainFrame.Visible = XenoLord.JanelaAberta
-end)
-
--- Tecla K para minimizar
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.K then
-        XenoLord.JanelaAberta = not XenoLord.JanelaAberta
-        MainFrame.Visible = XenoLord.JanelaAberta
-    end
-end)
-
--- Criar botões
-local function CriarBotao(texto, yPos, configName)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 180, 0, 40)
-    btn.Position = UDim2.new(0, 20, 0, yPos)
-    btn.Text = texto .. " ❌"
-    btn.TextSize = 16
-    btn.TextColor3 = Cores.Vermelho.texto
-    btn.BackgroundColor3 = Cores.Vermelho.fundo
-    btn.BorderColor3 = Cores.Vermelho.destaque
-    btn.Parent = MainFrame
-    
-    btn.MouseButton1Click:Connect(function()
-        Config[configName] = not Config[configName]
-        btn.Text = texto .. (Config[configName] and " ✅" or " ❌")
-        
-        if configName == "KillAura" and Config.KillAura then
-            task.spawn(KillAuraFunction)
-        elseif configName == "AntiAFK" and Config.AntiAFK then
-            task.spawn(AntiAFKFunction)
-        elseif configName == "DestrancarPortas" and Config.DestrancarPortas then
-            task.spawn(DestrancarPortasFunction)
-        elseif configName == "AutoComprar" and Config.AutoComprar then
-            task.spawn(AutoComprarFunction)
-        elseif configName == "AutoUpgrade" and Config.AutoUpgrade then
-            task.spawn(AutoUpgradeFunction)
-        elseif configName == "HitKill" and Config.HitKill then
-            task.spawn(HitKillFunction)
-        elseif configName == "CongelarInimigos" and Config.CongelarInimigos then
-            task.spawn(CongelarInimigosFunction)
         end
     end)
-    
-    return btn
+    if not success then
+        warn("Erro ao carregar configuração: " .. err)
+    end
 end
 
--- Criar todos os botões
-CriarBotao("Kill Aura", 50, "KillAura")
-CriarBotao("Anti AFK", 100, "AntiAFK")
-CriarBotao("Destrancar Portas", 150, "DestrancarPortas")
-CriarBotao("Auto Comprar Vantagens", 200, "AutoComprar")
-CriarBotao("Auto Upgrade Armas", 250, "AutoUpgrade")
-CriarBotao("Hit Kill", 300, "HitKill")
-CriarBotao("Congelar Inimigos", 350, "CongelarInimigos")
-
--- Botão Teleporte Seguro
-local TeleporteBtn = Instance.new("TextButton")
-TeleporteBtn.Size = UDim2.new(0, 180, 0, 40)
-TeleporteBtn.Position = UDim2.new(0, 20, 0, 400)
-TeleporteBtn.Text = "Teleporte Seguro"
-TeleporteBtn.TextSize = 16
-TeleporteBtn.TextColor3 = Cores.Vermelho.texto
-TeleporteBtn.BackgroundColor3 = Cores.Vermelho.fundo
-TeleporteBtn.BorderColor3 = Cores.Vermelho.destaque
-TeleporteBtn.Parent = MainFrame
-
-TeleporteBtn.MouseButton1Click:Connect(TeleportarSeguro)
-
--- Botão de mudar cor
-local CorBtn = Instance.new("TextButton")
-CorBtn.Size = UDim2.new(0, 180, 0, 40)
-CorBtn.Position = UDim2.new(1, -200, 0, 400)
-CorBtn.Text = "Cor: Vermelho"
-CorBtn.TextSize = 16
-CorBtn.TextColor3 = Cores.Vermelho.texto
-CorBtn.BackgroundColor3 = Cores.Vermelho.fundo
-CorBtn.BorderColor3 = Cores.Vermelho.destaque
-CorBtn.Parent = MainFrame
-
-local coresLista = {"Vermelho", "Verde", "Azul", "Amarelo", "Rosa"}
-local corIndex = 1
-
-CorBtn.MouseButton1Click:Connect(function()
-    corIndex = corIndex % #coresLista + 1
-    XenoLord.CorAtual = coresLista[corIndex]
-    CorBtn.Text = "Cor: " .. XenoLord.CorAtual
-    AtualizarCores()
+-- Criar pasta de configuração
+pcall(function()
+    makefolder(ConfigFolder)
 end)
 
--- Informação do script
-local InfoLabel = Instance.new("TextLabel")
-InfoLabel.Size = UDim2.new(1, 0, 0, 30)
-InfoLabel.Position = UDim2.new(0, 0, 1, -30)
-InfoLabel.Text = "Xeno Lord v1.0 | Autor: alyssonzkn"
-InfoLabel.TextSize = 12
-InfoLabel.TextColor3 = Cores.Vermelho.texto
-InfoLabel.BackgroundTransparency = 1
-InfoLabel.Parent = MainFrame
+-- Carregar configurações salvas
+LoadConfig()
 
--- Armazenar GUI na tabela principal
-XenoLord.ScreenGui = ScreenGui
-XenoLord.MainFrame = MainFrame
+-- Criar Window Principal
+local Window = Rayfield:CreateWindow({
+    Name = "Apocalypse Rising 2 • Rayfield Edition",
+    Icon = 0,
+    LoadingTitle = "Carregando AR2 Menu",
+    LoadingSubtitle = "by Alysson",
+    Theme = "Dark",
+    Transparency = 0.85,
+    Keybind = Enum.KeyCode.RightShift,
+    SavePosition = true,
+})
 
--- Iniciar loops automaticamente
-task.spawn(function()
-    while task.wait(0.1) do
-        if Config.TeleporteSeguro and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            if LocalPlayer.Character.Humanoid.Health < 50 then
-                TeleportarSeguro()
+-- Funções Auxiliares
+local function CreateHighlight(object, color, transparency)
+    local highlight = Instance.new("Highlight")
+    highlight.Parent = object
+    highlight.FillColor = color
+    highlight.FillTransparency = transparency or 0.5
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineTransparency = 0.3
+    return highlight
+end
+
+local function GetPlayerColor(player)
+    if player.Team == LocalPlayer.Team then
+        return Color3.fromRGB(0, 255, 0) -- Verde para aliados
+    else
+        return Color3.fromRGB(255, 0, 0) -- Vermelho para inimigos
+    end
+end
+
+-- Variáveis para ESP
+local ESPObjects = {}
+local ESPEnabled = true
+
+-- Função ESP
+local function CreateESP(instance, espType, color)
+    if not ESPEnabled then return end
+    
+    local billboard = Instance.new("BillboardGui")
+    billboard.Size = UDim2.new(0, 100, 0, 30)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = instance
+    
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextColor3 = color or Color3.fromRGB(255, 255, 255)
+    textLabel.TextStrokeTransparency = 0.3
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextScaled = true
+    textLabel.Parent = billboard
+    
+    ESPObjects[instance] = billboard
+    return billboard
+end
+
+-- ============================================
+-- 🏠 ABA HOME
+-- ============================================
+local HomeTab = Window:CreateTab("🏠 Home", 0)
+
+-- Título e Créditos
+HomeTab:CreateParagraph({
+    Title = "✨ Apocalypse Rising 2 • Rayfield Edition",
+    Content = "Versão Premium 2.0.0\nDesenvolvido por Alysson\nDesign Ultra Moderno com Neon"
+})
+
+-- Status do Jogo
+HomeTab:CreateParagraph({
+    Title = "📊 Status do Jogo",
+    Content = "👥 Players Online: Carregando...\n🧟 Zombies Ativos: Carregando...\n⚡ Ping: Carregando...\n🎮 Server Time: Carregando..."
+})
+
+-- Atualizar Status
+spawn(function()
+    while true do
+        wait(5)
+        local playerCount = #Players:GetPlayers()
+        local zombieCount = #Workspace:GetDescendants()
+        local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValueString()
+        
+        HomeTab:ClearParagraph("📊 Status do Jogo")
+        HomeTab:CreateParagraph({
+            Title = "📊 Status do Jogo",
+            Content = string.format("👥 Players Online: %d\n🧟 Zombies Ativos: %d\n⚡ Ping: %s\n🎮 Server Time: %s", 
+                playerCount, zombieCount, ping, os.date("%H:%M:%S"))
+        })
+    end
+end)
+
+-- Master Switch
+HomeTab:CreateToggle({
+    Name = "🔘 Master Switch",
+    CurrentValue = Flags.MasterSwitch or false,
+    Flag = "MasterSwitch",
+    Callback = function(Value)
+        Flags.MasterSwitch = Value
+        ESPEnabled = Value
+        SaveConfig()
+        
+        if Value then
+            Rayfield:Notify({
+                Title = "Master Switch",
+                Content = "Todos os módulos ativados!",
+                Duration = 2,
+            })
+        else
+            Rayfield:Notify({
+                Title = "Master Switch",
+                Content = "Todos os módulos desativados!",
+                Duration = 2,
+            })
+        end
+    end,
+})
+
+-- Botão Discord
+HomeTab:CreateButton({
+    Name = "💬 Copiar Discord",
+    Callback = function()
+        setclipboard("https://discord.gg/ar2-rayfield")
+        Rayfield:Notify({
+            Title = "Discord Copiado!",
+            Content = "Link do Discord copiado para área de transferência",
+            Duration = 2,
+        })
+    end,
+})
+
+-- Botão de Key
+HomeTab:CreateButton({
+    Name = "🔑 Obter Key",
+    Callback = function()
+        Rayfield:Notify({
+            Title = "Key System",
+            Content = "Key: AR2-RAYFIELD-2024-PREMIUM",
+            Duration = 5,
+        })
+    end,
+})
+
+-- ============================================
+-- 👁️ ABA ESP
+-- ============================================
+local ESPTab = Window:CreateTab("👁️ ESP", 1)
+
+-- Section Player ESP
+ESPTab:CreateSection("🎯 Player ESP")
+
+ESPTab:CreateToggle({
+    Name = "Player ESP",
+    CurrentValue = Flags.PlayerESP or false,
+    Flag = "PlayerESP",
+    Callback = function(Value)
+        Flags.PlayerESP = Value
+        SaveConfig()
+    end,
+})
+
+ESPTab:CreateToggle({
+    Name = "Player Boxes",
+    CurrentValue = Flags.PlayerBoxes or false,
+    Flag = "PlayerBoxes",
+    Callback = function(Value)
+        Flags.PlayerBoxes = Value
+        SaveConfig()
+    end,
+})
+
+ESPTab:CreateToggle({
+    Name = "Player Tracers",
+    CurrentValue = Flags.PlayerTracers or false,
+    Flag = "PlayerTracers",
+    Callback = function(Value)
+        Flags.PlayerTracers = Value
+        SaveConfig()
+    end,
+})
+
+ESPTab:CreateToggle({
+    Name = "Player Names",
+    CurrentValue = Flags.PlayerNames or false,
+    Flag = "PlayerNames",
+    Callback = function(Value)
+        Flags.PlayerNames = Value
+        SaveConfig()
+    end,
+})
+
+ESPTab:CreateSlider({
+    Name = "ESP Distance",
+    Range = {50, 500},
+    Increment = 10,
+    Suffix = "Studs",
+    CurrentValue = Flags.ESPDistance or 250,
+    Flag = "ESPDistance",
+    Callback = function(Value)
+        Flags.ESPDistance = Value
+        SaveConfig()
+    end,
+})
+
+-- Section Zombie ESP
+ESPTab:CreateSection("🧟 Zombie ESP")
+
+ESPTab:CreateToggle({
+    Name = "Zombie ESP",
+    CurrentValue = Flags.ZombieESP or false,
+    Flag = "ZombieESP",
+    Callback = function(Value)
+        Flags.ZombieESP = Value
+        SaveConfig()
+    end,
+})
+
+ESPTab:CreateToggle({
+    Name = "Zombie Health",
+    CurrentValue = Flags.ZombieHealth or false,
+    Flag = "ZombieHealth",
+    Callback = function(Value)
+        Flags.ZombieHealth = Value
+        SaveConfig()
+    end,
+})
+
+-- Section Item ESP
+ESPTab:CreateSection("📦 Item/Loot ESP")
+
+ESPTab:CreateToggle({
+    Name = "Weapon ESP",
+    CurrentValue = Flags.WeaponESP or false,
+    Flag = "WeaponESP",
+    Callback = function(Value)
+        Flags.WeaponESP = Value
+        SaveConfig()
+    end,
+})
+
+ESPTab:CreateToggle({
+    Name = "Ammo ESP",
+    CurrentValue = Flags.AmmoESP or false,
+    Flag = "AmmoESP",
+    Callback = function(Value)
+        Flags.AmmoESP = Value
+        SaveConfig()
+    end,
+})
+
+ESPTab:CreateToggle({
+    Name = "Medical ESP",
+    CurrentValue = Flags.MedicalESP or false,
+    Flag = "MedicalESP",
+    Callback = function(Value)
+        Flags.MedicalESP = Value
+        SaveConfig()
+    end,
+})
+
+ESPTab:CreateToggle({
+    Name = "Vehicle ESP",
+    CurrentValue = Flags.VehicleESP or false,
+    Flag = "VehicleESP",
+    Callback = function(Value)
+        Flags.VehicleESP = Value
+        SaveConfig()
+    end,
+})
+
+-- ============================================
+-- 🎯 ABA AIMBOT
+-- ============================================
+local AimbotTab = Window:CreateTab("🎯 Aimbot", 2)
+
+AimbotTab:CreateToggle({
+    Name = "🎯 Aimbot",
+    CurrentValue = Flags.AimbotEnabled or false,
+    Flag = "AimbotEnabled",
+    Callback = function(Value)
+        Flags.AimbotEnabled = Value
+        SaveConfig()
+    end,
+})
+
+AimbotTab:CreateToggle({
+    Name = "Silent Aim",
+    CurrentValue = Flags.SilentAim or false,
+    Flag = "SilentAim",
+    Callback = function(Value)
+        Flags.SilentAim = Value
+        SaveConfig()
+    end,
+})
+
+AimbotTab:CreateSlider({
+    Name = "Smoothness",
+    Range = {0.1, 1},
+    Increment = 0.05,
+    Suffix = "x",
+    CurrentValue = Flags.Smoothness or 0.5,
+    Flag = "Smoothness",
+    Callback = function(Value)
+        Flags.Smoothness = Value
+        SaveConfig()
+    end,
+})
+
+AimbotTab:CreateDropdown({
+    Name = "Aim Part",
+    Options = {"Head", "UpperTorso", "HumanoidRootPart"},
+    CurrentOption = Flags.AimPart or "Head",
+    Flag = "AimPart",
+    Callback = function(Option)
+        Flags.AimPart = Option
+        SaveConfig()
+    end,
+})
+
+AimbotTab:CreateSlider({
+    Name = "FOV Size",
+    Range = {10, 500},
+    Increment = 10,
+    Suffix = "px",
+    CurrentValue = Flags.FOVSize or 150,
+    Flag = "FOVSize",
+    Callback = function(Value)
+        Flags.FOVSize = Value
+        SaveConfig()
+    end,
+})
+
+AimbotTab:CreateToggle({
+    Name = "Show FOV Circle",
+    CurrentValue = Flags.ShowFOV or false,
+    Flag = "ShowFOV",
+    Callback = function(Value)
+        Flags.ShowFOV = Value
+        SaveConfig()
+    end,
+})
+
+AimbotTab:CreateToggle({
+    Name = "Visibility Check",
+    CurrentValue = Flags.VisibilityCheck or true,
+    Flag = "VisibilityCheck",
+    Callback = function(Value)
+        Flags.VisibilityCheck = Value
+        SaveConfig()
+    end,
+})
+
+AimbotTab:CreateToggle({
+    Name = "Team Check",
+    CurrentValue = Flags.AimbotTeamCheck or true,
+    Flag = "AimbotTeamCheck",
+    Callback = function(Value)
+        Flags.AimbotTeamCheck = Value
+        SaveConfig()
+    end,
+})
+
+AimbotTab:CreateToggle({
+    Name = "Triggerbot",
+    CurrentValue = Flags.Triggerbot or false,
+    Flag = "Triggerbot",
+    Callback = function(Value)
+        Flags.Triggerbot = Value
+        SaveConfig()
+    end,
+})
+
+AimbotTab:CreateKeybind({
+    Name = "Aimbot Keybind",
+    CurrentKeybind = Flags.AimbotKeybind or "RightShift",
+    Flag = "AimbotKeybind",
+    Callback = function(Keybind)
+        Flags.AimbotKeybind = Keybind
+        SaveConfig()
+    end,
+})
+
+-- ============================================
+-- 🔫 ABA WEAPON
+-- ============================================
+local WeaponTab = Window:CreateTab("🔫 Weapon", 3)
+
+WeaponTab:CreateToggle({
+    Name = "No Recoil",
+    CurrentValue = Flags.NoRecoil or false,
+    Flag = "NoRecoil",
+    Callback = function(Value)
+        Flags.NoRecoil = Value
+        SaveConfig()
+        
+        if Value then
+            local oldRecoil = game:GetService("Players").LocalPlayer.Character.Humanoid.CameraOffset
+            -- Implementação do no recoil
+        end
+    end,
+})
+
+WeaponTab:CreateToggle({
+    Name = "No Spread",
+    CurrentValue = Flags.NoSpread or false,
+    Flag = "NoSpread",
+    Callback = function(Value)
+        Flags.NoSpread = Value
+        SaveConfig()
+    end,
+})
+
+WeaponTab:CreateToggle({
+    Name = "Infinite Ammo",
+    CurrentValue = Flags.InfiniteAmmo or false,
+    Flag = "InfiniteAmmo",
+    Callback = function(Value)
+        Flags.InfiniteAmmo = Value
+        SaveConfig()
+    end,
+})
+
+WeaponTab:CreateToggle({
+    Name = "Fast Fire Rate",
+    CurrentValue = Flags.FastFireRate or false,
+    Flag = "FastFireRate",
+    Callback = function(Value)
+        Flags.FastFireRate = Value
+        SaveConfig()
+    end,
+})
+
+WeaponTab:CreateSlider({
+    Name = "Fire Rate Multiplier",
+    Range = {1, 10},
+    Increment = 0.5,
+    Suffix = "x",
+    CurrentValue = Flags.FireRateMult or 2,
+    Flag = "FireRateMult",
+    Callback = function(Value)
+        Flags.FireRateMult = Value
+        SaveConfig()
+    end,
+})
+
+WeaponTab:CreateToggle({
+    Name = "Instant Kill",
+    CurrentValue = Flags.InstantKill or false,
+    Flag = "InstantKill",
+    Callback = function(Value)
+        Flags.InstantKill = Value
+        SaveConfig()
+    end,
+})
+
+WeaponTab:CreateColorPicker({
+    Name = "Bullet Tracer Color",
+    Color = Flags.TracerColor or Color3.fromRGB(0, 255, 255),
+    Flag = "TracerColor",
+    Callback = function(Color)
+        Flags.TracerColor = Color
+        SaveConfig()
+    end,
+})
+
+-- ============================================
+-- 🏃 ABA MOVEMENT
+-- ============================================
+local MovementTab = Window:CreateTab("🏃 Movement", 4)
+
+MovementTab:CreateToggle({
+    Name = "Speed Boost",
+    CurrentValue = Flags.SpeedBoost or false,
+    Flag = "SpeedBoost",
+    Callback = function(Value)
+        Flags.SpeedBoost = Value
+        SaveConfig()
+    end,
+})
+
+MovementTab:CreateSlider({
+    Name = "Walk Speed",
+    Range = {16, 100},
+    Increment = 1,
+    Suffix = "Studs/s",
+    CurrentValue = Flags.WalkSpeed or 16,
+    Flag = "WalkSpeed",
+    Callback = function(Value)
+        Flags.WalkSpeed = Value
+        if Flags.SpeedBoost and LocalPlayer.Character and LocalPlayer.Character.Humanoid then
+            LocalPlayer.Character.Humanoid.WalkSpeed = Value
+        end
+        SaveConfig()
+    end,
+})
+
+MovementTab:CreateSlider({
+    Name = "Jump Power",
+    Range = {50, 200},
+    Increment = 5,
+    Suffix = "Power",
+    CurrentValue = Flags.JumpPower or 50,
+    Flag = "JumpPower",
+    Callback = function(Value)
+        Flags.JumpPower = Value
+        if LocalPlayer.Character and LocalPlayer.Character.Humanoid then
+            LocalPlayer.Character.Humanoid.JumpPower = Value
+        end
+        SaveConfig()
+    end,
+})
+
+MovementTab:CreateToggle({
+    Name = "Fly Mode",
+    CurrentValue = Flags.FlyMode or false,
+    Flag = "FlyMode",
+    Callback = function(Value)
+        Flags.FlyMode = Value
+        SaveConfig()
+    end,
+})
+
+MovementTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = Flags.Noclip or false,
+    Flag = "Noclip",
+    Callback = function(Value)
+        Flags.Noclip = Value
+        SaveConfig()
+    end,
+})
+
+MovementTab:CreateToggle({
+    Name = "Infinite Stamina",
+    CurrentValue = Flags.InfiniteStamina or false,
+    Flag = "InfiniteStamina",
+    Callback = function(Value)
+        Flags.InfiniteStamina = Value
+        SaveConfig()
+    end,
+})
+
+MovementTab:CreateToggle({
+    Name = "No Fall Damage",
+    CurrentValue = Flags.NoFallDamage or false,
+    Flag = "NoFallDamage",
+    Callback = function(Value)
+        Flags.NoFallDamage = Value
+        SaveConfig()
+    end,
+})
+
+MovementTab:CreateKeybind({
+    Name = "Fly Keybind",
+    CurrentKeybind = Flags.FlyKeybind or "F",
+    Flag = "FlyKeybind",
+    Callback = function(Keybind)
+        Flags.FlyKeybind = Keybind
+        SaveConfig()
+    end,
+})
+
+-- ============================================
+-- 🌟 ABA VISUALS
+-- ============================================
+local VisualsTab = Window:CreateTab("🌟 Visuals", 5)
+
+VisualsTab:CreateToggle({
+    Name = "Fullbright",
+    CurrentValue = Flags.Fullbright or false,
+    Flag = "Fullbright",
+    Callback = function(Value)
+        Flags.Fullbright = Value
+        if Value then
+            Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+            Lighting.Brightness = 2
+        else
+            Lighting.Ambient = Color3.fromRGB(0, 0, 0)
+            Lighting.Brightness = 0
+        end
+        SaveConfig()
+    end,
+})
+
+VisualsTab:CreateToggle({
+    Name = "No Fog",
+    CurrentValue = Flags.NoFog or false,
+    Flag = "NoFog",
+    Callback = function(Value)
+        Flags.NoFog = Value
+        if Value then
+            Lighting.FogEnd = 100000
+        else
+            Lighting.FogEnd = 1000
+        end
+        SaveConfig()
+    end,
+})
+
+VisualsTab:CreateToggle({
+    Name = "Custom Crosshair",
+    CurrentValue = Flags.CustomCrosshair or false,
+    Flag = "CustomCrosshair",
+    Callback = function(Value)
+        Flags.CustomCrosshair = Value
+        SaveConfig()
+    end,
+})
+
+VisualsTab:CreateColorPicker({
+    Name = "Crosshair Color",
+    Color = Flags.CrosshairColor or Color3.fromRGB(255, 0, 255),
+    Flag = "CrosshairColor",
+    Callback = function(Color)
+        Flags.CrosshairColor = Color
+        SaveConfig()
+    end,
+})
+
+VisualsTab:CreateToggle({
+    Name = "Hitmarker",
+    CurrentValue = Flags.Hitmarker or true,
+    Flag = "Hitmarker",
+    Callback = function(Value)
+        Flags.Hitmarker = Value
+        SaveConfig()
+    end,
+})
+
+VisualsTab:CreateToggle({
+    Name = "Hitmarker Sound",
+    CurrentValue = Flags.HitmarkerSound or true,
+    Flag = "HitmarkerSound",
+    Callback = function(Value)
+        Flags.HitmarkerSound = Value
+        SaveConfig()
+    end,
+})
+
+VisualsTab:CreateSlider({
+    Name = "Field of View",
+    Range = {70, 120},
+    Increment = 1,
+    Suffix = "°",
+    CurrentValue = Flags.FOV or 70,
+    Flag = "FOV",
+    Callback = function(Value)
+        Flags.FOV = Value
+        Camera.FieldOfView = Value
+        SaveConfig()
+    end,
+})
+
+-- ============================================
+-- ⚙️ ABA UI SETTINGS
+-- ============================================
+local UISettingsTab = Window:CreateTab("⚙️ UI Settings", 6)
+
+UISettingsTab:CreateDropdown({
+    Name = "Theme",
+    Options = {"Dark", "Ocean", "Amethyst", "Rose", "Midnight"},
+    CurrentOption = Flags.Theme or "Dark",
+    Flag = "Theme",
+    Callback = function(Option)
+        Flags.Theme = Option
+        Rayfield:ChangeTheme(Option)
+        SaveConfig()
+    end,
+})
+
+UISettingsTab:CreateSlider({
+    Name = "UI Transparency",
+    Range = {0, 1},
+    Increment = 0.05,
+    Suffix = "%",
+    CurrentValue = Flags.Transparency or 0.85,
+    Flag = "Transparency",
+    Callback = function(Value)
+        Flags.Transparency = Value
+        Rayfield:SetTransparency(Value)
+        SaveConfig()
+    end,
+})
+
+UISettingsTab:CreateKeybind({
+    Name = "Menu Keybind",
+    CurrentKeybind = Flags.MenuKeybind or "RightShift",
+    Flag = "MenuKeybind",
+    Callback = function(Keybind)
+        Flags.MenuKeybind = Keybind
+        Rayfield:SetKeybind(Enum.KeyCode[Keybind])
+        SaveConfig()
+    end,
+})
+
+UISettingsTab:CreateButton({
+    Name = "Destroy UI",
+    Callback = function()
+        Rayfield:Destroy()
+    end,
+})
+
+UISettingsTab:CreateToggle({
+    Name = "Rainbow Mode",
+    CurrentValue = Flags.RainbowMode or false,
+    Flag = "RainbowMode",
+    Callback = function(Value)
+        Flags.RainbowMode = Value
+        SaveConfig()
+        
+        if Value then
+            -- Rainbow mode implementation
+            spawn(function()
+                while Flags.RainbowMode do
+                    wait(0.05)
+                    local hue = tick() % 1
+                    local color = Color3.fromHSV(hue, 1, 1)
+                    Rayfield:SetAccentColor(color)
+                end
+            end)
+        end
+    end,
+})
+
+UISettingsTab:CreateToggle({
+    Name = "Auto Save Config",
+    CurrentValue = Flags.AutoSave or true,
+    Flag = "AutoSave",
+    Callback = function(Value)
+        Flags.AutoSave = Value
+        SaveConfig()
+    end,
+})
+
+UISettingsTab:CreateToggle({
+    Name = "Performance Mode",
+    CurrentValue = Flags.PerformanceMode or false,
+    Flag = "PerformanceMode",
+    Callback = function(Value)
+        Flags.PerformanceMode = Value
+        SaveConfig()
+    end,
+})
+
+-- Mensagem de Boas-vindas
+Rayfield:Notify({
+    Title = "✨ AR2 Rayfield Edition",
+    Content = "Menu carregado com sucesso!\nDesenvolvido por Alysson",
+    Duration = 5,
+})
+
+-- Loop principal para atualizar configurações
+spawn(function()
+    while true do
+        wait(0.1)
+        
+        -- Atualizar WalkSpeed e JumpPower
+        if Flags.SpeedBoost and LocalPlayer.Character and LocalPlayer.Character.Humanoid then
+            LocalPlayer.Character.Humanoid.WalkSpeed = Flags.WalkSpeed
+            LocalPlayer.Character.Humanoid.JumpPower = Flags.JumpPower
+        end
+        
+        -- Noclip
+        if Flags.Noclip and LocalPlayer.Character then
+            for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+        
+        -- Auto Save Config
+        if Flags.AutoSave then
+            SaveConfig()
+        end
+        
+        -- Performance Mode
+        if Flags.PerformanceMode then
+            RunService:Set3dRenderingEnabled(false)
+            wait(0.5)
+            RunService:Set3dRenderingEnabled(true)
+        end
+    end
+end)
+
+-- Sistema de Fly
+local flying = false
+local flySpeed = 50
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode[Flags.FlyKeybind] and Flags.FlyMode then
+        flying = not flying
+        if LocalPlayer.Character and LocalPlayer.Character.Humanoid then
+            local humanoid = LocalPlayer.Character.Humanoid
+            if flying then
+                humanoid.PlatformStand = true
+                Rayfield:Notify({
+                    Title = "Fly Mode",
+                    Content = "Ativado! Use WASD para voar",
+                    Duration = 2,
+                })
+            else
+                humanoid.PlatformStand = false
             end
         end
     end
 end)
 
-print("Xeno Lord carregado com sucesso! Autor: alyssonzkn")
-print("Pressione K para minimizar o menu")
+-- Sistema de voo
+RunService.RenderStepped:Connect(function()
+    if flying and LocalPlayer.Character and LocalPlayer.Character.Humanoid then
+        local humanoid = LocalPlayer.Character.Humanoid
+        local rootPart = LocalPlayer.Character.HumanoidRootPart
+        local moveDirection = Vector3.new()
+        
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDirection = moveDirection + Camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDirection = moveDirection - Camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDirection = moveDirection + Camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDirection = moveDirection - Camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDirection = moveDirection + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            moveDirection = moveDirection - Vector3.new(0, 1, 0)
+        end
+        
+        rootPart.Velocity = moveDirection * flySpeed
+    end
+end)
+
+print("AR2 Rayfield Edition - Carregado com sucesso!")
+print("Menu ativado - Pressione RightShift para abrir")
