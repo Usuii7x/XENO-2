@@ -1,282 +1,341 @@
--- =============================================
--- XENO LORD - Poly's Zombies Script
--- Autor: alyssonzkn
--- Versão: 1.0
--- UI: WindUI
--- =============================================
+--[[
+    Script: Xeno Lord
+    Autor: alyssonzkn
+    Para: Polyz (WindUI)
+--]]
 
-local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/RedZircon/WindUI/main/source"))()
-
-local Window = WindUI:CreateWindow({
-    Title = "Xeno Lord | Poly's Zombies",
-    Icon = "rbxassetid://17789440466", -- ícone opcional
-    Size = UDim2.new(0, 620, 0, 460),
-    Theme = "Dark",
-    DefaultColor = Color3.fromRGB(170, 0, 0) -- Vermelho padrão
-})
-
--- Variáveis globais de toggles
-getgenv().XenoSettings = {
-    KillAura = false,
-    AntiAFK = false,
-    AutoUnlockDoors = false,
-    AutoBuyPerks = false,
-    AutoUpgradeWeapons = false,
-    OneHitKill = false,
-    FreezeEnemies = false,
-    SafeTP = false,
+local XenoLord = {
+    Nome = "Xeno Lord",
+    Autor = "alyssonzkn",
+    Versao = "1.0",
+    JanelaAberta = true,
+    CorAtual = "Vermelho"
 }
 
+-- Cores disponíveis
+local Cores = {
+    Vermelho = { fundo = Color3.fromRGB(30, 0, 0), texto = Color3.fromRGB(255, 0, 0), destaque = Color3.fromRGB(200, 0, 0) },
+    Verde = { fundo = Color3.fromRGB(0, 30, 0), texto = Color3.fromRGB(0, 255, 0), destaque = Color3.fromRGB(0, 200, 0) },
+    Azul = { fundo = Color3.fromRGB(0, 0, 30), texto = Color3.fromRGB(0, 100, 255), destaque = Color3.fromRGB(0, 150, 200) },
+    Amarelo = { fundo = Color3.fromRGB(30, 30, 0), texto = Color3.fromRGB(255, 255, 0), destaque = Color3.fromRGB(200, 200, 0) },
+    Rosa = { fundo = Color3.fromRGB(30, 0, 30), texto = Color3.fromRGB(255, 0, 255), destaque = Color3.fromRGB(200, 0, 200) }
+}
+
+-- Configurações
+local Config = {
+    KillAura = false,
+    AntiAFK = false,
+    DestrancarPortas = false,
+    AutoComprar = false,
+    AutoUpgrade = false,
+    HitKill = false,
+    CongelarInimigos = false,
+    TeleporteSeguro = false
+}
+
+-- Variáveis globais
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local TPpos = CFrame.new(0, 50, 0)
 local LocalPlayer = Players.LocalPlayer
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Mouse = LocalPlayer:GetMouse()
 
--- ==================== FUNÇÕES DE EXPLOIT ====================
+-- Função para encontrar inimigos próximos
+local function GetNearbyEnemies(range)
+    local enemies = {}
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local distance = (LocalPlayer.Character.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
+                if distance <= range then
+                    table.insert(enemies, v)
+                end
+            end
+        end
+    end
+    return enemies
+end
 
-local function KillAura()
-    while getgenv().XenoSettings.KillAura do
+-- Kill Aura
+local function KillAuraFunction()
+    while Config.KillAura and task.wait(0.1) do
+        local enemies = GetNearbyEnemies(30)
+        for _, enemy in ipairs(enemies) do
+            if enemy.Character and enemy.Character:FindFirstChild("HumanoidRootPart") then
+                local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                if tool then
+                    tool:Activate()
+                    firetouchinterest(LocalPlayer.Character.HumanoidRootPart, enemy.Character.HumanoidRootPart, 0)
+                    firetouchinterest(LocalPlayer.Character.HumanoidRootPart, enemy.Character.HumanoidRootPart, 1)
+                end
+            end
+        end
+    end
+end
+
+-- Anti AFK
+local function AntiAFKFunction()
+    while Config.AntiAFK and task.wait(60) do
+        local vu = game:GetService("VirtualUser")
+        vu:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
         task.wait(0.1)
-        pcall(function()
-            for _, zombie in ipairs(Workspace.Zombies:GetChildren()) do
-                if zombie:FindFirstChild("Humanoid") and zombie.Humanoid.Health > 0 then
-                    local dist = (zombie.HumanoidRootPart.Position - Character.HumanoidRootPart.Position).Magnitude
-                    if dist < 25 then -- alcance da aura
-                        zombie.Humanoid:TakeDamage(9999)
-                    end
+        vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+    end
+end
+
+-- Destrancar portas
+local function DestrancarPortasFunction()
+    while Config.DestrancarPortas and task.wait(0.5) do
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("ProximityPrompt") or v:IsA("ClickDetector") then
+                fireproximityprompt(v)
+            end
+            if v.Name:lower():match("door") or v.Name:lower():match("porta") then
+                if v:IsA("BasePart") then
+                    v.CanCollide = false
+                    v.Transparency = 0.5
                 end
             end
-        end)
+        end
     end
 end
 
-local function OneHitKill()
-    while getgenv().XenoSettings.OneHitKill do
-        task.wait(0.2)
-        pcall(function()
-            for _, zombie in ipairs(Workspace.Zombies:GetChildren()) do
-                if zombie:FindFirstChild("Humanoid") then
-                    zombie.Humanoid.Health = 1
-                end
+-- Auto comprar vantagens
+local function AutoComprarFunction()
+    while Config.AutoComprar and task.wait(1) do
+        for _, v in pairs(LocalPlayer.PlayerGui:GetDescendants()) do
+            if v:IsA("TextButton") and (v.Text:lower():match("comprar") or v.Text:lower():match("buy")) then
+                v:Click()
             end
-        end)
-    end
-end
-
-local function FreezeEnemies()
-    while getgenv().XenoSettings.FreezeEnemies do
-        task.wait(0.5)
-        pcall(function()
-            for _, zombie in ipairs(Workspace.Zombies:GetChildren()) do
-                if zombie:FindFirstChild("Humanoid") then
-                    zombie.Humanoid.WalkSpeed = 0
-                    zombie.Humanoid.JumpPower = 0
-                end
+        end
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("ProximityPrompt") and v.Parent and v.Parent.Name:match("Vantagem") then
+                fireproximityprompt(v)
             end
-        end)
+        end
     end
 end
 
-local function AntiAFK()
-    while getgenv().XenoSettings.AntiAFK do
-        task.wait(30)
-        pcall(function()
-            game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
-            task.wait(0.1)
-            game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
-        end)
-    end
-end
-
-local function AutoUnlockDoors()
-    while getgenv().XenoSettings.AutoUnlockDoors do
-        task.wait(1)
-        pcall(function()
-            for _, door in ipairs(Workspace:GetDescendants()) do
-                if door.Name:lower():find("door") or door.Name == "Gate" then
-                    if door:FindFirstChild("Lock") then
-                        door.Lock:Destroy()
-                    end
-                    if door:FindFirstChild("Value") then
-                        door.Value.Value = false
-                    end
-                end
+-- Auto upgrade armas
+local function AutoUpgradeFunction()
+    while Config.AutoUpgrade and task.wait(0.5) do
+        for _, v in pairs(LocalPlayer.Backpack:GetChildren()) do
+            if v:IsA("Tool") and v:FindFirstChild("UpgradeButton") then
+                v.UpgradeButton:Click()
             end
-        end)
-    end
-end
-
-local function AutoBuyPerks()
-    while getgenv().XenoSettings.AutoBuyPerks do
-        task.wait(2)
-        pcall(function()
-            -- Ajuste conforme os nomes reais do jogo
-            for _, perk in ipairs({"Juggernog", "SpeedCola", "QuickRevive", "DoubleTap"}) do
-                local buyPart = Workspace:FindFirstChild(perk, true)
-                if buyPart and buyPart:FindFirstChild("ProximityPrompt") then
-                    fireproximityprompt(buyPart.ProximityPrompt)
-                end
+        end
+        for _, v in pairs(LocalPlayer.Character:GetChildren()) do
+            if v:IsA("Tool") and v:FindFirstChild("UpgradeButton") then
+                v.UpgradeButton:Click()
             end
-        end)
+        end
     end
 end
 
-local function AutoUpgradeWeapons()
-    while getgenv().XenoSettings.AutoUpgradeWeapons do
-        task.wait(3)
-        pcall(function()
-            -- Exemplo genérico - ajuste conforme o jogo
-            local upgradeMachine = Workspace:FindFirstChild("PackAPunch", true) or Workspace:FindFirstChild("UpgradeStation", true)
-            if upgradeMachine and upgradeMachine:FindFirstChild("ProximityPrompt") then
-                fireproximityprompt(upgradeMachine.ProximityPrompt)
+-- Hit Kill
+local function HitKillFunction()
+    while Config.HitKill and task.wait(0.1) do
+        local enemies = GetNearbyEnemies(50)
+        for _, enemy in ipairs(enemies) do
+            if enemy.Character and enemy.Character:FindFirstChild("Humanoid") then
+                enemy.Character.Humanoid.Health = 0
             end
-        end)
+        end
     end
 end
 
-local function TeleportToSafe()
-    pcall(function()
-        local safeSpots = {
-            Vector3.new(0, 50, 0),   -- ajuste conforme mapa
-            Vector3.new(100, 20, 100),
-            Vector3.new(-150, 30, -80)
-        }
-        Character.HumanoidRootPart.CFrame = CFrame.new(safeSpots[math.random(1, #safeSpots)])
-    end)
+-- Congelar inimigos
+local function CongelarInimigosFunction()
+    while Config.CongelarInimigos and task.wait(0.5) do
+        local enemies = GetNearbyEnemies(100)
+        for _, enemy in ipairs(enemies) do
+            if enemy.Character and enemy.Character:FindFirstChild("Humanoid") then
+                enemy.Character.Humanoid.WalkSpeed = 0
+                enemy.Character.Humanoid.JumpPower = 0
+            end
+        end
+    end
 end
 
--- ==================== INTERFACE ====================
-
-local TabMain = Window:Tab({
-    Title = "Principal",
-    Icon = "home"
-})
-
-TabMain:Toggle({
-    Title = "Kill Aura",
-    Default = false,
-    Callback = function(v)
-        getgenv().XenoSettings.KillAura = v
-        if v then task.spawn(KillAura) end
+-- Teleporte para local seguro
+local function TeleportarSeguro()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        LocalPlayer.Character.HumanoidRootPart.CFrame = TPpos
+        LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
     end
-})
+end
 
-TabMain:Toggle({
-    Title = "One Hit Kill",
-    Default = false,
-    Callback = function(v)
-        getgenv().XenoSettings.OneHitKill = v
-        if v then task.spawn(OneHitKill) end
+-- Atualizar cores do menu
+local function AtualizarCores()
+    local cor = Cores[XenoLord.CorAtual]
+    for _, button in pairs(XenoLord.ScreenGui:GetDescendants()) do
+        if button:IsA("TextButton") or button:IsA("TextLabel") then
+            button.TextColor3 = cor.texto
+        end
+        if button:IsA("TextButton") then
+            button.BackgroundColor3 = cor.fundo
+            button.BorderColor3 = cor.destaque
+        end
     end
-})
+    XenoLord.MainFrame.BackgroundColor3 = cor.fundo
+    XenoLord.MainFrame.BorderColor3 = cor.destaque
+end
 
-TabMain:Toggle({
-    Title = "Congelar Inimigos",
-    Default = false,
-    Callback = function(v)
-        getgenv().XenoSettings.FreezeEnemies = v
-        if v then task.spawn(FreezeEnemies) end
-    end
-})
+-- Criar GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "XenoLordGUI"
+ScreenGui.Parent = game.CoreGui
 
-TabMain:Button({
-    Title = "Teleport para Local Seguro",
-    Callback = function()
-        TeleportToSafe()
-    end
-})
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 400, 0, 500)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
+MainFrame.BackgroundTransparency = 0.1
+MainFrame.BackgroundColor3 = Cores.Vermelho.fundo
+MainFrame.BorderSizePixel = 2
+MainFrame.BorderColor3 = Cores.Vermelho.destaque
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
 
-local TabAuto = Window:Tab({
-    Title = "Automação",
-    Icon = "cpu"
-})
+-- Título
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Position = UDim2.new(0, 0, 0, 0)
+Title.Text = "XENO LORD - alyssonzkn"
+Title.TextSize = 24
+Title.TextColor3 = Cores.Vermelho.texto
+Title.BackgroundTransparency = 1
+Title.Parent = MainFrame
 
-TabAuto:Toggle({
-    Title = "Anti AFK",
-    Default = false,
-    Callback = function(v)
-        getgenv().XenoSettings.AntiAFK = v
-        if v then task.spawn(AntiAFK) end
-    end
-})
+-- Botão minimizar
+local Minimizar = Instance.new("TextButton")
+Minimizar.Size = UDim2.new(0, 30, 0, 30)
+Minimizar.Position = UDim2.new(1, -35, 0, 5)
+Minimizar.Text = "-"
+Minimizar.TextSize = 20
+Minimizar.TextColor3 = Cores.Vermelho.texto
+Minimizar.BackgroundColor3 = Cores.Vermelho.fundo
+Minimizar.BorderColor3 = Cores.Vermelho.destaque
+Minimizar.Parent = MainFrame
 
-TabAuto:Toggle({
-    Title = "Desbloqueio Automático de Portas",
-    Default = false,
-    Callback = function(v)
-        getgenv().XenoSettings.AutoUnlockDoors = v
-        if v then task.spawn(AutoUnlockDoors) end
-    end
-})
+Minimizar.MouseButton1Click:Connect(function()
+    XenoLord.JanelaAberta = not XenoLord.JanelaAberta
+    MainFrame.Visible = XenoLord.JanelaAberta
+end)
 
-TabAuto:Toggle({
-    Title = "Auto Comprar Vantagens (Perks)",
-    Default = false,
-    Callback = function(v)
-        getgenv().XenoSettings.AutoBuyPerks = v
-        if v then task.spawn(AutoBuyPerks) end
-    end
-})
-
-TabAuto:Toggle({
-    Title = "Auto Upgrade de Armas",
-    Default = false,
-    Callback = function(v)
-        getgenv().XenoSettings.AutoUpgradeWeapons = v
-        if v then task.spawn(AutoUpgradeWeapons) end
-    end
-})
-
--- ==================== CONFIGURAÇÕES ====================
-
-local TabConfig = Window:Tab({
-    Title = "Configurações",
-    Icon = "settings"
-})
-
-TabConfig:Dropdown({
-    Title = "Cor do Menu",
-    Items = {"Vermelho e Preto", "Verde e Preto", "Azul e Preto", "Amarelo e Preto", "Rosa e Preto"},
-    Default = "Vermelho e Preto",
-    Callback = function(selected)
-        local colors = {
-            ["Vermelho e Preto"] = Color3.fromRGB(170, 0, 0),
-            ["Verde e Preto"] = Color3.fromRGB(0, 170, 0),
-            ["Azul e Preto"] = Color3.fromRGB(0, 100, 255),
-            ["Amarelo e Preto"] = Color3.fromRGB(255, 200, 0),
-            ["Rosa e Preto"] = Color3.fromRGB(255, 0, 150)
-        }
-        Window:SetAccent(colors[selected])
-    end
-})
-
-TabConfig:Button({
-    Title = "Minimizar Menu (Tecla K)",
-    Callback = function()
-        print("Pressione 'K' para minimizar")
-    end
-})
-
--- ==================== HOTKEY MINIMIZAR ====================
-
-local minimized = false
-game:GetService("UserInputService").InputBegan:Connect(function(input, gp)
-    if gp then return end
+-- Tecla K para minimizar
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.K then
-        minimized = not minimized
-        if minimized then
-            Window:Minimize()
-        else
-            Window:Restore()
+        XenoLord.JanelaAberta = not XenoLord.JanelaAberta
+        MainFrame.Visible = XenoLord.JanelaAberta
+    end
+end)
+
+-- Criar botões
+local function CriarBotao(texto, yPos, configName)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 180, 0, 40)
+    btn.Position = UDim2.new(0, 20, 0, yPos)
+    btn.Text = texto .. " ❌"
+    btn.TextSize = 16
+    btn.TextColor3 = Cores.Vermelho.texto
+    btn.BackgroundColor3 = Cores.Vermelho.fundo
+    btn.BorderColor3 = Cores.Vermelho.destaque
+    btn.Parent = MainFrame
+    
+    btn.MouseButton1Click:Connect(function()
+        Config[configName] = not Config[configName]
+        btn.Text = texto .. (Config[configName] and " ✅" or " ❌")
+        
+        if configName == "KillAura" and Config.KillAura then
+            task.spawn(KillAuraFunction)
+        elseif configName == "AntiAFK" and Config.AntiAFK then
+            task.spawn(AntiAFKFunction)
+        elseif configName == "DestrancarPortas" and Config.DestrancarPortas then
+            task.spawn(DestrancarPortasFunction)
+        elseif configName == "AutoComprar" and Config.AutoComprar then
+            task.spawn(AutoComprarFunction)
+        elseif configName == "AutoUpgrade" and Config.AutoUpgrade then
+            task.spawn(AutoUpgradeFunction)
+        elseif configName == "HitKill" and Config.HitKill then
+            task.spawn(HitKillFunction)
+        elseif configName == "CongelarInimigos" and Config.CongelarInimigos then
+            task.spawn(CongelarInimigosFunction)
+        end
+    end)
+    
+    return btn
+end
+
+-- Criar todos os botões
+CriarBotao("Kill Aura", 50, "KillAura")
+CriarBotao("Anti AFK", 100, "AntiAFK")
+CriarBotao("Destrancar Portas", 150, "DestrancarPortas")
+CriarBotao("Auto Comprar Vantagens", 200, "AutoComprar")
+CriarBotao("Auto Upgrade Armas", 250, "AutoUpgrade")
+CriarBotao("Hit Kill", 300, "HitKill")
+CriarBotao("Congelar Inimigos", 350, "CongelarInimigos")
+
+-- Botão Teleporte Seguro
+local TeleporteBtn = Instance.new("TextButton")
+TeleporteBtn.Size = UDim2.new(0, 180, 0, 40)
+TeleporteBtn.Position = UDim2.new(0, 20, 0, 400)
+TeleporteBtn.Text = "Teleporte Seguro"
+TeleporteBtn.TextSize = 16
+TeleporteBtn.TextColor3 = Cores.Vermelho.texto
+TeleporteBtn.BackgroundColor3 = Cores.Vermelho.fundo
+TeleporteBtn.BorderColor3 = Cores.Vermelho.destaque
+TeleporteBtn.Parent = MainFrame
+
+TeleporteBtn.MouseButton1Click:Connect(TeleportarSeguro)
+
+-- Botão de mudar cor
+local CorBtn = Instance.new("TextButton")
+CorBtn.Size = UDim2.new(0, 180, 0, 40)
+CorBtn.Position = UDim2.new(1, -200, 0, 400)
+CorBtn.Text = "Cor: Vermelho"
+CorBtn.TextSize = 16
+CorBtn.TextColor3 = Cores.Vermelho.texto
+CorBtn.BackgroundColor3 = Cores.Vermelho.fundo
+CorBtn.BorderColor3 = Cores.Vermelho.destaque
+CorBtn.Parent = MainFrame
+
+local coresLista = {"Vermelho", "Verde", "Azul", "Amarelo", "Rosa"}
+local corIndex = 1
+
+CorBtn.MouseButton1Click:Connect(function()
+    corIndex = corIndex % #coresLista + 1
+    XenoLord.CorAtual = coresLista[corIndex]
+    CorBtn.Text = "Cor: " .. XenoLord.CorAtual
+    AtualizarCores()
+end)
+
+-- Informação do script
+local InfoLabel = Instance.new("TextLabel")
+InfoLabel.Size = UDim2.new(1, 0, 0, 30)
+InfoLabel.Position = UDim2.new(0, 0, 1, -30)
+InfoLabel.Text = "Xeno Lord v1.0 | Autor: alyssonzkn"
+InfoLabel.TextSize = 12
+InfoLabel.TextColor3 = Cores.Vermelho.texto
+InfoLabel.BackgroundTransparency = 1
+InfoLabel.Parent = MainFrame
+
+-- Armazenar GUI na tabela principal
+XenoLord.ScreenGui = ScreenGui
+XenoLord.MainFrame = MainFrame
+
+-- Iniciar loops automaticamente
+task.spawn(function()
+    while task.wait(0.1) do
+        if Config.TeleporteSeguro and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            if LocalPlayer.Character.Humanoid.Health < 50 then
+                TeleportarSeguro()
+            end
         end
     end
 end)
 
-Window:Notify({
-    Title = "Xeno Lord",
-    Content = "Script carregado com sucesso!\nAutor: alyssonzkn\nPressione K para minimizar.",
-    Duration = 6
-})
-
-print("Xeno Lord carregado por alyssonzkn")
+print("Xeno Lord carregado com sucesso! Autor: alyssonzkn")
+print("Pressione K para minimizar o menu")
