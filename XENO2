@@ -1,535 +1,373 @@
 --[[
-    ██╗   ██╗██╗   ██╗██╗      ██████╗ █████╗ ███╗   ██╗
-    ██║   ██║██║   ██║██║     ██╔════╝██╔══██╗████╗  ██║
-    ██║   ██║██║   ██║██║     ██║     ███████║██╔██╗ ██║
-    ╚██╗ ██╔╝██║   ██║██║     ██║     ██╔══██║██║╚██╗██║
-     ╚████╔╝ ╚██████╔╝███████╗╚██████╗██║  ██║██║ ╚████║
-      ╚═══╝   ╚═════╝ ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝
-    
-    Sniper Arena - Vulcan UI
-    Versão: 1.0.0
-    Compatível: Synapse X, Krnl, ScriptWare
+    Fix It Up - Ultimate Xeno
+    Tema: Azul Escuro e Roxo
+    Funcionalidades completas para simulação de conserto de carros
+    Compatível com Solara, Wave, Delta e outros
 --]]
 
--- // Verificação de ambiente
-if not game:IsLoaded() then game.Loaded:Wait() end
+-- Configurações padrão salvas globalmente
+getgenv().FixItUpConfig = getgenv().FixItUpConfig or {
+    AutoRepair = false,
+    AutoPaint = false,
+    PaintColor = "Vermelho",
+    AutoUpgrade = false,
+    AutoSell = false,
+    AutoBuyBestCar = false,
+    AutoFarmMoney = false,
+    ESPEnabled = false,
+    TeleportCar = false,
+    TeleportJunkyard = false,
+    TeleportGarage = false,
+    AntiAFK = false
+}
 
--- // Variáveis globais
+-- Variáveis de controle
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
-local Mouse = LocalPlayer:GetMouse()
+local player = Players.LocalPlayer
+local carrosDisponiveis = {"Carro Iniciante", "Carro Médio", "Carro Avançado", "Carro Elite", "Carro Lendário"}
+local pecas = {"Motor", "Caixa de Câmbio", "Suspensão", "Freios", "Pneus"}
 
--- // Configurações do usuário
-local Settings = {
-    Aimbot = {
-        Enabled = false,
-        Smooth = 0.3,
-        FOV = 120,
-        TargetPart = "Head", -- Head, Chest, Random
-        Priority = "Distance" -- Distance, Angle
-    },
-    InfiniteAmmo = {
-        Enabled = false,
-        NoReload = true
-    },
-    ESP = {
-        Enabled = false,
-        Box = true,
-        Lines = true,
-        Name = true,
-        Distance = true,
-        HealthBar = true,
-        Skeleton = false,
-        TeamColors = true,
-        VisibleColor = Color3.fromRGB(255, 0, 0),
-        HiddenColor = Color3.fromRGB(100, 100, 100)
-    },
-    NoRecoil = false,
-    NoSpread = false
-}
+-- Verificar se o jogo é Fix It Up (ajuste os nomes conforme necessário)
+local function isFixItUpGame()
+    return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name:find("Fix It Up") or false
+end
 
--- // Anti-Ban simples (ofuscação)
-local AntiBan = {
-    Delay = function(t)
-        local start = tick()
-        while tick() - start < t do
-            game:GetService("RunService").Stepped:Wait()
-        end
-    end,
-    RandomWait = function()
-        wait(math.random(0.05, 0.15))
-    end
-}
+if not isFixItUpGame() then
+    warn("Script pode não funcionar corretamente - lugar não reconhecido como Fix It Up")
+end
 
--- // Utilitários
-local function GetClosestPlayer()
-    local closest = nil
-    local closestDistance = Settings.Aimbot.Priority == "Distance" and math.huge or math.huge
-    
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-            local character = player.Character
-            local headPos = character:FindFirstChild("Head") and character.Head.Position or character.PrimaryPart.Position
-            local screenPos, onScreen = Camera:WorldToScreenPoint(headPos)
-            
-            if onScreen then
-                local distance = (headPos - Camera.CFrame.Position).Magnitude
-                local angle = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
-                
-                if Settings.Aimbot.Priority == "Distance" then
-                    if distance < closestDistance then
-                        closestDistance = distance
-                        closest = player
-                    end
-                else -- Angle
-                    if angle < closestDistance and angle <= Settings.Aimbot.FOV then
-                        closestDistance = angle
-                        closest = player
-                    end
-                end
+-- Utilitários
+local function findCar()
+    -- Procura o carro mais próximo ou atual do jogador
+    local character = player.Character
+    if character then
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("Model") and v:FindFirstChild("Humanoid") and v:FindFirstChild("EnginePart") then
+                return v
             end
         end
     end
-    
-    return closest
+    return nil
 end
 
--- // Aimbot
-local AimbotActive = false
-local function UpdateAimbot()
-    if not Settings.Aimbot.Enabled then return end
-    
-    local target = GetClosestPlayer()
-    if target and target.Character then
-        local targetPart
-        if Settings.Aimbot.TargetPart == "Head" then
-            targetPart = target.Character:FindFirstChild("Head")
-        elseif Settings.Aimbot.TargetPart == "Chest" then
-            targetPart = target.Character:FindFirstChild("UpperTorso") or target.Character:FindFirstChild("Torso")
-        else -- Random
-            local parts = {"Head", "UpperTorso", "LowerTorso"}
-            targetPart = target.Character:FindFirstChild(parts[math.random(1, #parts)])
+local function getCarParts(car)
+    if not car then return {} end
+    local parts = {}
+    for _, partName in ipairs(pecas) do
+        local part = car:FindFirstChild(partName)
+        if part then table.insert(parts, part) end
+    end
+    return parts
+end
+
+local function repairCar(car)
+    if not car then return end
+    for _, part in pairs(getCarParts(car)) do
+        if part:IsA("BasePart") and part:FindFirstChild("Damage") then
+            part.Damage.Value = 0
         end
-        
-        if targetPart then
-            local targetPos = targetPart.Position
-            local cameraPos = Camera.CFrame.Position
-            local direction = (targetPos - cameraPos).Unit
-            local newCFrame = CFrame.new(cameraPos, cameraPos + direction)
-            
-            -- Smooth AIM
-            if Settings.Aimbot.Smooth > 0 then
-                Camera.CFrame = Camera.CFrame:Lerp(newCFrame, Settings.Aimbot.Smooth)
-            else
-                Camera.CFrame = newCFrame
+    end
+    print("[Fix It Up] Carro reparado")
+end
+
+local function paintCar(car, color)
+    if not car then return end
+    for _, part in pairs(car:GetDescendants()) do
+        if part:IsA("BasePart") and part.BrickColor then
+            part.BrickColor = BrickColor.new(color)
+        end
+    end
+    print("[Fix It Up] Carro pintado de " .. color)
+end
+
+local function upgradeCar(car)
+    if not car then return end
+    for _, upgrade in pairs({"EnginePower", "BrakeForce", "SuspensionHeight", "Transmission"}) do
+        local upgradePart = car:FindFirstChild(upgrade)
+        if upgradePart and upgradePart:IsA("NumberValue") then
+            upgradePart.Value = upgradePart.Value + 0.1
+        end
+    end
+    print("[Fix It Up] Carro melhorado")
+end
+
+local function sellCar(car)
+    if not car then return end
+    local sellButton = car:FindFirstChild("SellButton")
+    if sellButton and sellButton:IsA("ClickDetector") then
+        fireclickdetector(sellButton)
+        print("[Fix It Up] Carro vendido")
+    end
+end
+
+local function buyBestCar()
+    local junkyard = workspace:FindFirstChild("Junkyard")
+    if junkyard then
+        local bestCar = nil
+        local bestPrice = 0
+        for _, car in pairs(junkyard:GetChildren()) do
+            local price = car:FindFirstChild("Price")
+            if price and price.Value > bestPrice then
+                bestPrice = price.Value
+                bestCar = car
+            end
+        end
+        if bestCar then
+            local buyButton = bestCar:FindFirstChild("BuyButton")
+            if buyButton and buyButton:IsA("ClickDetector") then
+                fireclickdetector(buyButton)
+                print("[Fix It Up] Melhor carro comprado por " .. bestPrice)
             end
         end
     end
 end
 
--- // Munição Infinita
-local function HandleInfiniteAmmo()
-    if not Settings.InfiniteAmmo.Enabled then return end
-    
-    local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-    if tool then
-        local ammoCount = tool:FindFirstChild("AmmoCount")
-        if ammoCount then
-            ammoCount.Value = math.huge
+local function farmCycle()
+    local car = findCar()
+    if not car then
+        buyBestCar()
+        wait(1)
+        car = findCar()
+    end
+    if car then
+        repairCar(car)
+        wait(0.5)
+        if getgenv().FixItUpConfig.AutoPaint then
+            paintCar(car, getgenv().FixItUpConfig.PaintColor)
+            wait(0.5)
         end
-        
-        if Settings.InfiniteAmmo.NoReload then
-            local reloadEvent = tool:FindFirstChild("ReloadEvent")
-            if reloadEvent then
-                reloadEvent:FireServer()
-                AntiBan.RandomWait()
-            end
+        if getgenv().FixItUpConfig.AutoUpgrade then
+            upgradeCar(car)
+            wait(0.5)
         end
+        sellCar(car)
     end
 end
 
--- // ESP
-local ESPObjects = {}
-local function CreateESP(player)
-    if not player or player == LocalPlayer then return end
-    
-    local espData = {
-        Box = nil,
-        Line = nil,
-        Name = nil,
-        Distance = nil,
-        HealthBar = nil
-    }
-    
-    -- Cria os elementos de desenho
-    local function UpdateESP()
-        if not Settings.ESP.Enabled or not player.Character then
-            for _, v in pairs(espData) do
-                if v then v:Remove() end
-            end
-            return
-        end
-        
-        local character = player.Character
-        local humanoid = character:FindFirstChild("Humanoid")
-        if not humanoid or humanoid.Health <= 0 then return end
-        
-        local rootPart = character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart
-        if not rootPart then return end
-        
-        local screenPos, onScreen = Camera:WorldToScreenPoint(rootPart.Position)
-        if not onScreen then return end
-        
-        local espColor = Settings.ESP.TeamColors and (player.Team == LocalPlayer.Team and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)) or Settings.ESP.VisibleColor
-        
-        -- Box ESP
-        if Settings.ESP.Box then
-            if not espData.Box then
-                espData.Box = Drawing.new("Square")
-                espData.Box.Thickness = 2
-                espData.Box.Filled = false
-            end
-            local size = 3
-            espData.Box.Position = Vector2.new(screenPos.X - size, screenPos.Y - size)
-            espData.Box.Size = Vector2.new(size * 2, size * 2)
-            espData.Box.Color = espColor
-            espData.Box.Visible = true
-        elseif espData.Box then
-            espData.Box.Visible = false
-        end
-        
-        -- Lines ESP
-        if Settings.ESP.Lines then
-            if not espData.Line then
-                espData.Line = Drawing.new("Line")
-                espData.Line.Thickness = 1
-            end
-            espData.Line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-            espData.Line.To = Vector2.new(screenPos.X, screenPos.Y)
-            espData.Line.Color = espColor
-            espData.Line.Visible = true
-        elseif espData.Line then
-            espData.Line.Visible = false
-        end
-        
-        -- Name ESP
-        if Settings.ESP.Name then
-            if not espData.Name then
-                espData.Name = Drawing.new("Text")
-                espData.Name.Size = 14
-                espData.Name.Center = true
-            end
-            espData.Name.Text = player.Name
-            espData.Name.Position = Vector2.new(screenPos.X, screenPos.Y - 30)
-            espData.Name.Color = espColor
-            espData.Name.Visible = true
-        elseif espData.Name then
-            espData.Name.Visible = false
-        end
-        
-        -- Distance ESP
-        if Settings.ESP.Distance then
-            if not espData.Distance then
-                espData.Distance = Drawing.new("Text")
-                espData.Distance.Size = 12
-                espData.Distance.Center = true
-            end
-            local distance = (rootPart.Position - Camera.CFrame.Position).Magnitude
-            espData.Distance.Text = string.format("%.1fm", distance)
-            espData.Distance.Position = Vector2.new(screenPos.X, screenPos.Y + 10)
-            espData.Distance.Color = espColor
-            espData.Distance.Visible = true
-        elseif espData.Distance then
-            espData.Distance.Visible = false
-        end
-        
-        -- Health Bar ESP
-        if Settings.ESP.HealthBar then
-            if not espData.HealthBar then
-                espData.HealthBar = Drawing.new("Line")
-                espData.HealthBar.Thickness = 4
-            end
-            local healthPercent = humanoid.Health / humanoid.MaxHealth
-            local barLength = 50 * healthPercent
-            espData.HealthBar.From = Vector2.new(screenPos.X - 25, screenPos.Y - 20)
-            espData.HealthBar.To = Vector2.new(screenPos.X - 25 + barLength, screenPos.Y - 20)
-            espData.HealthBar.Color = Color3.fromRGB(0, 255, 0)
-            espData.HealthBar.Visible = true
-        elseif espData.HealthBar then
-            espData.HealthBar.Visible = false
-        end
-    end
-    
-    -- Loop de atualização do ESP
-    coroutine.wrap(function()
-        while player and player.Parent do
-            UpdateESP()
-            RunService.RenderStepped:Wait()
-        end
-        for _, v in pairs(espData) do
-            if v then v:Remove() end
-        end
-    end)()
+-- Anti-AFK
+local function antiAFK()
+    if not getgenv().FixItUpConfig.AntiAFK then return end
+    local VirtualUser = game:GetService("VirtualUser")
+    game:GetService("Players").LocalPlayer.Idled:Connect(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
 end
 
--- // Interface Vulcan UI
-local VulcanUI = {
-    ScreenGui = nil,
-    MainFrame = nil,
-    ToggleButtons = {},
-    Sliders = {}
-}
+-- ESP (simples usando Highlight)
+local espObjects = {}
+local function toggleESP()
+    if getgenv().FixItUpConfig.ESPEnabled then
+        for _, obj in pairs(espObjects) do
+            if obj and obj.Parent then obj:Destroy() end
+        end
+        table.clear(espObjects)
+        
+        for _, car in pairs(workspace:GetDescendants()) do
+            if car:IsA("Model") and car:FindFirstChild("Humanoid") and car:FindFirstChild("EnginePart") then
+                local highlight = Instance.new("Highlight")
+                highlight.Parent = car
+                highlight.Adornee = car
+                highlight.FillColor = Color3.fromRGB(128, 0, 255)
+                highlight.FillTransparency = 0.5
+                highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
+                table.insert(espObjects, highlight)
+            end
+        end
+    else
+        for _, obj in pairs(espObjects) do
+            if obj and obj.Parent then obj:Destroy() end
+        end
+        table.clear(espObjects)
+    end
+end
 
-function VulcanUI:Create()
-    self.ScreenGui = Instance.new("ScreenGui")
-    self.ScreenGui.Name = "VulcanUI"
-    self.ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    self.ScreenGui.ResetOnSpawn = false
-    
-    -- Main Frame
-    self.MainFrame = Instance.new("Frame")
-    self.MainFrame.Size = UDim2.new(0, 400, 0, 500)
-    self.MainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
-    self.MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-    self.MainFrame.BackgroundTransparency = 0.1
-    self.MainFrame.BorderSizePixel = 0
-    self.MainFrame.ClipsDescendants = true
-    self.MainFrame.Parent = self.ScreenGui
-    
-    -- Título
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-    title.Text = "🔫 SNIPER ARENA - VULCAN UI"
-    title.TextColor3 = Color3.fromRGB(0, 200, 255)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 18
-    title.Parent = self.MainFrame
-    
-    -- Abas
-    local tabs = {"AIMBOT", "ESP", "MUNIÇÃO", "EXTRAS"}
-    local tabButtons = {}
-    local contentFrame = Instance.new("Frame")
-    contentFrame.Size = UDim2.new(1, 0, 1, -40)
-    contentFrame.Position = UDim2.new(0, 0, 0, 40)
-    contentFrame.BackgroundTransparency = 1
-    contentFrame.Parent = self.MainFrame
-    
-    for i, tabName in ipairs(tabs) do
+-- Teleportes simulados (ajustar conforme mapa real)
+local function teleportToJunkyard()
+    local junkyardSpot = workspace:FindFirstChild("JunkyardTeleport")
+    if junkyardSpot then
+        player.Character.HumanoidRootPart.CFrame = junkyardSpot.CFrame
+    end
+end
+
+local function teleportToGarage()
+    local garageSpot = workspace:FindFirstChild("GarageTeleport")
+    if garageSpot then
+        player.Character.HumanoidRootPart.CFrame = garageSpot.CFrame
+    end
+end
+
+-- Loop principal de automação
+spawn(function()
+    while wait(1) do
+        if getgenv().FixItUpConfig.AutoFarmMoney then
+            farmCycle()
+        elseif getgenv().FixItUpConfig.AutoRepair then
+            local car = findCar()
+            if car then repairCar(car) end
+        end
+        if getgenv().FixItUpConfig.AutoSell then
+            local car = findCar()
+            if car then sellCar(car) end
+        end
+        if getgenv().FixItUpConfig.AutoBuyBestCar then
+            buyBestCar()
+        end
+        if getgenv().FixItUpConfig.TeleportCar then
+            local car = findCar()
+            if car then player.Character.HumanoidRootPart.CFrame = car.HumanoidRootPart.CFrame end
+            getgenv().FixItUpConfig.TeleportCar = false
+        end
+        if getgenv().FixItUpConfig.TeleportJunkyard then
+            teleportToJunkyard()
+            getgenv().FixItUpConfig.TeleportJunkyard = false
+        end
+        if getgenv().FixItUpConfig.TeleportGarage then
+            teleportToGarage()
+            getgenv().FixItUpConfig.TeleportGarage = false
+        end
+        antiAFK()
+        toggleESP()
+    end
+end)
+
+-- Interface Fluent-style com Library padrão
+local Window = {
+    Visible = true,
+    Toggle = function(self, text, callback)
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0.25, 0, 0, 30)
-        btn.Position = UDim2.new((i-1) * 0.25, 0, 0, 40)
-        btn.Text = tabName
-        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-        btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-        btn.Font = Enum.Font.Gotham
-        btn.TextSize = 14
-        btn.Parent = self.MainFrame
-        
-        local tabContent = Instance.new("Frame")
-        tabContent.Size = UDim2.new(1, 0, 1, 0)
-        tabContent.BackgroundTransparency = 1
-        tabContent.Visible = i == 1
-        tabContent.Parent = contentFrame
-        
-        tabButtons[btn] = tabContent
+        btn.Size = UDim2.new(0, 200, 0, 40)
+        btn.Text = text
+        btn.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+        btn.TextColor3 = Color3.fromRGB(200, 200, 255)
+        btn.BorderSizePixel = 0
+        btn.Parent = self.Container
         btn.MouseButton1Click:Connect(function()
-            for _, content in pairs(tabButtons) do
-                content.Visible = false
-            end
-            tabContent.Visible = true
+            local newState = not (btn.BackgroundColor3 == Color3.fromRGB(80, 80, 150))
+            btn.BackgroundColor3 = newState and Color3.fromRGB(80, 80, 150) or Color3.fromRGB(30, 30, 50)
+            callback(newState)
         end)
-        
-        -- Conteúdo das abas
-        if tabName == "AIMBOT" then
-            self:CreateToggle(tabContent, "Ativar Aimbot", "Enabled", Settings.Aimbot, 10)
-            self:CreateSlider(tabContent, "Smooth AIM", 0, 1, Settings.Aimbot.Smooth, function(v) Settings.Aimbot.Smooth = v end, 10, 50)
-            self:CreateSlider(tabContent, "FOV (Ângulo)", 30, 180, Settings.Aimbot.FOV, function(v) Settings.Aimbot.FOV = v end, 10, 90)
-            
-            local priorityDrop = Instance.new("TextButton")
-            priorityDrop.Size = UDim2.new(0.9, 0, 0, 35)
-            priorityDrop.Position = UDim2.new(0.05, 0, 0, 130)
-            priorityDrop.Text = "Prioridade: " .. Settings.Aimbot.Priority
-            priorityDrop.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
-            priorityDrop.Parent = tabContent
-            priorityDrop.MouseButton1Click:Connect(function()
-                Settings.Aimbot.Priority = Settings.Aimbot.Priority == "Distance" and "Angle" or "Distance"
-                priorityDrop.Text = "Prioridade: " .. Settings.Aimbot.Priority
-            end)
-            
-            local partDrop = Instance.new("TextButton")
-            partDrop.Size = UDim2.new(0.9, 0, 0, 35)
-            partDrop.Position = UDim2.new(0.05, 0, 0, 175)
-            partDrop.Text = "Alvo: " .. Settings.Aimbot.TargetPart
-            partDrop.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
-            partDrop.Parent = tabContent
-            partDrop.MouseButton1Click:Connect(function()
-                local parts = {"Head", "Chest", "Random"}
-                local current = table.find(parts, Settings.Aimbot.TargetPart)
-                Settings.Aimbot.TargetPart = parts[current % #parts + 1]
-                partDrop.Text = "Alvo: " .. Settings.Aimbot.TargetPart
-            end)
-            
-        elseif tabName == "ESP" then
-            self:CreateToggle(tabContent, "Ativar ESP", "Enabled", Settings.ESP, 10)
-            self:CreateToggle(tabContent, "ESP Box", "Box", Settings.ESP, 50)
-            self:CreateToggle(tabContent, "ESP Lines", "Lines", Settings.ESP, 90)
-            self:CreateToggle(tabContent, "ESP Name", "Name", Settings.ESP, 130)
-            self:CreateToggle(tabContent, "ESP Distance", "Distance", Settings.ESP, 170)
-            self:CreateToggle(tabContent, "ESP Health Bar", "HealthBar", Settings.ESP, 210)
-            self:CreateToggle(tabContent, "Cores por Time", "TeamColors", Settings.ESP, 250)
-            
-        elseif tabName == "MUNIÇÃO" then
-            self:CreateToggle(tabContent, "Munição Infinita", "Enabled", Settings.InfiniteAmmo, 10)
-            self:CreateToggle(tabContent, "Sem Recarregar", "NoReload", Settings.InfiniteAmmo, 50)
-            
-        elseif tabName == "EXTRAS" then
-            self:CreateToggle(tabContent, "Sem Recoil", "NoRecoil", Settings, 10)
-            self:CreateToggle(tabContent, "Sem Dispersão", "NoSpread", Settings, 50)
-        end
+        return btn
+    end,
+    Dropdown = function(self, text, items, callback)
+        local dropdown = Instance.new("TextButton")
+        dropdown.Size = UDim2.new(0, 200, 0, 40)
+        dropdown.Text = text .. ": " .. items[1]
+        dropdown.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+        dropdown.TextColor3 = Color3.fromRGB(200, 200, 255)
+        dropdown.Parent = self.Container
+        local index = 1
+        dropdown.MouseButton1Click:Connect(function()
+            index = index % #items + 1
+            dropdown.Text = text .. ": " .. items[index]
+            callback(items[index])
+        end)
+    end,
+    Button = function(self, text, callback)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 200, 0, 40)
+        btn.Text = text
+        btn.BackgroundColor3 = Color3.fromRGB(50, 50, 100)
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Parent = self.Container
+        btn.MouseButton1Click:Connect(callback)
+    end,
+    Show = function(self)
+        self.Frame.Visible = true
+    end,
+    Hide = function(self)
+        self.Frame.Visible = false
     end
-    
-    -- Botão Fechar
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0, 5)
-    closeBtn.Text = "X"
-    closeBtn.TextColor3 = Color3.fromRGB(255, 0, 0)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-    closeBtn.Parent = self.MainFrame
-    closeBtn.MouseButton1Click:Connect(function()
-        self.ScreenGui.Enabled = not self.ScreenGui.Enabled
-    end)
-    
-    -- Fechar com Insert
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if not gameProcessed and input.KeyCode == Enum.KeyCode.Insert then
-            self.ScreenGui.Enabled = not self.ScreenGui.Enabled
-        end
-    end)
-end
+}
 
-function VulcanUI:CreateToggle(parent, labelText, settingName, settingsTable, yPos)
-    local toggleBtn = Instance.new("TextButton")
-    toggleBtn.Size = UDim2.new(0.9, 0, 0, 35)
-    toggleBtn.Position = UDim2.new(0.05, 0, 0, yPos)
-    toggleBtn.Text = labelText .. ": OFF"
-    toggleBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
-    toggleBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    toggleBtn.Parent = parent
-    
-    toggleBtn.MouseButton1Click:Connect(function()
-        settingsTable[settingName] = not settingsTable[settingName]
-        toggleBtn.Text = labelText .. ": " .. (settingsTable[settingName] and "ON" or "OFF")
-        toggleBtn.BackgroundColor3 = settingsTable[settingName] and Color3.fromRGB(0, 100, 150) or Color3.fromRGB(45, 45, 60)
-    end)
-    
-    return toggleBtn
-end
+-- Criar UI principal
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FixItUpGUI"
+screenGui.Parent = player.PlayerGui
 
-function VulcanUI:CreateSlider(parent, labelText, minVal, maxVal, startVal, callback, yPos, offsetX)
-    local sliderFrame = Instance.new("Frame")
-    sliderFrame.Size = UDim2.new(0.9, 0, 0, 40)
-    sliderFrame.Position = UDim2.new(0.05, 0, 0, yPos)
-    sliderFrame.BackgroundTransparency = 1
-    sliderFrame.Parent = parent
-    
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.4, 0, 1, 0)
-    label.Text = labelText .. ": " .. string.format("%.2f", startVal)
-    label.TextColor3 = Color3.fromRGB(200, 200, 200)
-    label.BackgroundTransparency = 1
-    label.Parent = sliderFrame
-    
-    local slider = Instance.new("Frame")
-    slider.Size = UDim2.new(0.5, 0, 0.3, 0)
-    slider.Position = UDim2.new(0.45, 0, 0.35, 0)
-    slider.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    slider.Parent = sliderFrame
-    
-    local fill = Instance.new("Frame")
-    fill.Size = UDim2.new((startVal - minVal) / (maxVal - minVal), 0, 1, 0)
-    fill.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
-    fill.Parent = slider
-    
-    local function updateSlider(input)
-        local relativeX = math.clamp((input.Position.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
-        local value = minVal + (maxVal - minVal) * relativeX
-        fill.Size = UDim2.new(relativeX, 0, 1, 0)
-        label.Text = labelText .. ": " .. string.format("%.2f", value)
-        callback(value)
-    end
-    
-    local dragging = false
-    slider.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            updateSlider(input)
-        end
-    end)
-    
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end)
-    
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            updateSlider(input)
-        end
-    end)
-end
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 300, 0, 500)
+mainFrame.Position = UDim2.new(0.5, -150, 0.5, -250)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
+mainFrame.BackgroundTransparency = 0.1
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
 
--- // No Recoil & No Spread
-local function HandleNoRecoilSpread()
-    local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-    if tool then
-        if Settings.NoRecoil then
-            local recoilMod = tool:FindFirstChild("RecoilModifier")
-            if recoilMod then recoilMod.Value = 0 end
-        end
-        if Settings.NoSpread then
-            local spreadMod = tool:FindFirstChild("SpreadModifier")
-            if spreadMod then spreadMod.Value = 0 end
-        end
-    end
-end
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Text = "Fix It Up - Ultimate Xeno"
+title.BackgroundColor3 = Color3.fromRGB(50, 20, 80)
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.Parent = mainFrame
 
--- // Inicialização
-coroutine.wrap(function()
-    while true do
-        if Settings.Aimbot.Enabled then
-            UpdateAimbot()
-        end
-        HandleInfiniteAmmo()
-        HandleNoRecoilSpread()
-        
-        -- ESP Players
-        if Settings.ESP.Enabled then
-            for _, player in ipairs(Players:GetPlayers()) do
-                if not ESPObjects[player] then
-                    ESPObjects[player] = true
-                    CreateESP(player)
-                end
-            end
-        end
-        
-        AntiBan.Delay(0.01)
-        RunService.RenderStepped:Wait()
-    end
-end)()
+local container = Instance.new("ScrollingFrame")
+container.Size = UDim2.new(1, 0, 1, -60)
+container.Position = UDim2.new(0, 0, 0, 45)
+container.BackgroundTransparency = 1
+container.CanvasSize = UDim2.new(0, 0, 0, 400)
+container.ScrollBarThickness = 6
+container.Parent = mainFrame
 
--- // Carrega UI
-VulcanUI:Create()
-VulcanUI.ScreenGui.Parent = game:GetService("CoreGui")
+Window.Container = container
+Window.Frame = mainFrame
 
--- // Mensagem de boas-vindas
-game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "Vulcan UI",
-    Text = "Carregado com sucesso! Use INSERT para abrir/fechar.",
-    Duration = 3
-})
+-- Construir UI com todas as opções
+Window:Toggle("Auto Repair", function(state)
+    getgenv().FixItUpConfig.AutoRepair = state
+end)
+
+Window:Toggle("Auto Paint", function(state)
+    getgenv().FixItUpConfig.AutoPaint = state
+end)
+
+Window:Dropdown("Paint Color", {"Vermelho", "Azul", "Verde", "Preto", "Branco", "Amarelo"}, function(selected)
+    getgenv().FixItUpConfig.PaintColor = selected
+end)
+
+Window:Toggle("Auto Upgrade", function(state)
+    getgenv().FixItUpConfig.AutoUpgrade = state
+end)
+
+Window:Toggle("Auto Sell", function(state)
+    getgenv().FixItUpConfig.AutoSell = state
+end)
+
+Window:Toggle("Auto Buy Best Car", function(state)
+    getgenv().FixItUpConfig.AutoBuyBestCar = state
+end)
+
+Window:Toggle("Auto Farm Money", function(state)
+    getgenv().FixItUpConfig.AutoFarmMoney = state
+end)
+
+Window:Toggle("Car ESP", function(state)
+    getgenv().FixItUpConfig.ESPEnabled = state
+end)
+
+Window:Toggle("Anti-AFK", function(state)
+    getgenv().FixItUpConfig.AntiAFK = state
+end)
+
+Window:Button("Teleport to Car", function()
+    getgenv().FixItUpConfig.TeleportCar = true
+end)
+
+Window:Button("Teleport to Junkyard", function()
+    getgenv().FixItUpConfig.TeleportJunkyard = true
+end)
+
+Window:Button("Teleport to Garage", function()
+    getgenv().FixItUpConfig.TeleportGarage = true
+end)
+
+Window:Button("Buy Best Car Now", function()
+    buyBestCar()
+end)
+
+print("[Fix It Up] Script carregado com sucesso! Interface aberta.")
