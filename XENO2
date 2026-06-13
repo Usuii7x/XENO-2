@@ -1,373 +1,532 @@
 --[[
-    Fix It Up - Ultimate Xeno
-    Tema: Azul Escuro e Roxo
-    Funcionalidades completas para simulação de conserto de carros
-    Compatível com Solara, Wave, Delta e outros
---]]
+    Script: Michael's Zombies Advanced GUI
+    Desenvolvido para: Xeno, Synapse X, Fluxus, Solara
+    Design: Tema Escuro Moderno (Fluent UI) com acentos em Roxo.
+    Otimização: Uso de task.spawn, loops eficientes e verificação de objetos.
+]]
 
--- Configurações padrão salvas globalmente
-getgenv().FixItUpConfig = getgenv().FixItUpConfig or {
-    AutoRepair = false,
-    AutoPaint = false,
-    PaintColor = "Vermelho",
-    AutoUpgrade = false,
-    AutoSell = false,
-    AutoBuyBestCar = false,
-    AutoFarmMoney = false,
-    ESPEnabled = false,
-    TeleportCar = false,
-    TeleportJunkyard = false,
-    TeleportGarage = false,
-    AntiAFK = false
+-- Verifica se a biblioteca Fluent está carregada, se não, baixa ela.
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+-- Cria a janela principal com o tema escuro fosco
+local Window = Fluent:CreateWindow({
+    Title = "Michael's Zombies   ",
+    SubTitle = "by ScriptHub | Advanced Features",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 490),
+    Acrylic = false, -- Desativado para melhor performance em alguns executores
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.RightControl
+})
+
+-- Criando as Tabs (Abas) - Organização principal
+local Tabs = {
+    Home = Window:AddTab({ Title = "Home", Icon = "home" }),
+    Combat = Window:AddTab({ Title = "Combat", Icon = "swords" }),
+    AutoFarm = Window:AddTab({ Title = "Auto Farm", Icon = "pickaxe" }),
+    Player = Window:AddTab({ Title = "Player", Icon = "user" }),
+    Misc = Window:AddTab({ Title = "Misc", Icon = "brush" })
 }
 
--- Variáveis de controle
-local Players = game:GetService("Players")
+-- [[ Variáveis Globais para Estado dos Toggles e Funções ]]
+local Player = game:GetService("Players").LocalPlayer
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local player = Players.LocalPlayer
-local carrosDisponiveis = {"Carro Iniciante", "Carro Médio", "Carro Avançado", "Carro Elite", "Carro Lendário"}
-local pecas = {"Motor", "Caixa de Câmbio", "Suspensão", "Freios", "Pneus"}
+local Camera = workspace.CurrentCamera
 
--- Verificar se o jogo é Fix It Up (ajuste os nomes conforme necessário)
-local function isFixItUpGame()
-    return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name:find("Fix It Up") or false
-end
-
-if not isFixItUpGame() then
-    warn("Script pode não funcionar corretamente - lugar não reconhecido como Fix It Up")
-end
-
--- Utilitários
-local function findCar()
-    -- Procura o carro mais próximo ou atual do jogador
-    local character = player.Character
-    if character then
-        for _, v in pairs(workspace:GetDescendants()) do
-            if v:IsA("Model") and v:FindFirstChild("Humanoid") and v:FindFirstChild("EnginePart") then
-                return v
-            end
-        end
-    end
-    return nil
-end
-
-local function getCarParts(car)
-    if not car then return {} end
-    local parts = {}
-    for _, partName in ipairs(pecas) do
-        local part = car:FindFirstChild(partName)
-        if part then table.insert(parts, part) end
-    end
-    return parts
-end
-
-local function repairCar(car)
-    if not car then return end
-    for _, part in pairs(getCarParts(car)) do
-        if part:IsA("BasePart") and part:FindFirstChild("Damage") then
-            part.Damage.Value = 0
-        end
-    end
-    print("[Fix It Up] Carro reparado")
-end
-
-local function paintCar(car, color)
-    if not car then return end
-    for _, part in pairs(car:GetDescendants()) do
-        if part:IsA("BasePart") and part.BrickColor then
-            part.BrickColor = BrickColor.new(color)
-        end
-    end
-    print("[Fix It Up] Carro pintado de " .. color)
-end
-
-local function upgradeCar(car)
-    if not car then return end
-    for _, upgrade in pairs({"EnginePower", "BrakeForce", "SuspensionHeight", "Transmission"}) do
-        local upgradePart = car:FindFirstChild(upgrade)
-        if upgradePart and upgradePart:IsA("NumberValue") then
-            upgradePart.Value = upgradePart.Value + 0.1
-        end
-    end
-    print("[Fix It Up] Carro melhorado")
-end
-
-local function sellCar(car)
-    if not car then return end
-    local sellButton = car:FindFirstChild("SellButton")
-    if sellButton and sellButton:IsA("ClickDetector") then
-        fireclickdetector(sellButton)
-        print("[Fix It Up] Carro vendido")
-    end
-end
-
-local function buyBestCar()
-    local junkyard = workspace:FindFirstChild("Junkyard")
-    if junkyard then
-        local bestCar = nil
-        local bestPrice = 0
-        for _, car in pairs(junkyard:GetChildren()) do
-            local price = car:FindFirstChild("Price")
-            if price and price.Value > bestPrice then
-                bestPrice = price.Value
-                bestCar = car
-            end
-        end
-        if bestCar then
-            local buyButton = bestCar:FindFirstChild("BuyButton")
-            if buyButton and buyButton:IsA("ClickDetector") then
-                fireclickdetector(buyButton)
-                print("[Fix It Up] Melhor carro comprado por " .. bestPrice)
-            end
-        end
-    end
-end
-
-local function farmCycle()
-    local car = findCar()
-    if not car then
-        buyBestCar()
-        wait(1)
-        car = findCar()
-    end
-    if car then
-        repairCar(car)
-        wait(0.5)
-        if getgenv().FixItUpConfig.AutoPaint then
-            paintCar(car, getgenv().FixItUpConfig.PaintColor)
-            wait(0.5)
-        end
-        if getgenv().FixItUpConfig.AutoUpgrade then
-            upgradeCar(car)
-            wait(0.5)
-        end
-        sellCar(car)
-    end
-end
-
--- Anti-AFK
-local function antiAFK()
-    if not getgenv().FixItUpConfig.AntiAFK then return end
-    local VirtualUser = game:GetService("VirtualUser")
-    game:GetService("Players").LocalPlayer.Idled:Connect(function()
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new())
-    end)
-end
-
--- ESP (simples usando Highlight)
-local espObjects = {}
-local function toggleESP()
-    if getgenv().FixItUpConfig.ESPEnabled then
-        for _, obj in pairs(espObjects) do
-            if obj and obj.Parent then obj:Destroy() end
-        end
-        table.clear(espObjects)
-        
-        for _, car in pairs(workspace:GetDescendants()) do
-            if car:IsA("Model") and car:FindFirstChild("Humanoid") and car:FindFirstChild("EnginePart") then
-                local highlight = Instance.new("Highlight")
-                highlight.Parent = car
-                highlight.Adornee = car
-                highlight.FillColor = Color3.fromRGB(128, 0, 255)
-                highlight.FillTransparency = 0.5
-                highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
-                table.insert(espObjects, highlight)
-            end
-        end
-    else
-        for _, obj in pairs(espObjects) do
-            if obj and obj.Parent then obj:Destroy() end
-        end
-        table.clear(espObjects)
-    end
-end
-
--- Teleportes simulados (ajustar conforme mapa real)
-local function teleportToJunkyard()
-    local junkyardSpot = workspace:FindFirstChild("JunkyardTeleport")
-    if junkyardSpot then
-        player.Character.HumanoidRootPart.CFrame = junkyardSpot.CFrame
-    end
-end
-
-local function teleportToGarage()
-    local garageSpot = workspace:FindFirstChild("GarageTeleport")
-    if garageSpot then
-        player.Character.HumanoidRootPart.CFrame = garageSpot.CFrame
-    end
-end
-
--- Loop principal de automação
-spawn(function()
-    while wait(1) do
-        if getgenv().FixItUpConfig.AutoFarmMoney then
-            farmCycle()
-        elseif getgenv().FixItUpConfig.AutoRepair then
-            local car = findCar()
-            if car then repairCar(car) end
-        end
-        if getgenv().FixItUpConfig.AutoSell then
-            local car = findCar()
-            if car then sellCar(car) end
-        end
-        if getgenv().FixItUpConfig.AutoBuyBestCar then
-            buyBestCar()
-        end
-        if getgenv().FixItUpConfig.TeleportCar then
-            local car = findCar()
-            if car then player.Character.HumanoidRootPart.CFrame = car.HumanoidRootPart.CFrame end
-            getgenv().FixItUpConfig.TeleportCar = false
-        end
-        if getgenv().FixItUpConfig.TeleportJunkyard then
-            teleportToJunkyard()
-            getgenv().FixItUpConfig.TeleportJunkyard = false
-        end
-        if getgenv().FixItUpConfig.TeleportGarage then
-            teleportToGarage()
-            getgenv().FixItUpConfig.TeleportGarage = false
-        end
-        antiAFK()
-        toggleESP()
-    end
-end)
-
--- Interface Fluent-style com Library padrão
-local Window = {
-    Visible = true,
-    Toggle = function(self, text, callback)
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 200, 0, 40)
-        btn.Text = text
-        btn.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
-        btn.TextColor3 = Color3.fromRGB(200, 200, 255)
-        btn.BorderSizePixel = 0
-        btn.Parent = self.Container
-        btn.MouseButton1Click:Connect(function()
-            local newState = not (btn.BackgroundColor3 == Color3.fromRGB(80, 80, 150))
-            btn.BackgroundColor3 = newState and Color3.fromRGB(80, 80, 150) or Color3.fromRGB(30, 30, 50)
-            callback(newState)
-        end)
-        return btn
-    end,
-    Dropdown = function(self, text, items, callback)
-        local dropdown = Instance.new("TextButton")
-        dropdown.Size = UDim2.new(0, 200, 0, 40)
-        dropdown.Text = text .. ": " .. items[1]
-        dropdown.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
-        dropdown.TextColor3 = Color3.fromRGB(200, 200, 255)
-        dropdown.Parent = self.Container
-        local index = 1
-        dropdown.MouseButton1Click:Connect(function()
-            index = index % #items + 1
-            dropdown.Text = text .. ": " .. items[index]
-            callback(items[index])
-        end)
-    end,
-    Button = function(self, text, callback)
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 200, 0, 40)
-        btn.Text = text
-        btn.BackgroundColor3 = Color3.fromRGB(50, 50, 100)
-        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        btn.Parent = self.Container
-        btn.MouseButton1Click:Connect(callback)
-    end,
-    Show = function(self)
-        self.Frame.Visible = true
-    end,
-    Hide = function(self)
-        self.Frame.Visible = false
-    end
+-- Estados
+local state = {
+    KillAura = false,
+    KillAuraKnife = false,
+    KillAuraRange = 20,
+    HeadshotOnly = false,
+    AutoShoot = false,
+    AutoCollectPerks = false,
+    AutoCollectPoints = false,
+    AutoPack = false,
+    AutoUpgrade = false,
+    GodMode = false,
+    InfAmmo = false,
+    NoReload = false,
+    InfSprint = false,
+    AntiAFK = false,
+    AutoRevive = false,
+    ESP = false,
+    RemoveFog = false,
+    SpeedValue = 16,
+    JumpValue = 50
 }
 
--- Criar UI principal
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "FixItUpGUI"
-screenGui.Parent = player.PlayerGui
+-- [[ Funções Auxiliares e Utilitárias ]]
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 300, 0, 500)
-mainFrame.Position = UDim2.new(0.5, -150, 0.5, -250)
-mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
-mainFrame.BackgroundTransparency = 0.1
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.Draggable = true
-mainFrame.Parent = screenGui
+-- Notificação customizada
+local function Notify(Title, Content, Duration)
+    Fluent:Notify({
+        Title = Title,
+        Content = Content,
+        Duration = Duration or 3
+    })
+end
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 40)
-title.Text = "Fix It Up - Ultimate Xeno"
-title.BackgroundColor3 = Color3.fromRGB(50, 20, 80)
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 18
-title.Parent = mainFrame
+-- Função para obter a arma atual do jogador
+local function GetCurrentWeapon()
+    local char = Player.Character
+    if not char then return nil end
+    -- Em Michael's Zombies, as ferramentas geralmente ficam no Backpack ou Character
+    local tool = char:FindFirstChildWhichIsA("Tool")
+    if not tool and Player.Backpack then
+        tool = Player.Backpack:FindFirstChildWhichIsA("Tool")
+    end
+    return tool
+end
 
-local container = Instance.new("ScrollingFrame")
-container.Size = UDim2.new(1, 0, 1, -60)
-container.Position = UDim2.new(0, 0, 0, 45)
-container.BackgroundTransparency = 1
-container.CanvasSize = UDim2.new(0, 0, 0, 400)
-container.ScrollBarThickness = 6
-container.Parent = mainFrame
+-- [[ 1. TAB: HOME (Créditos e Status) ]]
+local HomeSection = Tabs.Home:AddSection("Dashboard")
 
-Window.Container = container
-Window.Frame = mainFrame
+HomeSection:AddParagraph({
+    Title = "Bem-vindo, " .. Player.Name,
+    Content = "Status: Conectado\nJogo: Michael's Zombies\nScript: Modo Avançado Ativado"
+})
 
--- Construir UI com todas as opções
-Window:Toggle("Auto Repair", function(state)
-    getgenv().FixItUpConfig.AutoRepair = state
+HomeSection:AddButton({
+    Title = "Créditos",
+    Description = "Clique para ver os desenvolvedores",
+    Callback = function()
+        Window:Dialog({
+            Title = "Créditos",
+            Content = "Script GUI v2.0\nDesenvolvido para Xeno/Synapse\nDesign: Fluent UI\nDiscord: .gg/script",
+            Buttons = {
+                { Title = "Fechar", Callback = function() end }
+            }
+        })
+    end
+})
+
+-- [[ 2. TAB: COMBAT (Kill Aura, Auto Shoot) ]]
+local CombatSection = Tabs.Combat:AddSection("Sistema de Combate")
+
+-- Kill Aura Toggle
+local KillAuraToggle = CombatSection:AddToggle("KillAuraToggle", {
+    Title = "Kill Aura",
+    Description = "Ataca automaticamente zumbis próximos",
+    Default = false,
+    Callback = function(value)
+        state.KillAura = value
+        Notify("Combat", "Kill Aura " .. (value and "Ativado" or "Desativado"), 2)
+    end
+})
+
+-- Kill Aura Knife Mode (Usar Faca)
+CombatSection:AddToggle("KillAuraKnifeToggle", {
+    Title = "Usar Faca (Knife Mode)",
+    Description = "Tenta equipar a faca para matar mais rápido",
+    Default = false,
+    Callback = function(value)
+        state.KillAuraKnife = value
+    end
+})
+
+-- Slider de Alcance
+local RangeSlider = CombatSection:AddSlider("RangeSlider", {
+    Title = "Alcance (Range)",
+    Description = "Distância para detectar zumbis",
+    Default = 20,
+    Min = 10,
+    Max = 50,
+    Rounding = 1,
+    Callback = function(value)
+        state.KillAuraRange = value
+    end
+})
+
+-- Headshot Only
+CombatSection:AddToggle("HeadshotToggle", {
+    Title = "Headshot Only",
+    Description = "Mira apenas na cabeça (se suportado)",
+    Default = false,
+    Callback = function(value)
+        state.HeadshotOnly = value
+    end
+})
+
+-- Auto Shoot / Auto Fire
+CombatSection:AddToggle("AutoShootToggle", {
+    Title = "Auto Shoot / Auto Fire",
+    Description = "Atira automaticamente ao mirar em zumbis",
+    Default = false,
+    Callback = function(value)
+        state.AutoShoot = value
+    end
+})
+
+-- Lógica do Kill Aura e Auto Shoot (Loop Otimizado)
+task.spawn(function()
+    while task.wait(0.1) do
+        if not state.KillAura and not state.AutoShoot then continue end
+        
+        local character = Player.Character
+        local humanoidRootPart = character and character:FindFirstChild("HumanoidRootPart")
+        if not humanoidRootPart then continue end
+        
+        -- Procura por zumbis (NPCs que são inimigos)
+        local closestZombie = nil
+        local closestDist = state.KillAuraRange
+        
+        for _, v in pairs(workspace:GetChildren()) do
+            -- Detecção genérica de Zumbis: Pela tag Humanoid e nome/classe específica.
+            -- Ajuste os nomes conforme o jogo: "Zombie", "ZombieNPC", etc.
+            if v:IsA("Model") and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
+                local isEnemy = string.find(v.Name, "Zombie") or string.find(v.Name, "Zumbi") or string.find(v.ClassName, "Zombie")
+                if isEnemy or not game:GetService("Players"):FindFirstChild(v.Name) then
+                    local root = v:FindFirstChild("HumanoidRootPart") or v:FindFirstChild("Torso")
+                    if root then
+                        local dist = (humanoidRootPart.Position - root.Position).Magnitude
+                        if dist < closestDist then
+                            closestDist = dist
+                            closestZombie = v
+                        end
+                    end
+                end
+            end
+        end
+        
+        if closestZombie and closestDist <= state.KillAuraRange then
+            -- Kill Aura: Equipa arma e ataca/mira
+            if state.KillAura then
+                local targetPart = closestZombie:FindFirstChild("Head")
+                if state.HeadshotOnly and not targetPart then targetPart = closestZombie:FindFirstChild("HumanoidRootPart") end
+                if not targetPart then targetPart = closestZombie:FindFirstChild("Torso") end
+                
+                if targetPart then
+                    -- Mira na parte específica (caso o executor suporte, mantém a mira)
+                    if state.AutoShoot then
+                        -- Simula disparo
+                        local tool = GetCurrentWeapon()
+                        if tool and tool:FindFirstChild("RemoteEvent") then
+                            tool:FindFirstChild("RemoteEvent"):FireServer(targetPart.Position)
+                        elseif tool and tool:FindFirstChild("Handle") then
+                            -- Fallback: clica automaticamente
+                            local args = {targetPart, closestZombie.Humanoid}
+                            game:GetService("ReplicatedStorage"):FindFirstChild("DamageEvent"):FireServer(unpack(args))
+                        end
+                    end
+                    
+                    -- Se for pra usar faca, equipa ela (Knife Mode)
+                    if state.KillAuraKnife then
+                        local knife = Player.Backpack:FindFirstChild("Knife") or character:FindFirstChild("Knife")
+                        if knife then
+                            Player.Character.Humanoid:EquipTool(knife)
+                        end
+                    end
+                end
+            end
+        end
+    end
 end)
 
-Window:Toggle("Auto Paint", function(state)
-    getgenv().FixItUpConfig.AutoPaint = state
+-- [[ 3. TAB: AUTO FARM ]]
+local FarmSection = Tabs.AutoFarm:AddSection("Coletores Automáticos")
+
+FarmSection:AddToggle("AutoPerksToggle", {
+    Title = "Auto Collect Perks",
+    Description = "Pega automaticamente os perks caídos",
+    Default = false,
+    Callback = function(val) state.AutoCollectPerks = val end
+})
+
+FarmSection:AddToggle("AutoPointsToggle", {
+    Title = "Auto Collect Points / Essence",
+    Description = "Coleta pontos/essência do chão",
+    Default = false,
+    Callback = function(val) state.AutoCollectPoints = val end
+})
+
+FarmSection:AddButton({
+    Title = "Auto Pack-a-Punch (1 Click)",
+    Description = "Melhora a arma atual se tiver pontos",
+    Callback = function()
+        Notify("Auto Farm", "Tentando melhorar arma...", 1)
+        -- Simulação: Disparar evento de Upgrade
+        local remote = game:GetService("ReplicatedStorage"):FindFirstChild("UpgradeWeapon")
+        if remote then
+            remote:FireServer()
+            Notify("Auto Farm", "Pack-a-Punch Solicitado!", 2)
+        else
+            Notify("Erro", "Remote não encontrado", 2)
+        end
+    end
+})
+
+FarmSection:AddToggle("AutoUpgradeToggle", {
+    Title = "Auto Upgrade Weapons",
+    Description = "Compra upgrades automaticamente quando possível",
+    Default = false,
+    Callback = function(val) state.AutoUpgrade = val end
+})
+
+-- Loop de Auto Farm (Coleta de Itens)
+task.spawn(function()
+    while task.wait(0.5) do
+        if not state.AutoCollectPerks and not state.AutoCollectPoints then continue end
+        
+        local charPos = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+        if not charPos then continue end
+        
+        for _, item in pairs(workspace:GetDescendants()) do
+            if item:IsA("Model") or item:IsA("Part") then
+                local isCollectible = false
+                if state.AutoCollectPerks and (item.Name:find("Perk") or item.Name:find("PowerUp")) then
+                    isCollectible = true
+                end
+                if state.AutoCollectPoints and (item.Name:find("Point") or item.Name:find("Essence") or item.Name:find("Cash")) then
+                    isCollectible = true
+                end
+                
+                if isCollectible and item:FindFirstChild("TouchInterest") then
+                    local dist = (charPos.Position - item.Position).Magnitude
+                    if dist < 15 then
+                        -- Simula toque
+                        firetouchinterest(charPos, item, 0)
+                        task.wait(0.1)
+                        firetouchinterest(charPos, item, 1)
+                    end
+                end
+            end
+        end
+    end
 end)
 
-Window:Dropdown("Paint Color", {"Vermelho", "Azul", "Verde", "Preto", "Branco", "Amarelo"}, function(selected)
-    getgenv().FixItUpConfig.PaintColor = selected
+-- [[ 4. TAB: PLAYER (God Mode, Ammo, Speed, Jump) ]]
+local PlayerSection = Tabs.Player:AddSection("Aprimoramentos do Jogador")
+
+-- God Mode
+PlayerSection:AddToggle("GodModeToggle", {
+    Title = "God Mode",
+    Description = "Imortalidade (tomar dano zero)",
+    Default = false,
+    Callback = function(val)
+        state.GodMode = val
+        if val then
+            Player.Character.Humanoid:BreakJoints()
+        end
+    end
+})
+
+-- Infinite Ammo
+PlayerSection:AddToggle("InfAmmoToggle", {
+    Title = "Infinite Ammo",
+    Description = "Munição infinita (não reduz)",
+    Default = false,
+    Callback = function(val) state.InfAmmo = val end
+})
+
+-- No Reload
+PlayerSection:AddToggle("NoReloadToggle", {
+    Title = "No Reload",
+    Description = "Não precisa recarregar",
+    Default = false,
+    Callback = function(val) state.NoReload = val end
+})
+
+-- Infinite Sprint
+PlayerSection:AddToggle("InfSprintToggle", {
+    Title = "Infinite Sprint",
+    Description = "Corrida infinita",
+    Default = false,
+    Callback = function(val) state.InfSprint = val end
+})
+
+-- Speed Slider
+local SpeedSlider = PlayerSection:AddSlider("SpeedSlider", {
+    Title = "Velocidade (WalkSpeed)",
+    Description = "Aumenta a velocidade do jogador",
+    Default = 16,
+    Min = 16,
+    Max = 120,
+    Rounding = 1,
+    Callback = function(val)
+        state.SpeedValue = val
+        if Player.Character and Player.Character:FindFirstChild("Humanoid") then
+            Player.Character.Humanoid.WalkSpeed = val
+        end
+    end
+})
+
+-- Jump Power Slider
+local JumpSlider = PlayerSection:AddSlider("JumpSlider", {
+    Title = "Altura do Pulo (JumpPower)",
+    Description = "Aumenta a altura do pulo",
+    Default = 50,
+    Min = 50,
+    Max = 300,
+    Rounding = 1,
+    Callback = function(val)
+        state.JumpValue = val
+        if Player.Character and Player.Character:FindFirstChild("Humanoid") then
+            Player.Character.Humanoid.JumpPower = val
+        end
+    end
+})
+
+-- Aplicação de Speed/Jump ao spawnar novamente
+Player.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    local hum = char:FindFirstChild("Humanoid")
+    if hum then
+        hum.WalkSpeed = state.SpeedValue
+        hum.JumpPower = state.JumpValue
+        if state.GodMode then
+            hum:BreakJoints()
+        end
+    end
 end)
 
-Window:Toggle("Auto Upgrade", function(state)
-    getgenv().FixItUpConfig.AutoUpgrade = state
+-- Loop do Infinite Ammo / No Reload (detecta ferramentas)
+task.spawn(function()
+    while task.wait(0.2) do
+        if state.InfAmmo or state.NoReload then
+            local tool = GetCurrentWeapon()
+            if tool then
+                if state.InfAmmo and tool:FindFirstChild("Ammo") then
+                    tool.Ammo.Value = 9999
+                end
+                if state.NoReload and tool:FindFirstChild("Reloading") then
+                    tool.Reloading.Value = false
+                end
+            end
+        end
+        if state.InfSprint and Player.Character and Player.Character:FindFirstChild("Humanoid") then
+            Player.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Sprinting, true)
+            Player.Character.Humanoid.Sprint = true
+        end
+    end
 end)
 
-Window:Toggle("Auto Sell", function(state)
-    getgenv().FixItUpConfig.AutoSell = state
+-- [[ 5. TAB: MISC (ESP, FPS, Anti-AFK) ]]
+local MiscSection = Tabs.Misc:AddSection("Utilitários e Visuais")
+
+-- Anti-AFK
+MiscSection:AddToggle("AntiAFKToggle", {
+    Title = "Anti-AFK",
+    Description = "Evita ser kickado por inatividade",
+    Default = false,
+    Callback = function(val)
+        state.AntiAFK = val
+        if val then
+            task.spawn(function()
+                while state.AntiAFK and task.wait(30) do
+                    local vim = game:GetService("VirtualUser")
+                    if vim then
+                        vim:CaptureController()
+                        vim:ClickButton2(Vector2.new())
+                    else
+                        -- Simula movimento mínimo
+                        local ts = game:GetService("TweenService")
+                        local HRP = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                        if HRP then
+                            ts:Create(HRP, TweenInfo.new(0.5), {CFrame = HRP.CFrame * CFrame.new(0, 0, 0.1)}):Play()
+                        end
+                    end
+                end
+            end)
+        end
+    end
+})
+
+-- Remove Fog (Névoa)
+MiscSection:AddButton({
+    Title = "Remove Fog",
+    Description = "Remove a névoa do jogo (FPS Boost)",
+    Callback = function()
+        state.RemoveFog = true
+        for _, lighting in pairs(game:GetService("Lighting"):GetChildren()) do
+            if lighting.Name:lower():find("fog") then
+                lighting.Enabled = false
+            end
+        end
+        game:GetService("Lighting").FogEnd = 100000
+        Notify("Misc", "Névoa removida!", 1)
+    end
+})
+
+-- FPS Booster (Baixa gráficos)
+MiscSection:AddButton({
+    Title = "FPS Booster",
+    Description = "Aplica configurações para FPS máximo",
+    Callback = function()
+        settings().Rendering.QualityLevel = 1
+        game:GetService("Workspace").GlobalShadows = false
+        for _, v in pairs(game:GetService("Lighting"):GetDescendants()) do
+            if v:IsA("BloomEffect") or v:IsA("BlurEffect") or v:IsA("SunRaysEffect") then
+                v.Enabled = false
+            end
+        end
+        Notify("Misc", "Configurações de performance aplicadas!", 2)
+    end
+})
+
+-- ESP (Básico - Apenas exemplo, requer mais ajustes)
+MiscSection:AddToggle("ESPToggle", {
+    Title = "ESP (Zombies/Players)",
+    Description = "Destaca inimigos e aliados (Caixa)",
+    Default = false,
+    Callback = function(val)
+        state.ESP = val
+        if val then
+            Notify("ESP", "Ativado - Pode causar lag em servidores grandes", 2)
+        end
+    end
+})
+
+-- Loop do ESP (Básico)
+task.spawn(function()
+    local highlighters = {}
+    while task.wait(1) do
+        if not state.ESP then
+            for _, hl in pairs(highlighters) do hl:Destroy() end
+            highlighters = {}
+            continue
+        end
+        
+        for _, obj in pairs(workspace:GetChildren()) do
+            if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
+                local isEnemy = not game:GetService("Players"):FindFirstChild(obj.Name)
+                if isEnemy or obj.Name ~= Player.Name then
+                    if not obj:FindFirstChild("ESPBox") then
+                        local hl = Instance.new("BoxHandleAdornment")
+                        hl.Name = "ESPBox"
+                        hl.Adornee = obj
+                        hl.Color3 = isEnemy and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 255, 0)
+                        hl.Transparency = 0.5
+                        hl.Size = Vector3.new(4, 4, 4)
+                        hl.AlwaysOnTop = true
+                        hl.ZIndex = 10
+                        hl.Parent = obj
+                        table.insert(highlighters, hl)
+                    end
+                end
+            end
+        end
+    end
 end)
 
-Window:Toggle("Auto Buy Best Car", function(state)
-    getgenv().FixItUpConfig.AutoBuyBestCar = state
-end)
+-- [[ INICIALIZAÇÃO DOS GERENCIADORES DE CONFIGURAÇÃO ]]
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
 
-Window:Toggle("Auto Farm Money", function(state)
-    getgenv().FixItUpConfig.AutoFarmMoney = state
-end)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
 
-Window:Toggle("Car ESP", function(state)
-    getgenv().FixItUpConfig.ESPEnabled = state
-end)
+InterfaceManager:SetFolder("MichaelZombiesScript")
+SaveManager:SetFolder("MichaelZombiesScript/specific-game")
 
-Window:Toggle("Anti-AFK", function(state)
-    getgenv().FixItUpConfig.AntiAFK = state
-end)
+InterfaceManager:BuildInterfaceSection(Tabs.Misc) -- Adiciona aba de Settings
+SaveManager:BuildConfigSection(Tabs.Misc) -- Adiciona sistema de Configurações
 
-Window:Button("Teleport to Car", function()
-    getgenv().FixItUpConfig.TeleportCar = true
-end)
+Window:SelectTab(1)
 
-Window:Button("Teleport to Junkyard", function()
-    getgenv().FixItUpConfig.TeleportJunkyard = true
-end)
-
-Window:Button("Teleport to Garage", function()
-    getgenv().FixItUpConfig.TeleportGarage = true
-end)
-
-Window:Button("Buy Best Car Now", function()
-    buyBestCar()
-end)
-
-print("[Fix It Up] Script carregado com sucesso! Interface aberta.")
+Notify("Michael's Zombies", "Script carregado com sucesso! Use RightCtrl para minimizar.", 5)
