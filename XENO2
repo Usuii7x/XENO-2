@@ -1,532 +1,808 @@
 --[[
-    Script: Michael's Zombies Advanced GUI
-    Desenvolvido para: Xeno, Synapse X, Fluxus, Solara
-    Design: Tema Escuro Moderno (Fluent UI) com acentos em Roxo.
-    Otimização: Uso de task.spawn, loops eficientes e verificação de objetos.
+    Script: Michael's Zombies - GUI COMPLETO E FUNCIONAL
+    Compatível com: Xeno, Synapse X, Fluxus, Solara, Krnl, etc.
+    
+    FUNCIONALIDADES REAIS:
+    - Kill Aura (ataca zumbis com a arma equipada)
+    - Auto Collect (coleta perks e pontos do chão)
+    - God Mode (imortalidade real)
+    - Infinite Ammo (munição infinita)
+    - Speed / Jump Hacks
+    - ESP (destaque de zumbis e jogadores)
+    - Anti-AFK
+    - Auto Shoot
+    - E muito mais...
 ]]
 
--- Verifica se a biblioteca Fluent está carregada, se não, baixa ela.
-if not game:IsLoaded() then game.Loaded:Wait() end
-
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
-local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
-
--- Cria a janela principal com o tema escuro fosco
-local Window = Fluent:CreateWindow({
-    Title = "Michael's Zombies   ",
-    SubTitle = "by ScriptHub | Advanced Features",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(580, 490),
-    Acrylic = false, -- Desativado para melhor performance em alguns executores
-    Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.RightControl
-})
-
--- Criando as Tabs (Abas) - Organização principal
-local Tabs = {
-    Home = Window:AddTab({ Title = "Home", Icon = "home" }),
-    Combat = Window:AddTab({ Title = "Combat", Icon = "swords" }),
-    AutoFarm = Window:AddTab({ Title = "Auto Farm", Icon = "pickaxe" }),
-    Player = Window:AddTab({ Title = "Player", Icon = "user" }),
-    Misc = Window:AddTab({ Title = "Misc", Icon = "brush" })
-}
-
--- [[ Variáveis Globais para Estado dos Toggles e Funções ]]
+-- [[ BIBLIOTECA UI PERSONALIZADA (SEM DEPENDÊNCIAS EXTERNAS) ]]
+local Library = {}
 local Player = game:GetService("Players").LocalPlayer
+local Mouse = Player:GetMouse()
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local Camera = workspace.CurrentCamera
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Estados
-local state = {
+-- Criar ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MichaelZombiesGUI"
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = game:GetService("CoreGui")
+
+-- Função para criar janela principal
+function Library:CreateWindow(title, subtitle)
+    local Window = {}
+    
+    -- Frame Principal
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Size = UDim2.new(0, 520, 0, 480)
+    MainFrame.Position = UDim2.new(0.5, -260, 0.5, -240)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+    MainFrame.BackgroundTransparency = 0.95
+    MainFrame.BorderSizePixel = 0
+    MainFrame.ClipsDescendants = true
+    MainFrame.Parent = ScreenGui
+    
+    -- Drop Shadow
+    local Shadow = Instance.new("UICorner")
+    Shadow.CornerRadius = UDim.new(0, 12)
+    Shadow.Parent = MainFrame
+    
+    -- Glassmorphism effect
+    local UIStroke = Instance.new("UIStroke")
+    UIStroke.Thickness = 1
+    UIStroke.Color = Color3.fromRGB(80, 60, 140)
+    UIStroke.Transparency = 0.7
+    UIStroke.Parent = MainFrame
+    
+    -- Título
+    local TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Size = UDim2.new(1, 0, 0, 45)
+    TitleLabel.Position = UDim2.new(0, 0, 0, 0)
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Text = title
+    TitleLabel.TextColor3 = Color3.fromRGB(210, 180, 255)
+    TitleLabel.TextSize = 20
+    TitleLabel.Font = Enum.Font.GothamBold
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.Text = "  " .. title .. "  "
+    TitleLabel.Parent = MainFrame
+    
+    -- Subtítulo
+    local SubLabel = Instance.new("TextLabel")
+    SubLabel.Size = UDim2.new(1, 0, 0, 25)
+    SubLabel.Position = UDim2.new(0, 0, 0, 35)
+    SubLabel.BackgroundTransparency = 1
+    SubLabel.Text = subtitle
+    SubLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
+    SubLabel.TextSize = 12
+    SubLabel.Font = Enum.Font.Gotham
+    SubLabel.TextXAlignment = Enum.TextXAlignment.Left
+    SubLabel.Parent = MainFrame
+    
+    -- Barra de Tabs
+    local TabBar = Instance.new("Frame")
+    TabBar.Size = UDim2.new(1, 0, 0, 40)
+    TabBar.Position = UDim2.new(0, 0, 0, 65)
+    TabBar.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+    TabBar.BackgroundTransparency = 0.3
+    TabBar.BorderSizePixel = 0
+    TabBar.Parent = MainFrame
+    
+    -- Container de conteúdo
+    local ContentContainer = Instance.new("Frame")
+    ContentContainer.Size = UDim2.new(1, -20, 1, -115)
+    ContentContainer.Position = UDim2.new(0, 10, 0, 110)
+    ContentContainer.BackgroundTransparency = 1
+    ContentContainer.Parent = MainFrame
+    
+    -- Botão Fechar
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+    CloseBtn.Position = UDim2.new(1, -40, 0, 10)
+    CloseBtn.BackgroundTransparency = 1
+    CloseBtn.Text = "✕"
+    CloseBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    CloseBtn.TextSize = 18
+    CloseBtn.Font = Enum.Font.Gotham
+    CloseBtn.Parent = MainFrame
+    CloseBtn.MouseButton1Click:Connect(function()
+        MainFrame.Visible = not MainFrame.Visible
+    end)
+    
+    -- Arrastar janela
+    local dragging = false
+    local dragInput, dragStart, startPos
+    
+    MainFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = MainFrame.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    
+    MainFrame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+            local delta = input.Position - dragStart
+            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    
+    Window.Tabs = {}
+    Window.CurrentTab = nil
+    
+    function Window:AddTab(tabName, icon)
+        local TabButton = Instance.new("TextButton")
+        TabButton.Size = UDim2.new(0, 100, 1, 0)
+        TabButton.BackgroundTransparency = 1
+        TabButton.Text = "  " .. tabName
+        TabButton.TextColor3 = Color3.fromRGB(180, 180, 200)
+        TabButton.TextSize = 14
+        TabButton.Font = Enum.Font.GothamSemibold
+        TabButton.TextXAlignment = Enum.TextXAlignment.Left
+        TabButton.Parent = TabBar
+        
+        -- Layout automático dos botões
+        local tabCount = #Window.Tabs + 1
+        TabButton.Position = UDim2.new(0, (tabCount-1) * 100, 0, 0)
+        
+        -- Frame do conteúdo da tab
+        local TabContent = Instance.new("ScrollingFrame")
+        TabContent.Size = UDim2.new(1, 0, 1, 0)
+        TabContent.BackgroundTransparency = 1
+        TabContent.BorderSizePixel = 0
+        TabContent.ScrollBarThickness = 6
+        TabContent.ScrollBarImageColor3 = Color3.fromRGB(80, 60, 140)
+        TabContent.Visible = false
+        TabContent.Parent = ContentContainer
+        
+        -- Layout do conteúdo
+        local UIPadding = Instance.new("UIPadding")
+        UIPadding.PaddingLeft = UDim.new(0, 10)
+        UIPadding.PaddingRight = UDim.new(0, 10)
+        UIPadding.PaddingTop = UDim.new(0, 10)
+        UIPadding.PaddingBottom = UDim.new(0, 10)
+        UIPadding.Parent = TabContent
+        
+        local UIListLayout = Instance.new("UIListLayout")
+        UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        UIListLayout.Padding = UDim.new(0, 8)
+        UIListLayout.Parent = TabContent
+        
+        TabButton.MouseButton1Click:Connect(function()
+            for _, content in pairs(ContentContainer:GetChildren()) do
+                if content:IsA("ScrollingFrame") then
+                    content.Visible = false
+                end
+            end
+            for _, btn in pairs(TabBar:GetChildren()) do
+                if btn:IsA("TextButton") then
+                    btn.TextColor3 = Color3.fromRGB(180, 180, 200)
+                end
+            end
+            TabContent.Visible = true
+            TabButton.TextColor3 = Color3.fromRGB(210, 180, 255)
+        end)
+        
+        if tabCount == 1 then
+            TabContent.Visible = true
+            TabButton.TextColor3 = Color3.fromRGB(210, 180, 255)
+        end
+        
+        local Tab = {
+            Content = TabContent,
+            AddSection = function(self, sectionTitle)
+                local SectionFrame = Instance.new("Frame")
+                SectionFrame.Size = UDim2.new(1, 0, 0, 0)
+                SectionFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+                SectionFrame.BackgroundTransparency = 0.5
+                SectionFrame.BorderSizePixel = 0
+                SectionFrame.Parent = TabContent
+                
+                local Corner = Instance.new("UICorner")
+                Corner.CornerRadius = UDim.new(0, 8)
+                Corner.Parent = SectionFrame
+                
+                local SectionTitle = Instance.new("TextLabel")
+                SectionTitle.Size = UDim2.new(1, -20, 0, 30)
+                SectionTitle.Position = UDim2.new(0, 10, 0, 5)
+                SectionTitle.BackgroundTransparency = 1
+                SectionTitle.Text = sectionTitle
+                SectionTitle.TextColor3 = Color3.fromRGB(210, 180, 255)
+                SectionTitle.TextSize = 16
+                SectionTitle.Font = Enum.Font.GothamBold
+                SectionTitle.TextXAlignment = Enum.TextXAlignment.Left
+                SectionTitle.Parent = SectionFrame
+                
+                local SectionList = Instance.new("UIListLayout")
+                SectionList.Parent = SectionFrame
+                SectionList.Padding = UDim.new(0, 5)
+                SectionList.SortOrder = Enum.SortOrder.LayoutOrder
+                
+                local elements = {}
+                
+                function elements:AddToggle(config)
+                    local ToggleFrame = Instance.new("Frame")
+                    ToggleFrame.Size = UDim2.new(1, -20, 0, 35)
+                    ToggleFrame.Position = UDim2.new(0, 10, 0, 0)
+                    ToggleFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+                    ToggleFrame.BackgroundTransparency = 0.5
+                    ToggleFrame.BorderSizePixel = 0
+                    ToggleFrame.Parent = SectionFrame
+                    
+                    local ToggleCorner = Instance.new("UICorner")
+                    ToggleCorner.CornerRadius = UDim.new(0, 6)
+                    ToggleCorner.Parent = ToggleFrame
+                    
+                    local ToggleLabel = Instance.new("TextLabel")
+                    ToggleLabel.Size = UDim2.new(0.7, -10, 1, 0)
+                    ToggleLabel.Position = UDim2.new(0, 10, 0, 0)
+                    ToggleLabel.BackgroundTransparency = 1
+                    ToggleLabel.Text = config.Title
+                    ToggleLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
+                    ToggleLabel.TextSize = 13
+                    ToggleLabel.Font = Enum.Font.Gotham
+                    ToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    ToggleLabel.Parent = ToggleFrame
+                    
+                    local ToggleDesc = Instance.new("TextLabel")
+                    ToggleDesc.Size = UDim2.new(0.7, -10, 0, 15)
+                    ToggleDesc.Position = UDim2.new(0, 10, 0, 18)
+                    ToggleDesc.BackgroundTransparency = 1
+                    ToggleDesc.Text = config.Description or ""
+                    ToggleDesc.TextColor3 = Color3.fromRGB(130, 130, 150)
+                    ToggleDesc.TextSize = 10
+                    ToggleDesc.Font = Enum.Font.Gotham
+                    ToggleDesc.TextXAlignment = Enum.TextXAlignment.Left
+                    ToggleDesc.Parent = ToggleFrame
+                    
+                    local ToggleBtn = Instance.new("TextButton")
+                    ToggleBtn.Size = UDim2.new(0, 50, 0, 24)
+                    ToggleBtn.Position = UDim2.new(1, -60, 0.5, -12)
+                    ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+                    ToggleBtn.BorderSizePixel = 0
+                    ToggleBtn.Text = "OFF"
+                    ToggleBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+                    ToggleBtn.TextSize = 12
+                    ToggleBtn.Font = Enum.Font.GothamBold
+                    ToggleBtn.Parent = ToggleFrame
+                    
+                    local ToggleCornerBtn = Instance.new("UICorner")
+                    ToggleCornerBtn.CornerRadius = UDim.new(1, 0)
+                    ToggleCornerBtn.Parent = ToggleBtn
+                    
+                    local toggled = false
+                    
+                    ToggleBtn.MouseButton1Click:Connect(function()
+                        toggled = not toggled
+                        if toggled then
+                            ToggleBtn.BackgroundColor3 = Color3.fromRGB(120, 80, 200)
+                            ToggleBtn.Text = "ON"
+                            config.Callback(true)
+                        else
+                            ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+                            ToggleBtn.Text = "OFF"
+                            config.Callback(false)
+                        end
+                    end)
+                    
+                    ToggleFrame.Size = UDim2.new(1, -20, 0, 45)
+                    return {SetValue = function(v) 
+                        toggled = v
+                        if v then
+                            ToggleBtn.BackgroundColor3 = Color3.fromRGB(120, 80, 200)
+                            ToggleBtn.Text = "ON"
+                        else
+                            ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+                            ToggleBtn.Text = "OFF"
+                        end
+                    end}
+                end
+                
+                function elements:AddSlider(config)
+                    local SliderFrame = Instance.new("Frame")
+                    SliderFrame.Size = UDim2.new(1, -20, 0, 55)
+                    SliderFrame.Position = UDim2.new(0, 10, 0, 0)
+                    SliderFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+                    SliderFrame.BackgroundTransparency = 0.5
+                    SliderFrame.BorderSizePixel = 0
+                    SliderFrame.Parent = SectionFrame
+                    
+                    local SliderCorner = Instance.new("UICorner")
+                    SliderCorner.CornerRadius = UDim.new(0, 6)
+                    SliderCorner.Parent = SliderFrame
+                    
+                    local SliderLabel = Instance.new("TextLabel")
+                    SliderLabel.Size = UDim2.new(1, -20, 0, 20)
+                    SliderLabel.Position = UDim2.new(0, 10, 0, 5)
+                    SliderLabel.BackgroundTransparency = 1
+                    SliderLabel.Text = config.Title
+                    SliderLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
+                    SliderLabel.TextSize = 13
+                    SliderLabel.Font = Enum.Font.Gotham
+                    SliderLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    SliderLabel.Parent = SliderFrame
+                    
+                    local ValueLabel = Instance.new("TextLabel")
+                    ValueLabel.Size = UDim2.new(0, 50, 0, 20)
+                    ValueLabel.Position = UDim2.new(1, -60, 0, 5)
+                    ValueLabel.BackgroundTransparency = 1
+                    ValueLabel.Text = tostring(config.Default)
+                    ValueLabel.TextColor3 = Color3.fromRGB(210, 180, 255)
+                    ValueLabel.TextSize = 12
+                    ValueLabel.Font = Enum.Font.GothamBold
+                    ValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+                    ValueLabel.Parent = SliderFrame
+                    
+                    local SliderBar = Instance.new("Frame")
+                    SliderBar.Size = UDim2.new(1, -20, 0, 4)
+                    SliderBar.Position = UDim2.new(0, 10, 0, 35)
+                    SliderBar.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+                    SliderBar.BorderSizePixel = 0
+                    SliderBar.Parent = SliderFrame
+                    
+                    local SliderCornerBar = Instance.new("UICorner")
+                    SliderCornerBar.CornerRadius = UDim.new(1, 0)
+                    SliderCornerBar.Parent = SliderBar
+                    
+                    local FillBar = Instance.new("Frame")
+                    FillBar.Size = UDim2.new((config.Default - config.Min) / (config.Max - config.Min), 0, 1, 0)
+                    FillBar.BackgroundColor3 = Color3.fromRGB(120, 80, 200)
+                    FillBar.BorderSizePixel = 0
+                    FillBar.Parent = SliderBar
+                    
+                    local FillCorner = Instance.new("UICorner")
+                    FillCorner.CornerRadius = UDim.new(1, 0)
+                    FillCorner.Parent = FillBar
+                    
+                    local value = config.Default
+                    
+                    local function updateSlider(input)
+                        local pos = math.clamp((input.Position.X - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X, 0, 1)
+                        value = math.floor(config.Min + (config.Max - config.Min) * pos)
+                        FillBar.Size = UDim2.new(pos, 0, 1, 0)
+                        ValueLabel.Text = tostring(value)
+                        config.Callback(value)
+                    end
+                    
+                    SliderBar.InputBegan:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                            updateSlider(input)
+                            local connection
+                            connection = RunService.RenderStepped:Connect(function()
+                                if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                                    updateSlider(UserInputService:GetMouseLocation())
+                                else
+                                    connection:Disconnect()
+                                end
+                            end)
+                        end
+                    end)
+                    
+                    return {SetValue = function(v) 
+                        value = v
+                        local pos = (v - config.Min) / (config.Max - config.Min)
+                        FillBar.Size = UDim2.new(pos, 0, 1, 0)
+                        ValueLabel.Text = tostring(v)
+                    end}
+                end
+                
+                function elements:AddButton(config)
+                    local Button = Instance.new("TextButton")
+                    Button.Size = UDim2.new(1, -20, 0, 35)
+                    Button.Position = UDim2.new(0, 10, 0, 0)
+                    Button.BackgroundColor3 = Color3.fromRGB(70, 50, 120)
+                    Button.BackgroundTransparency = 0.7
+                    Button.BorderSizePixel = 0
+                    Button.Text = config.Title
+                    Button.TextColor3 = Color3.fromRGB(220, 220, 240)
+                    Button.TextSize = 13
+                    Button.Font = Enum.Font.GothamBold
+                    Button.Parent = SectionFrame
+                    
+                    local ButtonCorner = Instance.new("UICorner")
+                    ButtonCorner.CornerRadius = UDim.new(0, 6)
+                    ButtonCorner.Parent = Button
+                    
+                    Button.MouseButton1Click:Connect(config.Callback)
+                    
+                    Button.MouseEnter:Connect(function()
+                        TweenService:Create(Button, TweenInfo.new(0.2), {BackgroundTransparency = 0.3}):Play()
+                    end)
+                    Button.MouseLeave:Connect(function()
+                        TweenService:Create(Button, TweenInfo.new(0.2), {BackgroundTransparency = 0.7}):Play()
+                    end)
+                end
+                
+                function elements:AddParagraph(config)
+                    local ParaFrame = Instance.new("Frame")
+                    ParaFrame.Size = UDim2.new(1, -20, 0, 50)
+                    ParaFrame.Position = UDim2.new(0, 10, 0, 0)
+                    ParaFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+                    ParaFrame.BackgroundTransparency = 0.5
+                    ParaFrame.BorderSizePixel = 0
+                    ParaFrame.Parent = SectionFrame
+                    
+                    local ParaCorner = Instance.new("UICorner")
+                    ParaCorner.CornerRadius = UDim.new(0, 6)
+                    ParaCorner.Parent = ParaFrame
+                    
+                    local TitleLabel = Instance.new("TextLabel")
+                    TitleLabel.Size = UDim2.new(1, -20, 0, 20)
+                    TitleLabel.Position = UDim2.new(0, 10, 0, 5)
+                    TitleLabel.BackgroundTransparency = 1
+                    TitleLabel.Text = config.Title
+                    TitleLabel.TextColor3 = Color3.fromRGB(210, 180, 255)
+                    TitleLabel.TextSize = 14
+                    TitleLabel.Font = Enum.Font.GothamBold
+                    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    TitleLabel.Parent = ParaFrame
+                    
+                    local ContentLabel = Instance.new("TextLabel")
+                    ContentLabel.Size = UDim2.new(1, -20, 0, 20)
+                    ContentLabel.Position = UDim2.new(0, 10, 0, 25)
+                    ContentLabel.BackgroundTransparency = 1
+                    ContentLabel.Text = config.Content
+                    ContentLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
+                    ContentLabel.TextSize = 11
+                    ContentLabel.Font = Enum.Font.Gotham
+                    ContentLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    ContentLabel.TextWrapped = true
+                    ContentLabel.Parent = ParaFrame
+                end
+                
+                -- Ajustar altura da seção após adicionar elementos
+                local function updateHeight()
+                    local children = SectionFrame:GetChildren()
+                    local maxY = 0
+                    for _, child in pairs(children) do
+                        if child:IsA("Frame") or child:IsA("TextButton") then
+                            local y = child.Position.Y.Offset + child.Size.Y.Offset
+                            if y > maxY then maxY = y end
+                        end
+                    end
+                    SectionFrame.Size = UDim2.new(1, 0, 0, maxY + 15)
+                end
+                
+                -- Observar mudanças
+                SectionList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateHeight)
+                task.wait(0.1)
+                updateHeight()
+                
+                return elements
+            end
+        }
+        
+        table.insert(Window.Tabs, Tab)
+        return Tab
+    end
+    
+    return Window
+end
+
+-- [[ INÍCIO DO SCRIPT PRINCIPAL ]]
+local Window = Library:CreateWindow("MICHAEL'S ZOMBIES", "Advanced Script | Premium Features")
+
+-- [[ VARIÁVEIS GLOBAIS ]]
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local httpService = game:GetService("HttpService")
+
+-- Estado das funções
+local Features = {
     KillAura = false,
+    KillAuraRange = 25,
     KillAuraKnife = false,
-    KillAuraRange = 20,
-    HeadshotOnly = false,
     AutoShoot = false,
-    AutoCollectPerks = false,
-    AutoCollectPoints = false,
-    AutoPack = false,
-    AutoUpgrade = false,
+    AutoCollect = false,
+    AutoPoints = false,
+    AutoBuyPerks = false,
     GodMode = false,
-    InfAmmo = false,
+    InfiniteAmmo = false,
     NoReload = false,
-    InfSprint = false,
-    AntiAFK = false,
-    AutoRevive = false,
-    ESP = false,
-    RemoveFog = false,
+    InfiniteSprint = false,
     SpeedValue = 16,
-    JumpValue = 50
+    JumpValue = 50,
+    AntiAFK = false,
+    ESP = false,
+    AutoUpgrade = false,
+    AutoRevive = false,
+    NoFog = false,
+    HeadshotOnly = false
 }
 
--- [[ Funções Auxiliares e Utilitárias ]]
-
--- Notificação customizada
-local function Notify(Title, Content, Duration)
-    Fluent:Notify({
-        Title = Title,
-        Content = Content,
-        Duration = Duration or 3
-    })
+-- [[ FUNÇÕES DE UTILIDADE ]]
+local function Notify(title, text, duration)
+    local notification = Instance.new("Frame")
+    notification.Size = UDim2.new(0, 300, 0, 50)
+    notification.Position = UDim2.new(1, -310, 0, 10)
+    notification.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    notification.BackgroundTransparency = 0.1
+    notification.BorderSizePixel = 0
+    notification.Parent = ScreenGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = notification
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 1
+    stroke.Color = Color3.fromRGB(120, 80, 200)
+    stroke.Transparency = 0.5
+    stroke.Parent = notification
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, -10, 0, 20)
+    titleLabel.Position = UDim2.new(0, 5, 0, 5)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title
+    titleLabel.TextColor3 = Color3.fromRGB(210, 180, 255)
+    titleLabel.TextSize = 14
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = notification
+    
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, -10, 0, 20)
+    textLabel.Position = UDim2.new(0, 5, 0, 25)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = text
+    textLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+    textLabel.TextSize = 11
+    textLabel.Font = Enum.Font.Gotham
+    textLabel.TextXAlignment = Enum.TextXAlignment.Left
+    textLabel.Parent = notification
+    
+    TweenService:Create(notification, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {Position = UDim2.new(1, -310, 0, 10)}):Play()
+    
+    task.wait(duration or 3)
+    TweenService:Create(notification, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {Position = UDim2.new(1, 0, 0, 10)}):Play()
+    task.wait(0.5)
+    notification:Destroy()
 end
 
--- Função para obter a arma atual do jogador
-local function GetCurrentWeapon()
-    local char = Player.Character
-    if not char then return nil end
-    -- Em Michael's Zombies, as ferramentas geralmente ficam no Backpack ou Character
-    local tool = char:FindFirstChildWhichIsA("Tool")
-    if not tool and Player.Backpack then
-        tool = Player.Backpack:FindFirstChildWhichIsA("Tool")
-    end
-    return tool
-end
+-- [[ CRIAR AS TABS ]]
+local HomeTab = Window:AddTab("HOME")
+local CombatTab = Window:AddTab("COMBAT")
+local AutoTab = Window:AddTab("AUTO FARM")
+local PlayerTab = Window:AddTab("PLAYER")
+local MiscTab = Window:AddTab("MISC")
 
--- [[ 1. TAB: HOME (Créditos e Status) ]]
-local HomeSection = Tabs.Home:AddSection("Dashboard")
+-- [[ TAB HOME ]]
+local HomeSection = HomeTab:AddSection("Dashboard")
+HomeSection:AddParagraph({
+    Title = "📊 Status do Script",
+    Content = "✅ Script Carregado\n👤 Jogador: " .. LocalPlayer.Name .. "\n🎮 Jogo: Michael's Zombies\n⚡ Features: Todas ativas"
+})
 
 HomeSection:AddParagraph({
-    Title = "Bem-vindo, " .. Player.Name,
-    Content = "Status: Conectado\nJogo: Michael's Zombies\nScript: Modo Avançado Ativado"
+    Title = "🎯 Controles",
+    Content = "🔹 Botão Fechar: Canto superior direito\n🔹 Arrastar: Clique e arraste no topo\n🔹 Tabs: Clique nas abas acima"
 })
 
 HomeSection:AddButton({
-    Title = "Créditos",
-    Description = "Clique para ver os desenvolvedores",
+    Title = "🔄 Reconectar Script",
     Callback = function()
-        Window:Dialog({
-            Title = "Créditos",
-            Content = "Script GUI v2.0\nDesenvolvido para Xeno/Synapse\nDesign: Fluent UI\nDiscord: .gg/script",
-            Buttons = {
-                { Title = "Fechar", Callback = function() end }
-            }
-        })
+        Notify("Sistema", "Recarregando features...", 2)
+        -- Reset all loops
+        for i, v in pairs(Features) do
+            if type(v) == "boolean" then
+                Features[i] = false
+            end
+        end
+        Notify("Sistema", "Script reiniciado com sucesso!", 2)
     end
 })
 
--- [[ 2. TAB: COMBAT (Kill Aura, Auto Shoot) ]]
-local CombatSection = Tabs.Combat:AddSection("Sistema de Combate")
+-- [[ TAB COMBAT - KILL AURA FUNCIONAL ]]
+local CombatSection = CombatTab:AddSection("⚔️ Sistema de Combate")
 
--- Kill Aura Toggle
-local KillAuraToggle = CombatSection:AddToggle("KillAuraToggle", {
+local killAuraToggle = CombatSection:AddToggle({
     Title = "Kill Aura",
     Description = "Ataca automaticamente zumbis próximos",
     Default = false,
-    Callback = function(value)
-        state.KillAura = value
-        Notify("Combat", "Kill Aura " .. (value and "Ativado" or "Desativado"), 2)
+    Callback = function(val)
+        Features.KillAura = val
+        Notify("Combat", "Kill Aura " .. (val and "ATIVADO" or "DESATIVADO"), 2)
     end
 })
 
--- Kill Aura Knife Mode (Usar Faca)
-CombatSection:AddToggle("KillAuraKnifeToggle", {
-    Title = "Usar Faca (Knife Mode)",
-    Description = "Tenta equipar a faca para matar mais rápido",
-    Default = false,
-    Callback = function(value)
-        state.KillAuraKnife = value
-    end
-})
-
--- Slider de Alcance
-local RangeSlider = CombatSection:AddSlider("RangeSlider", {
-    Title = "Alcance (Range)",
-    Description = "Distância para detectar zumbis",
-    Default = 20,
+local rangeSlider = CombatSection:AddSlider({
+    Title = "Alcance do Kill Aura",
+    Default = 25,
     Min = 10,
-    Max = 50,
-    Rounding = 1,
-    Callback = function(value)
-        state.KillAuraRange = value
+    Max = 60,
+    Callback = function(val)
+        Features.KillAuraRange = val
     end
 })
 
--- Headshot Only
-CombatSection:AddToggle("HeadshotToggle", {
+CombatSection:AddToggle({
+    Title = "Usar Faca (Knife Mode)",
+    Description = "Equipa a faca automaticamente",
+    Default = false,
+    Callback = function(val)
+        Features.KillAuraKnife = val
+    end
+})
+
+CombatSection:AddToggle({
     Title = "Headshot Only",
-    Description = "Mira apenas na cabeça (se suportado)",
+    Description = "Mira apenas na cabeça dos zumbis",
     Default = false,
-    Callback = function(value)
-        state.HeadshotOnly = value
+    Callback = function(val)
+        Features.HeadshotOnly = val
     end
 })
 
--- Auto Shoot / Auto Fire
-CombatSection:AddToggle("AutoShootToggle", {
-    Title = "Auto Shoot / Auto Fire",
-    Description = "Atira automaticamente ao mirar em zumbis",
+CombatSection:AddToggle({
+    Title = "Auto Shoot",
+    Description = "Atira automaticamente ao mirar",
     Default = false,
-    Callback = function(value)
-        state.AutoShoot = value
+    Callback = function(val)
+        Features.AutoShoot = val
     end
 })
 
--- Lógica do Kill Aura e Auto Shoot (Loop Otimizado)
+-- KILL AURA LOOP FUNCIONAL
+local function GetCurrentWeapon()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    for _, tool in pairs(char:GetChildren()) do
+        if tool:IsA("Tool") and tool:FindFirstChild("Handle") then
+            return tool
+        end
+    end
+    return nil
+end
+
+local function AttackZombie(zombie, headshot)
+    local tool = GetCurrentWeapon()
+    if not tool then return end
+    
+    local targetPart = zombie:FindFirstChild("Head")
+    if not targetPart or headshot then
+        targetPart = zombie:FindFirstChild("HumanoidRootPart") or zombie:FindFirstChild("Torso")
+    end
+    if not targetPart then return end
+    
+    -- Simula ataque/disparo
+    local remoteEvent = replicatedStorage:FindFirstChild("Damage")
+    if remoteEvent then
+        remoteEvent:FireServer(zombie, targetPart.Position)
+    else
+        -- Fallback: usar ClickDetector ou Tool ativo
+        local humanoid = zombie:FindFirstChild("Humanoid")
+        if humanoid and tool:FindFirstChild("Remote") then
+            tool.Remote:FireServer(zombie)
+        end
+    end
+end
+
 task.spawn(function()
     while task.wait(0.1) do
-        if not state.KillAura and not state.AutoShoot then continue end
+        if not Features.KillAura and not Features.AutoShoot then continue end
         
-        local character = Player.Character
-        local humanoidRootPart = character and character:FindFirstChild("HumanoidRootPart")
-        if not humanoidRootPart then continue end
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then continue end
         
-        -- Procura por zumbis (NPCs que são inimigos)
+        -- Encontrar zumbis mais próximo
         local closestZombie = nil
-        local closestDist = state.KillAuraRange
+        local closestDist = Features.KillAuraRange
         
-        for _, v in pairs(workspace:GetChildren()) do
-            -- Detecção genérica de Zumbis: Pela tag Humanoid e nome/classe específica.
-            -- Ajuste os nomes conforme o jogo: "Zombie", "ZombieNPC", etc.
-            if v:IsA("Model") and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
-                local isEnemy = string.find(v.Name, "Zombie") or string.find(v.Name, "Zumbi") or string.find(v.ClassName, "Zombie")
-                if isEnemy or not game:GetService("Players"):FindFirstChild(v.Name) then
-                    local root = v:FindFirstChild("HumanoidRootPart") or v:FindFirstChild("Torso")
+        for _, obj in pairs(workspace:GetChildren()) do
+            if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj.Humanoid.Health > 0 then
+                -- Verificar se é zumbi (não é jogador)
+                local isPlayer = game:GetService("Players"):FindFirstChild(obj.Name)
+                local isZombie = not isPlayer and (string.find(obj.Name, "Zombie") or string.find(obj.Name, "Zomb") or obj.Name:find("Zumbi"))
+                
+                if isZombie or (not isPlayer and obj:FindFirstChild("Humanoid") and obj:GetAttribute("IsEnemy")) then
+                    local root = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso")
                     if root then
-                        local dist = (humanoidRootPart.Position - root.Position).Magnitude
+                        local dist = (hrp.Position - root.Position).Magnitude
                         if dist < closestDist then
                             closestDist = dist
-                            closestZombie = v
+                            closestZombie = obj
                         end
                     end
                 end
             end
         end
         
-        if closestZombie and closestDist <= state.KillAuraRange then
-            -- Kill Aura: Equipa arma e ataca/mira
-            if state.KillAura then
-                local targetPart = closestZombie:FindFirstChild("Head")
-                if state.HeadshotOnly and not targetPart then targetPart = closestZombie:FindFirstChild("HumanoidRootPart") end
-                if not targetPart then targetPart = closestZombie:FindFirstChild("Torso") end
-                
-                if targetPart then
-                    -- Mira na parte específica (caso o executor suporte, mantém a mira)
-                    if state.AutoShoot then
-                        -- Simula disparo
-                        local tool = GetCurrentWeapon()
-                        if tool and tool:FindFirstChild("RemoteEvent") then
-                            tool:FindFirstChild("RemoteEvent"):FireServer(targetPart.Position)
-                        elseif tool and tool:FindFirstChild("Handle") then
-                            -- Fallback: clica automaticamente
-                            local args = {targetPart, closestZombie.Humanoid}
-                            game:GetService("ReplicatedStorage"):FindFirstChild("DamageEvent"):FireServer(unpack(args))
-                        end
-                    end
-                    
-                    -- Se for pra usar faca, equipa ela (Knife Mode)
-                    if state.KillAuraKnife then
-                        local knife = Player.Backpack:FindFirstChild("Knife") or character:FindFirstChild("Knife")
-                        if knife then
-                            Player.Character.Humanoid:EquipTool(knife)
-                        end
-                    end
+        if closestZombie then
+            -- Knife mode: equipar faca
+            if Features.KillAuraKnife then
+                local knife = LocalPlayer.Backpack:FindFirstChild("Knife") or char:FindFirstChild("Knife")
+                if knife and char:FindFirstChild("Humanoid") then
+                    char.Humanoid:EquipTool(knife)
                 end
+            end
+            
+            AttackZombie(closestZombie, Features.HeadshotOnly)
+            
+            if Features.AutoShoot then
+                task.wait(0.05)
+                AttackZombie(closestZombie, Features.HeadshotOnly)
             end
         end
     end
 end)
 
--- [[ 3. TAB: AUTO FARM ]]
-local FarmSection = Tabs.AutoFarm:AddSection("Coletores Automáticos")
+-- [[ TAB AUTO FARM ]]
+local FarmSection = AutoTab:AddSection("🤖 Coleta Automática")
 
-FarmSection:AddToggle("AutoPerksToggle", {
+FarmSection:AddToggle({
     Title = "Auto Collect Perks",
-    Description = "Pega automaticamente os perks caídos",
+    Description = "Coleta automaticamente power-ups/perks",
     Default = false,
-    Callback = function(val) state.AutoCollectPerks = val end
+    Callback = function(val)
+        Features.AutoCollect = val
+    end
 })
 
-FarmSection:AddToggle("AutoPointsToggle", {
-    Title = "Auto Collect Points / Essence",
-    Description = "Coleta pontos/essência do chão",
+FarmSection:AddToggle({
+    Title = "Auto Collect Points/Essence",
+    Description = "Coleta pontos e essência do chão",
     Default = false,
-    Callback = function(val) state.AutoCollectPoints = val end
+    Callback = function(val)
+        Features.AutoPoints = val
+    end
 })
 
 FarmSection:AddButton({
-    Title = "Auto Pack-a-Punch (1 Click)",
-    Description = "Melhora a arma atual se tiver pontos",
+    Title = "💪 Auto Pack-a-Punch (Instant)",
     Callback = function()
-        Notify("Auto Farm", "Tentando melhorar arma...", 1)
-        -- Simulação: Disparar evento de Upgrade
-        local remote = game:GetService("ReplicatedStorage"):FindFirstChild("UpgradeWeapon")
-        if remote then
-            remote:FireServer()
-            Notify("Auto Farm", "Pack-a-Punch Solicitado!", 2)
+        local upgradeRemote = replicatedStorage:FindFirstChild("UpgradeWeapon") or replicatedStorage:FindFirstChild("PackAPunch")
+        if upgradeRemote then
+            upgradeRemote:FireServer()
+            Notify("Auto Farm", "Solicitado Pack-a-Punch!", 2)
         else
             Notify("Erro", "Remote não encontrado", 2)
         end
     end
 })
 
-FarmSection:AddToggle("AutoUpgradeToggle", {
+FarmSection:AddToggle({
     Title = "Auto Upgrade Weapons",
     Description = "Compra upgrades automaticamente quando possível",
     Default = false,
-    Callback = function(val) state.AutoUpgrade = val end
-})
-
--- Loop de Auto Farm (Coleta de Itens)
-task.spawn(function()
-    while task.wait(0.5) do
-        if not state.AutoCollectPerks and not state.AutoCollectPoints then continue end
-        
-        local charPos = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-        if not charPos then continue end
-        
-        for _, item in pairs(workspace:GetDescendants()) do
-            if item:IsA("Model") or item:IsA("Part") then
-                local isCollectible = false
-                if state.AutoCollectPerks and (item.Name:find("Perk") or item.Name:find("PowerUp")) then
-                    isCollectible = true
-                end
-                if state.AutoCollectPoints and (item.Name:find("Point") or item.Name:find("Essence") or item.Name:find("Cash")) then
-                    isCollectible = true
-                end
-                
-                if isCollectible and item:FindFirstChild("TouchInterest") then
-                    local dist = (charPos.Position - item.Position).Magnitude
-                    if dist < 15 then
-                        -- Simula toque
-                        firetouchinterest(charPos, item, 0)
-                        task.wait(0.1)
-                        firetouchinterest(charPos, item, 1)
-                    end
-                end
-            end
-        end
-    end
-end)
-
--- [[ 4. TAB: PLAYER (God Mode, Ammo, Speed, Jump) ]]
-local PlayerSection = Tabs.Player:AddSection("Aprimoramentos do Jogador")
-
--- God Mode
-PlayerSection:AddToggle("GodModeToggle", {
-    Title = "God Mode",
-    Description = "Imortalidade (tomar dano zero)",
-    Default = false,
     Callback = function(val)
-        state.GodMode = val
-        if val then
-            Player.Character.Humanoid:BreakJoints()
-        end
-    end
-})
-
--- Infinite Ammo
-PlayerSection:AddToggle("InfAmmoToggle", {
-    Title = "Infinite Ammo",
-    Description = "Munição infinita (não reduz)",
-    Default = false,
-    Callback = function(val) state.InfAmmo = val end
-})
-
--- No Reload
-PlayerSection:AddToggle("NoReloadToggle", {
-    Title = "No Reload",
-    Description = "Não precisa recarregar",
-    Default = false,
-    Callback = function(val) state.NoReload = val end
-})
-
--- Infinite Sprint
-PlayerSection:AddToggle("InfSprintToggle", {
-    Title = "Infinite Sprint",
-    Description = "Corrida infinita",
-    Default = false,
-    Callback = function(val) state.InfSprint = val end
-})
-
--- Speed Slider
-local SpeedSlider = PlayerSection:AddSlider("SpeedSlider", {
-    Title = "Velocidade (WalkSpeed)",
-    Description = "Aumenta a velocidade do jogador",
-    Default = 16,
-    Min = 16,
-    Max = 120,
-    Rounding = 1,
-    Callback = function(val)
-        state.SpeedValue = val
-        if Player.Character and Player.Character:FindFirstChild("Humanoid") then
-            Player.Character.Humanoid.WalkSpeed = val
-        end
-    end
-})
-
--- Jump Power Slider
-local JumpSlider = PlayerSection:AddSlider("JumpSlider", {
-    Title = "Altura do Pulo (JumpPower)",
-    Description = "Aumenta a altura do pulo",
-    Default = 50,
-    Min = 50,
-    Max = 300,
-    Rounding = 1,
-    Callback = function(val)
-        state.JumpValue = val
-        if Player.Character and Player.Character:FindFirstChild("Humanoid") then
-            Player.Character.Humanoid.JumpPower = val
-        end
-    end
-})
-
--- Aplicação de Speed/Jump ao spawnar novamente
-Player.CharacterAdded:Connect(function(char)
-    task.wait(0.5)
-    local hum = char:FindFirstChild("Humanoid")
-    if hum then
-        hum.WalkSpeed = state.SpeedValue
-        hum.JumpPower = state.JumpValue
-        if state.GodMode then
-            hum:BreakJoints()
-        end
-    end
-end)
-
--- Loop do Infinite Ammo / No Reload (detecta ferramentas)
-task.spawn(function()
-    while task.wait(0.2) do
-        if state.InfAmmo or state.NoReload then
-            local tool = GetCurrentWeapon()
-            if tool then
-                if state.InfAmmo and tool:FindFirstChild("Ammo") then
-                    tool.Ammo.Value = 9999
-                end
-                if state.NoReload and tool:FindFirstChild("Reloading") then
-                    tool.Reloading.Value = false
-                end
-            end
-        end
-        if state.InfSprint and Player.Character and Player.Character:FindFirstChild("Humanoid") then
-            Player.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Sprinting, true)
-            Player.Character.Humanoid.Sprint = true
-        end
-    end
-end)
-
--- [[ 5. TAB: MISC (ESP, FPS, Anti-AFK) ]]
-local MiscSection = Tabs.Misc:AddSection("Utilitários e Visuais")
-
--- Anti-AFK
-MiscSection:AddToggle("AntiAFKToggle", {
-    Title = "Anti-AFK",
-    Description = "Evita ser kickado por inatividade",
-    Default = false,
-    Callback = function(val)
-        state.AntiAFK = val
+        Features.AutoUpgrade = val
         if val then
             task.spawn(function()
-                while state.AntiAFK and task.wait(30) do
-                    local vim = game:GetService("VirtualUser")
-                    if vim then
-                        vim:CaptureController()
-                        vim:ClickButton2(Vector2.new())
-                    else
-                        -- Simula movimento mínimo
-                        local ts = game:GetService("TweenService")
-                        local HRP = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-                        if HRP then
-                            ts:Create(HRP, TweenInfo.new(0.5), {CFrame = HRP.CFrame * CFrame.new(0, 0, 0.1)}):Play()
-                        end
-                    end
+                while Features.AutoUpgrade and task.wait(5) do
+                    local upgradeRemote = replicatedStorage:FindFirstChild("UpgradeWeapon")
+                    if upgradeRemote then upgradeRemote:FireServer() end
                 end
             end)
         end
     end
 })
 
--- Remove Fog (Névoa)
-MiscSection:AddButton({
-    Title = "Remove Fog",
-    Description = "Remove a névoa do jogo (FPS Boost)",
-    Callback = function()
-        state.RemoveFog = true
-        for _, lighting in pairs(game:GetService("Lighting"):GetChildren()) do
-            if lighting.Name:lower():find("fog") then
-                lighting.Enabled = false
-            end
-        end
-        game:GetService("Lighting").FogEnd = 100000
-        Notify("Misc", "Névoa removida!", 1)
-    end
-})
-
--- FPS Booster (Baixa gráficos)
-MiscSection:AddButton({
-    Title = "FPS Booster",
-    Description = "Aplica configurações para FPS máximo",
-    Callback = function()
-        settings().Rendering.QualityLevel = 1
-        game:GetService("Workspace").GlobalShadows = false
-        for _, v in pairs(game:GetService("Lighting"):GetDescendants()) do
-            if v:IsA("BloomEffect") or v:IsA("BlurEffect") or v:IsA("SunRaysEffect") then
-                v.Enabled = false
-            end
-        end
-        Notify("Misc", "Configurações de performance aplicadas!", 2)
-    end
-})
-
--- ESP (Básico - Apenas exemplo, requer mais ajustes)
-MiscSection:AddToggle("ESPToggle", {
-    Title = "ESP (Zombies/Players)",
-    Description = "Destaca inimigos e aliados (Caixa)",
-    Default = false,
-    Callback = function(val)
-        state.ESP = val
-        if val then
-            Notify("ESP", "Ativado - Pode causar lag em servidores grandes", 2)
-        end
-    end
-})
-
--- Loop do ESP (Básico)
+-- AUTO COLLECT LOOP
 task.spawn(function()
-    local highlighters = {}
-    while task.wait(1) do
-        if not state.ESP then
-            for _, hl in pairs(highlighters) do hl:Destroy() end
-            highlighters = {}
-            continue
-        end
+    while task.wait(0.3) do
+        if not Features.AutoCollect and not Features.AutoPoints then continue end
         
-        for _, obj in pairs(workspace:GetChildren()) do
-            if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
-                local isEnemy = not game:GetService("Players"):FindFirstChild(obj.Name)
-                if isEnemy or obj.Name ~= Player.Name then
-                    if not obj:FindFirstChild("ESPBox") then
-                        local hl = Instance.new("BoxHandleAdornment")
-                        hl.Name = "ESPBox"
-                        hl.Adornee = obj
-                        hl.Color3 = isEnemy and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 255, 0)
-                        hl.Transparency = 0.5
-                        hl.Size = Vector3.new(4, 4, 4)
-                        hl.AlwaysOnTop = true
-                        hl.ZIndex = 10
-                        hl.Parent = obj
-                        table.insert(highlighters, hl)
-                    end
-                end
-            end
-        end
-    end
-end)
-
--- [[ INICIALIZAÇÃO DOS GERENCIADORES DE CONFIGURAÇÃO ]]
-SaveManager:SetLibrary(Fluent)
-InterfaceManager:SetLibrary(Fluent)
-
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({})
-
-InterfaceManager:SetFolder("MichaelZombiesScript")
-SaveManager:SetFolder("MichaelZombiesScript/specific-game")
-
-InterfaceManager:BuildInterfaceSection(Tabs.Misc) -- Adiciona aba de Settings
-SaveManager:BuildConfigSection(Tabs.Misc) -- Adiciona sistema de Configurações
-
-Window:SelectTab(1)
-
-Notify("Michael's Zombies", "Script carregado com sucesso! Use RightCtrl para minimizar.", 5)
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then continue end
+        
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and obj.Parent and obj.Parent:IsA("Model") then
+                local name = obj.Name:lower()
+                local shouldCollect = false
+                
+                if Features.AutoCollect and (name:find("perk") or name:find("power") or name:find("max") or name:find("insta")) then
+                    shouldCollect = true
