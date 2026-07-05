@@ -1,1 +1,432 @@
+--[[
+    CAR FLIPPER - AUTO FARM SCRIPT
+    Versão: 2.0
+    Recursos:
+    - Auto Farm de Carros
+    - Seleção de Carro Específico
+    - Auto Coleta de Dinheiro e Peças (8 min)
+    - Sistema de Raridade com Cores
+    - Auto Comprar, Reparar e Vender
+]]
 
+-- Carregando bibliotecas
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/bloodball/Lib/main/StandartLibrary.lua"))()
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Variáveis Globais
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local VirtualUser = game:GetService("VirtualUser")
+local MarketplaceService = game:GetService("MarketplaceService")
+
+local Player = Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
+
+-- Configurações
+local Settings = {
+    AutoFarm = false,
+    AutoCollect = false,
+    AutoRepair = false,
+    AutoSell = false,
+    SelectedRarity = "All",
+    SelectedCar = "All",
+    CollectInterval = 480, -- 8 minutos em segundos
+    SellThreshold = 1000, -- Vender quando atingir este valor
+    RepairThreshold = 50, -- Reparar quando dano > 50%
+    TeleportSpeed = 50,
+}
+
+-- Sistema de Raridade com Cores
+local RaritySystem = {
+    ["Common"] = {
+        Color = Color3.fromRGB(128, 128, 128),
+        Grade = 1,
+        SellMultiplier = 1.0
+    },
+    ["Uncommon"] = {
+        Color = Color3.fromRGB(0, 255, 0),
+        Grade = 2,
+        SellMultiplier = 1.5
+    },
+    ["Rare"] = {
+        Color = Color3.fromRGB(0, 0, 255),
+        Grade = 3,
+        SellMultiplier = 2.5
+    },
+    ["Epic"] = {
+        Color = Color3.fromRGB(128, 0, 128),
+        Grade = 4,
+        SellMultiplier = 4.0
+    },
+    ["Legendary"] = {
+        Color = Color3.fromRGB(255, 165, 0),
+        Grade = 5,
+        SellMultiplier = 7.0
+    },
+    ["Mythic"] = {
+        Color = Color3.fromRGB(255, 0, 0),
+        Grade = 6,
+        SellMultiplier = 12.0
+    }
+}
+
+-- Funções de Utilidade
+local function GetCarParts()
+    local parts = {}
+    for _, v in pairs(workspace:GetChildren()) do
+        if v:IsA("Part") and v.Name:find("Car") then
+            table.insert(parts, v)
+        end
+    end
+    return parts
+end
+
+local function GetCarRarity(car)
+    if not car then return "Common" end
+    -- Lógica para detectar raridade do carro
+    if car:FindFirstChild("Rarity") then
+        local rarity = car.Rarity.Value
+        if RaritySystem[rarity] then
+            return rarity
+        end
+    end
+    return "Common"
+end
+
+local function GetCarValue(car)
+    if not car then return 0 end
+    if car:FindFirstChild("Value") then
+        return car.Value.Value
+    end
+    return 100
+end
+
+local function GetCarDamage(car)
+    if not car then return 0 end
+    if car:FindFirstChild("Damage") then
+        return car.Damage.Value
+    end
+    return 0
+end
+
+-- Sistema de Teleporte
+local function TeleportTo(position)
+    if not position then return end
+    local tweenInfo = TweenInfo.new(
+        0.5,
+        Enum.EasingStyle.Linear,
+        Enum.EasingDirection.Out
+    )
+    local tween = TweenService:Create(RootPart, tweenInfo, {CFrame = CFrame.new(position)})
+    tween:Play()
+    tween.Completed:Wait()
+end
+
+-- Função Principal de Auto Farm
+local function AutoFarmCar()
+    if not Settings.AutoFarm then return end
+    
+    local carSpawns = {}
+    for _, v in pairs(workspace:GetChildren()) do
+        if v:IsA("Part") and v.Name:find("Spawn") then
+            table.insert(carSpawns, v.Position)
+        end
+    end
+    
+    for _, spawnPos in ipairs(carSpawns) do
+        if not Settings.AutoFarm then break end
+        
+        TeleportTo(spawnPos)
+        wait(1)
+        
+        -- Interagir com o spawn
+        local nearestCar = nil
+        local nearestDist = math.huge
+        
+        for _, car in pairs(GetCarParts()) do
+            local dist = (RootPart.Position - car.Position).Magnitude
+            if dist < nearestDist and dist < 20 then
+                nearestCar = car
+                nearestDist = dist
+            end
+        end
+        
+        if nearestCar then
+            local rarity = GetCarRarity(nearestCar)
+            local carName = nearestCar.Name
+            
+            -- Verificar se o carro é o selecionado
+            if Settings.SelectedCar ~= "All" and carName ~= Settings.SelectedCar then
+                continue
+            end
+            
+            -- Verificar raridade
+            if Settings.SelectedRarity ~= "All" and rarity ~= Settings.SelectedRarity then
+                continue
+            end
+            
+            -- Comprar carro
+            if nearestCar:FindFirstChild("BuyButton") then
+                fireclickdetector(nearestCar.BuyButton)
+                wait(1)
+                
+                -- Reparar se necessário
+                if Settings.AutoRepair then
+                    local damage = GetCarDamage(nearestCar)
+                    if damage > Settings.RepairThreshold then
+                        if nearestCar:FindFirstChild("RepairButton") then
+                            fireclickdetector(nearestCar.RepairButton)
+                            wait(1)
+                        end
+                    end
+                end
+                
+                -- Vender carro
+                if Settings.AutoSell then
+                    local value = GetCarValue(nearestCar)
+                    if value >= Settings.SellThreshold then
+                        if nearestCar:FindFirstChild("SellButton") then
+                            fireclickdetector(nearestCar.SellButton)
+                            wait(1)
+                        end
+                    end
+                end
+            end
+        end
+        
+        wait(2)
+    end
+end
+
+-- Sistema de Coleta Automática
+local function AutoCollectResources()
+    while Settings.AutoCollect do
+        -- Coletar dinheiro
+        for _, v in pairs(workspace:GetChildren()) do
+            if v:IsA("Part") and v.Name:find("Money") then
+                TeleportTo(v.Position)
+                wait(0.5)
+                if v:FindFirstChild("Collect") then
+                    fireclickdetector(v.Collect)
+                end
+            end
+        end
+        
+        -- Coletar peças
+        for _, v in pairs(workspace:GetChildren()) do
+            if v:IsA("Part") and v.Name:find("Part") then
+                TeleportTo(v.Position)
+                wait(0.5)
+                if v:FindFirstChild("Collect") then
+                    fireclickdetector(v.Collect)
+                end
+            end
+        end
+        
+        wait(Settings.CollectInterval)
+    end
+end
+
+-- Loop Principal
+local function MainLoop()
+    while wait(1) do
+        if Settings.AutoFarm then
+            AutoFarmCar()
+        end
+    end
+end
+
+-- Criando Interface
+local function CreateGUI()
+    local Window = Rayfield:CreateWindow({
+        Name = "🚗 Car Flipper Auto Farm",
+        LoadingTitle = "Carregando...",
+        LoadingSubtitle = "Script by AutoFarm",
+        ConfigurationSaving = {
+            Enabled = true,
+            FolderName = "CarFlipper",
+            FileName = "Settings"
+        },
+        Discord = {
+            Enabled = false,
+            Invite = "noinvitelink",
+            RememberJoins = true
+        },
+        KeySystem = false,
+    })
+    
+    -- Tab Principal
+    local MainTab = Window:CreateTab("🚗 Auto Farm", nil)
+    
+    -- Toggle Auto Farm
+    MainTab:CreateToggle({
+        Name = "Ativar Auto Farm",
+        CurrentValue = false,
+        Flag = "AutoFarm",
+        Callback = function(Value)
+            Settings.AutoFarm = Value
+        end,
+    })
+    
+    -- Seleção de Raridade
+    MainTab:CreateDropdown({
+        Name = "🎨 Selecionar Raridade",
+        Options = {"All", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"},
+        CurrentOption = "All",
+        Flag = "RaritySelection",
+        Callback = function(Option)
+            Settings.SelectedRarity = Option
+        end,
+    })
+    
+    -- Seleção de Carro
+    MainTab:CreateDropdown({
+        Name = "🚘 Selecionar Carro",
+        Options = {"All", "Sedan", "SUV", "Sports", "Truck", "Classic"},
+        CurrentOption = "All",
+        Flag = "CarSelection",
+        Callback = function(Option)
+            Settings.SelectedCar = Option
+        end,
+    })
+    
+    -- Tab de Coleção
+    local CollectTab = Window:CreateTab("💰 Coleção", nil)
+    
+    -- Toggle Auto Coleta
+    CollectTab:CreateToggle({
+        Name = "🔁 Auto Coleta (8 min)",
+        CurrentValue = false,
+        Flag = "AutoCollect",
+        Callback = function(Value)
+            Settings.AutoCollect = Value
+            if Value then
+                spawn(AutoCollectResources)
+            end
+        end,
+    })
+    
+    -- Slider de Intervalo
+    CollectTab:CreateSlider({
+        Name = "⏱️ Intervalo de Coleta (min)",
+        Range = {1, 15},
+        Increment = 1,
+        Suffix = "min",
+        CurrentValue = 8,
+        Flag = "CollectInterval",
+        Callback = function(Value)
+            Settings.CollectInterval = Value * 60
+        end,
+    })
+    
+    -- Tab de Vendas
+    local SellTab = Window:CreateTab("💰 Vendas", nil)
+    
+    -- Toggle Auto Vender
+    SellTab:CreateToggle({
+        Name = "💵 Auto Vender",
+        CurrentValue = false,
+        Flag = "AutoSell",
+        Callback = function(Value)
+            Settings.AutoSell = Value
+        end,
+    })
+    
+    -- Slider de Limite de Venda
+    SellTab:CreateSlider({
+        Name = "💰 Limite Mínimo de Venda",
+        Range = {100, 10000},
+        Increment = 100,
+        Suffix = "$",
+        CurrentValue = 1000,
+        Flag = "SellThreshold",
+        Callback = function(Value)
+            Settings.SellThreshold = Value
+        end,
+    })
+    
+    -- Tab de Reparos
+    local RepairTab = Window:CreateTab("🔧 Reparos", nil)
+    
+    -- Toggle Auto Reparar
+    RepairTab:CreateToggle({
+        Name = "🔧 Auto Reparar",
+        CurrentValue = false,
+        Flag = "AutoRepair",
+        Callback = function(Value)
+            Settings.AutoRepair = Value
+        end,
+    })
+    
+    -- Slider de Limite de Reparo
+    RepairTab:CreateSlider({
+        Name = "⚠️ Limite de Dano para Reparo",
+        Range = {0, 100},
+        Increment = 5,
+        Suffix = "%",
+        CurrentValue = 50,
+        Flag = "RepairThreshold",
+        Callback = function(Value)
+            Settings.RepairThreshold = Value
+        end,
+    })
+    
+    -- Tab de Status
+    local StatusTab = Window:CreateTab("📊 Status", nil)
+    
+    -- Labels de Status
+    StatusTab:CreateLabel("🔴 Status: Carregando...")
+    StatusTab:CreateLabel("🚗 Carros na área: 0")
+    StatusTab:CreateLabel("💰 Dinheiro atual: $0")
+    
+    -- Atualizar Status
+    spawn(function()
+        while wait(2) do
+            local carCount = #GetCarParts()
+            local money = 0
+            if Player:FindFirstChild("leaderstats") then
+                if Player.leaderstats:FindFirstChild("Money") then
+                    money = Player.leaderstats.Money.Value
+                end
+            end
+            
+            StatusTab:Clear()
+            StatusTab:CreateLabel(string.format("🔴 Status: %s", Settings.AutoFarm and "✅ Ativo" or "⏸️ Pausado"))
+            StatusTab:CreateLabel(string.format("🚗 Carros na área: %d", carCount))
+            StatusTab:CreateLabel(string.format("💰 Dinheiro atual: $%d", money))
+        end
+    end)
+    
+    -- Tab de Informações
+    local InfoTab = Window:CreateTab("ℹ️ Info", nil)
+    InfoTab:CreateLabel("🚗 Car Flipper Auto Farm Script")
+    InfoTab:CreateLabel("Versão 2.0")
+    InfoTab:CreateLabel("Desenvolvido para maximizar seus lucros!")
+    InfoTab:CreateLabel("Atalho: F4 para abrir/fechar")
+end
+
+-- Iniciar Script
+spawn(function()
+    CreateGUI()
+    MainLoop()
+end)
+
+-- Tecla de Atalho
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.F4 then
+        -- Mostrar/Ocultar GUI
+        local gui = Player.PlayerGui:FindFirstChild("Rayfield")
+        if gui then
+            gui.Enabled = not gui.Enabled
+        end
+    end
+end)
+
+print("🚗 Car Flipper Auto Farm Script carregado com sucesso!")
+print("💡 Pressione F4 para abrir/fechar a interface")
