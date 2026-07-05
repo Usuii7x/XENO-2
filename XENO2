@@ -1,127 +1,176 @@
--- // VENDEDOR DE CARROS - FULL AUTO FARM (Otimizado)
+-- // VENDEDOR DE CARROS - RAYFIELD (Versão Funcional)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "Vendedor de Carros | Farm Otimizado",
-    LoadingTitle = "Otimizando...",
+    Name = "Vendedor de Carros | LARPWARE",
+    LoadingTitle = "Carregando Script...",
     LoadingSubtitle = "by Grok",
-    ConfigurationSaving = { Enabled = true, FolderName = "CarFlipper", FileName = "Optimized" }
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "CarFlipper",
+        FileName = "Larpware"
+    }
 })
 
-local Tab = Window:CreateTab("🚗 Auto Farm", 4483362458)
+local Tab = Window:CreateTab("🚗 Main Farm", 4483362458)
+local AutoBuyTab = Window:CreateTab("💰 Auto Buy", 4483362458)
+local SettingsTab = Window:CreateTab("⚙️ Settings", 4483362458)
 
-getgenv().FarmConfig = {
-    AutoAFK = true,
-    AutoParts = false,
-    AutoRepair = false,
-    AutoSell = false,
-    AutoMoney = false,
-    AutoBuy = false
-}
+-- Services & Remotes
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local FixCar   = ReplicatedStorage.Remotes.Repair.FixCar
+local SellCar  = ReplicatedStorage.Remotes.Garage.SellCar
+local BuyCar   = ReplicatedStorage.Remotes.Merchant.BuyCar
 
 local player = game.Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local root = character:WaitForChild("HumanoidRootPart")
 
--- Atualiza Root Part caso morra
-player.CharacterAdded:Connect(function(newChar)
-    character = newChar
-    root = newChar:WaitForChild("HumanoidRootPart")
-end)
+-- Variables
+getgenv().FarmRunning = false
+getgenv().AutoBuyRunning = false
+getgenv().AreaRotateRunning = false
+getgenv().AutoCollectRunning = false
 
--- ====================== ANTI AFK ======================
+-- Anti-AFK
 Tab:CreateToggle({
     Name = "🔄 Anti-AFK",
     CurrentValue = true,
     Callback = function(v)
-        getgenv().FarmConfig.AutoAFK = v
+        if v then
+            game:GetService("Players").LocalPlayer.Idled:Connect(function()
+                local vu = game:GetService("VirtualUser")
+                vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+                task.wait(1)
+                vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+            end)
+        end
     end
 })
 
-spawn(function()
-    while getgenv().FarmConfig.AutoAFK do
-        game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-        task.wait(1)
-        game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-        task.wait(25)
-    end
-end)
+-- ===================== FARM =====================
+Tab:CreateToggle({
+    Name = "🏭 Auto Farm (Buy → Repair → Sell)",
+    CurrentValue = false,
+    Callback = function(v)
+        getgenv().FarmRunning = v
+        if v then
+            spawn(function()
+                while getgenv().FarmRunning do
+                    local activeMerchants = workspace:FindFirstChild("ActiveMerchants")
+                    if activeMerchants then
+                        for _, merchant in pairs(activeMerchants:GetChildren()) do
+                            for _, car in pairs(merchant:GetChildren()) do
+                                if not getgenv().FarmRunning then break end
+                                -- Aqui você pode adicionar filtro de raridade se quiser
+                                if car:IsA("Model") then
+                                    -- Buy
+                                    local prompt = car:FindFirstChild("MerchantPrompt", true)
+                                    if prompt then
+                                        BuyCar:FireServer(prompt:GetAttribute("MerchantZone"), prompt:GetAttribute("MerchantId"))
+                                        task.wait(2)
+                                    end
 
--- ====================== FUNÇÃO PRINCIPAL ======================
-local function GetPromptsInRange(range)
-    local prompts = {}
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("ProximityPrompt") then
-            local dist = (obj.Parent.Position - root.Position).Magnitude
-            if dist < range then
-                table.insert(prompts, {prompt = obj, distance = dist})
-            end
-        end
-    end
-    -- Ordena por distância (mais perto primeiro)
-    table.sort(prompts, function(a,b) return a.distance < b.distance end)
-    return prompts
-end
-
--- ====================== AUTO FARM LOOP (Otimizado) ======================
-spawn(function()
-    while task.wait(0.4) do
-        if not root then continue end
-
-        local prompts = GetPromptsInRange(80)
-
-        for _, data in ipairs(prompts) do
-            local p = data.prompt
-            local name = p.Name:lower()
-
-            -- Auto Parts
-            if getgenv().FarmConfig.AutoParts and (name:find("part") or name:find("peça") or name:find("scrap") or name:find("collect")) then
-                fireproximityprompt(p)
-                task.wait(0.3)
-
-            -- Auto Repair
-            elseif getgenv().FarmConfig.AutoRepair and (name:find("repair") or name:find("consertar") or name:find("fix")) then
-                fireproximityprompt(p)
-                task.wait(0.9)
-
-            -- Auto Sell
-            elseif getgenv().FarmConfig.AutoSell and (name:find("sell") or name:find("vender") or name:find("deliver") or name:find("entregar")) then
-                fireproximityprompt(p)
-                task.wait(1.2)
-
-            -- Auto Buy
-            elseif getgenv().FarmConfig.AutoBuy and (name:find("buy") or name:find("comprar") or name:find("purchase")) then
-                fireproximityprompt(p)
-                task.wait(1.8)
-
-            -- Auto Money (15k+)
-            elseif getgenv().FarmConfig.AutoMoney then
-                local ls = player:FindFirstChild("leaderstats")
-                local money = ls and (ls:FindFirstChild("Cash") or ls:FindFirstChild("Money") or ls:FindFirstChild("Dinheiro"))
-                if money and money.Value >= 15000 and (name:find("money") or name:find("cash") or name:find("coletar")) then
-                    fireproximityprompt(p)
-                    task.wait(0.7)
+                                    -- Repair & Sell (simplificado)
+                                    task.wait(1)
+                                    FixCar:FireServer("16") -- ajuste o index se necessário
+                                    task.wait(1.5)
+                                    SellCar:FireServer("16")
+                                    task.wait(2)
+                                end
+                            end
+                        end
+                    end
+                    task.wait(3)
                 end
-            end
+            end)
         end
     end
-end)
+})
 
--- ====================== INTERFACE ======================
-Tab:CreateToggle({ Name = "🛠 Auto Coletar Peças", CurrentValue = false, Callback = function(v) getgenv().FarmConfig.AutoParts = v end })
-Tab:CreateToggle({ Name = "🔧 Auto Repair", CurrentValue = false, Callback = function(v) getgenv().FarmConfig.AutoRepair = v end })
-Tab:CreateToggle({ Name = "💸 Auto Sell", CurrentValue = false, Callback = function(v) getgenv().FarmConfig.AutoSell = v end })
-Tab:CreateToggle({ Name = "🛒 Auto Buy Carros", CurrentValue = false, Callback = function(v) getgenv().FarmConfig.AutoBuy = v end })
-Tab:CreateToggle({ Name = "💰 Auto Coletar Dinheiro (15k+)", CurrentValue = false, Callback = function(v) getgenv().FarmConfig.AutoMoney = v end })
+Tab:CreateToggle({
+    Name = "🛠 Auto Collect (Cash & Parts)",
+    CurrentValue = false,
+    Callback = function(v)
+        getgenv().AutoCollectRunning = v
+        if v then
+            spawn(function()
+                while getgenv().AutoCollectRunning do
+                    -- Collect Cash
+                    pcall(function()
+                        local cashPrompt = workspace.PlayerBases["base_"..player.UserId].CashBox.Box.CollectPrompt
+                        fireproximityprompt(cashPrompt)
+                    end)
+                    task.wait(1)
+                    -- Collect Parts
+                    pcall(function()
+                        local partsPrompt = workspace.PlayerBases["base_"..player.UserId].ResourceBox.Box.CollectPrompt
+                        fireproximityprompt(partsPrompt)
+                    end)
+                    task.wait(300) -- 5 minutos
+                end
+            end)
+        end
+    end
+})
+
+-- ===================== AUTO BUY =====================
+AutoBuyTab:CreateToggle({
+    Name = "💰 Auto Buy (com Area Rotation)",
+    CurrentValue = false,
+    Callback = function(v)
+        getgenv().AutoBuyRunning = v
+        if v then
+            spawn(function()
+                while getgenv().AutoBuyRunning do
+                    local activeMerchants = workspace:FindFirstChild("ActiveMerchants")
+                    if activeMerchants then
+                        for _, m in pairs(activeMerchants:GetChildren()) do
+                            for _, car in pairs(m:GetChildren()) do
+                                if car:IsA("Model") then
+                                    local prompt = car:FindFirstChild("MerchantPrompt", true)
+                                    if prompt then
+                                        BuyCar:FireServer(prompt:GetAttribute("MerchantZone"), prompt:GetAttribute("MerchantId"))
+                                        task.wait(1.8)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    task.wait(2)
+                end
+            end)
+        end
+    end
+})
+
+-- Botões rápidos
+Tab:CreateButton({
+    Name = "⚡ Collect Now",
+    Callback = function()
+        pcall(function()
+            local base = workspace.PlayerBases["base_"..player.UserId]
+            fireproximityprompt(base.CashBox.Box.CollectPrompt)
+            task.wait(0.5)
+            fireproximityprompt(base.ResourceBox.Box.CollectPrompt)
+        end)
+    end
+})
 
 Tab:CreateButton({
-    Name = "🧹 Coletar Tudo Agora (Uma vez)",
+    Name = "🔧 Repair Current Car",
     Callback = function()
-        for _, data in ipairs(GetPromptsInRange(120)) do
-            fireproximityprompt(data.prompt)
-            task.wait(0.2)
-        end
+        FixCar:FireServer("16") -- mude o número se necessário
     end
 })
 
-Rayfield:Notify({ Title = "Script Otimizado!", Content = "Loop de farm melhorado e mais leve!", Duration = 6 })
+Tab:CreateButton({
+    Name = "💸 Sell Current Car",
+    Callback = function()
+        SellCar:FireServer("16")
+    end
+})
+
+Rayfield:Notify({
+    Title = "Script Carregado!",
+    Content = "LARPWARE convertido para Rayfield ✅",
+    Duration = 6
+})
