@@ -1,11 +1,11 @@
 --[[
     Xeno Ultra - Evomon Script
     Compatível com Xeno Executor
-    Versão: 1.0.0
+    Versão: 2.0.0
 ]]
 
--- Carregar biblioteca Rayfield
-local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
+-- Verificar se o jogo está carregado
+repeat wait() until game:IsLoaded()
 
 -- Variáveis globais
 local Players = game:GetService("Players")
@@ -13,11 +13,12 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local VirtualUser = game:GetService("VirtualUser")
+local TeleportService = game:GetService("TeleportService")
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Humanoid = Character:WaitForChild("Humanoid")
 
--- Configurações do script
+-- Configurações
 local Settings = {
     AutoFarm = false,
     AutoBattle = false,
@@ -48,328 +49,750 @@ local Settings = {
     JumpPower = 50,
 }
 
--- Criar janela principal
-local Window = Rayfield:CreateWindow({
-    Name = "Xeno Ultra",
-    Icon = 0,
-    LoadingTitle = "Carregando Xeno Ultra...",
-    LoadingSubtitle = "By Xeno Team",
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = "XenoUltra",
-        FileName = "Config"
-    },
-    Keybind = Enum.KeyCode.RightControl,
-    KeybindMode = "Toggle"
-})
+-- ============= SISTEMA DE UI PERSONALIZADO =============
+-- Criando UI do zero para compatibilidade com Xeno
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "XenoUltraGUI"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ResetOnSpawn = false
+
+-- Janela principal
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.35, 0, 0.2, 0)
+MainFrame.Size = UDim2.new(0, 500, 0, 550)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+-- Bordas arredondadas
+local Corner = Instance.new("UICorner")
+Corner.Parent = MainFrame
+Corner.CornerRadius = UDim.new(0, 8)
+
+-- Título
+local TitleBar = Instance.new("Frame")
+TitleBar.Parent = MainFrame
+TitleBar.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
+TitleBar.BorderSizePixel = 0
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+TitleBar.Position = UDim2.new(0, 0, 0, 0)
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.Parent = TitleBar
+TitleCorner.CornerRadius = UDim.new(0, 8)
+
+local Title = Instance.new("TextLabel")
+Title.Parent = TitleBar
+Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(1, -60, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.Text = "XENO ULTRA"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 22
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Font = Enum.Font.GothamBold
+
+-- Botão Minimizar
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Parent = TitleBar
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+MinimizeBtn.BorderSizePixel = 0
+MinimizeBtn.Size = UDim2.new(0, 25, 0, 25)
+MinimizeBtn.Position = UDim2.new(1, -55, 0, 7.5)
+MinimizeBtn.Text = "_"
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.TextSize = 18
+MinimizeBtn.Font = Enum.Font.GothamBold
+
+local MinimizeCorner = Instance.new("UICorner")
+MinimizeCorner.Parent = MinimizeBtn
+
+-- Botão Fechar
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Parent = TitleBar
+CloseBtn.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
+CloseBtn.BorderSizePixel = 0
+CloseBtn.Size = UDim2.new(0, 25, 0, 25)
+CloseBtn.Position = UDim2.new(1, -30, 0, 7.5)
+CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.TextSize = 16
+CloseBtn.Font = Enum.Font.GothamBold
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.Parent = CloseBtn
+
+-- Sistema de Abas
+local TabContainer = Instance.new("Frame")
+TabContainer.Parent = MainFrame
+TabContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+TabContainer.BorderSizePixel = 0
+TabContainer.Size = UDim2.new(1, 0, 0, 35)
+TabContainer.Position = UDim2.new(0, 0, 0, 40)
+
+local TabButtons = {}
+local TabContents = {}
+local CurrentTab = "Farm"
 
 -- Criar abas
-local FarmTab = Window:CreateTab("Farm")
-local BossTab = Window:CreateTab("Boss/Dungeon")
-local PlayerTab = Window:CreateTab("Player")
-local MiscTab = Window:CreateTab("Misc/Extra")
-local SettingsTab = Window:CreateTab("Settings")
+local TabNames = {"Farm", "Boss", "Player", "Misc", "Settings"}
+local TabPositions = {}
 
--- ============= FUNÇÕES AUXILIARES =============
-
--- Função para notificações
-local function Notify(title, message, duration)
-    Rayfield:Notify({
-        Title = title,
-        Content = message,
-        Duration = duration or 3,
-        Image = 0,
-        Actions = {}
-    })
+for i, name in ipairs(TabNames) do
+    local btn = Instance.new("TextButton")
+    btn.Parent = TabContainer
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    btn.BorderSizePixel = 0
+    btn.Size = UDim2.new(0.2, 0, 1, 0)
+    btn.Position = UDim2.new((i-1) * 0.2, 0, 0, 0)
+    btn.Text = name
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.TextSize = 13
+    btn.Font = Enum.Font.GothamSemibold
+    btn.Name = name.."Tab"
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.Parent = btn
+    
+    TabButtons[name] = btn
+    
+    -- Conteúdo da aba
+    local content = Instance.new("ScrollingFrame")
+    content.Parent = MainFrame
+    content.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    content.BorderSizePixel = 0
+    content.Size = UDim2.new(1, 0, 1, -75)
+    content.Position = UDim2.new(0, 0, 0, 75)
+    content.CanvasSize = UDim2.new(0, 0, 0, 0)
+    content.ScrollBarThickness = 6
+    content.Visible = (i == 1)
+    content.Name = name.."Content"
+    
+    local contentCorner = Instance.new("UICorner")
+    contentCorner.Parent = content
+    
+    TabContents[name] = content
 end
 
--- Função para encontrar evomons próximos
+-- Função para alternar abas
+local function SwitchTab(tabName)
+    for name, content in pairs(TabContents) do
+        content.Visible = (name == tabName)
+        if name == tabName then
+            TabButtons[name].BackgroundColor3 = Color3.fromRGB(80, 0, 120)
+            TabButtons[name].TextColor3 = Color3.fromRGB(255, 255, 255)
+        else
+            TabButtons[name].BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+            TabButtons[name].TextColor3 = Color3.fromRGB(200, 200, 200)
+        end
+    end
+    CurrentTab = tabName
+end
+
+-- Conectar botões das abas
+for name, btn in pairs(TabButtons) do
+    btn.MouseButton1Click:Connect(function()
+        SwitchTab(name)
+    end)
+end
+
+-- Funções para criar elementos UI
+local function CreateToggle(parent, config)
+    local frame = Instance.new("Frame")
+    frame.Parent = parent
+    frame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    frame.BorderSizePixel = 0
+    frame.Size = UDim2.new(1, -20, 0, 35)
+    frame.Position = UDim2.new(0, 10, 0, (#parent:GetChildren() - 1) * 40 + 5)
+    
+    local frameCorner = Instance.new("UICorner")
+    frameCorner.Parent = frame
+    
+    local label = Instance.new("TextLabel")
+    label.Parent = frame
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.Text = config.Name
+    label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamMedium
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local toggleBtn = Instance.new("TextButton")
+    toggleBtn.Parent = frame
+    toggleBtn.BackgroundColor3 = config.CurrentValue and Color3.fromRGB(100, 0, 150) or Color3.fromRGB(60, 60, 70)
+    toggleBtn.BorderSizePixel = 0
+    toggleBtn.Size = UDim2.new(0, 50, 0, 25)
+    toggleBtn.Position = UDim2.new(1, -60, 0, 5)
+    toggleBtn.Text = config.CurrentValue and "ON" or "OFF"
+    toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggleBtn.TextSize = 12
+    toggleBtn.Font = Enum.Font.GothamBold
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.Parent = toggleBtn
+    
+    local isOn = config.CurrentValue or false
+    
+    toggleBtn.MouseButton1Click:Connect(function()
+        isOn = not isOn
+        toggleBtn.BackgroundColor3 = isOn and Color3.fromRGB(100, 0, 150) or Color3.fromRGB(60, 60, 70)
+        toggleBtn.Text = isOn and "ON" or "OFF"
+        if config.Callback then
+            config.Callback(isOn)
+        end
+    end)
+    
+    return {
+        SetValue = function(value)
+            isOn = value
+            toggleBtn.BackgroundColor3 = isOn and Color3.fromRGB(100, 0, 150) or Color3.fromRGB(60, 60, 70)
+            toggleBtn.Text = isOn and "ON" or "OFF"
+        end,
+        GetValue = function()
+            return isOn
+        end
+    }
+end
+
+local function CreateDropdown(parent, config)
+    local frame = Instance.new("Frame")
+    frame.Parent = parent
+    frame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    frame.BorderSizePixel = 0
+    frame.Size = UDim2.new(1, -20, 0, 35)
+    frame.Position = UDim2.new(0, 10, 0, (#parent:GetChildren() - 1) * 40 + 5)
+    
+    local frameCorner = Instance.new("UICorner")
+    frameCorner.Parent = frame
+    
+    local label = Instance.new("TextLabel")
+    label.Parent = frame
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.new(0.4, 0, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.Text = config.Name
+    label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamMedium
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local dropdownBtn = Instance.new("TextButton")
+    dropdownBtn.Parent = frame
+    dropdownBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    dropdownBtn.BorderSizePixel = 0
+    dropdownBtn.Size = UDim2.new(0.4, 0, 0.8, 0)
+    dropdownBtn.Position = UDim2.new(0.55, 0, 0.1, 0)
+    dropdownBtn.Text = config.CurrentOption or config.Options[1]
+    dropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    dropdownBtn.TextSize = 13
+    dropdownBtn.Font = Enum.Font.GothamMedium
+    
+    local dropdownCorner = Instance.new("UICorner")
+    dropdownCorner.Parent = dropdownBtn
+    
+    local dropdownVisible = false
+    local optionButtons = {}
+    
+    dropdownBtn.MouseButton1Click:Connect(function()
+        dropdownVisible = not dropdownVisible
+        for _, btn in pairs(optionButtons) do
+            btn.Visible = dropdownVisible
+        end
+    end)
+    
+    for i, option in ipairs(config.Options) do
+        local optBtn = Instance.new("TextButton")
+        optBtn.Parent = frame
+        optBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        optBtn.BorderSizePixel = 0
+        optBtn.Size = UDim2.new(0.4, 0, 0.8, 0)
+        optBtn.Position = UDim2.new(0.55, 0, 0.1 + i * 0.8, 0)
+        optBtn.Text = option
+        optBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        optBtn.TextSize = 13
+        optBtn.Font = Enum.Font.GothamMedium
+        optBtn.Visible = false
+        
+        local optCorner = Instance.new("UICorner")
+        optCorner.Parent = optBtn
+        
+        optBtn.MouseButton1Click:Connect(function()
+            dropdownBtn.Text = option
+            dropdownVisible = false
+            for _, btn in pairs(optionButtons) do
+                btn.Visible = false
+            end
+            if config.Callback then
+                config.Callback(option)
+            end
+        end)
+        
+        table.insert(optionButtons, optBtn)
+    end
+    
+    return {
+        SetValue = function(value)
+            dropdownBtn.Text = value
+        end
+    }
+end
+
+local function CreateSlider(parent, config)
+    local frame = Instance.new("Frame")
+    frame.Parent = parent
+    frame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    frame.BorderSizePixel = 0
+    frame.Size = UDim2.new(1, -20, 0, 45)
+    frame.Position = UDim2.new(0, 10, 0, (#parent:GetChildren() - 1) * 45 + 5)
+    
+    local frameCorner = Instance.new("UICorner")
+    frameCorner.Parent = frame
+    
+    local label = Instance.new("TextLabel")
+    label.Parent = frame
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.new(0.4, 0, 0.5, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.Text = config.Name
+    label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamMedium
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Parent = frame
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.Size = UDim2.new(0.2, 0, 0.5, 0)
+    valueLabel.Position = UDim2.new(0.75, 0, 0, 0)
+    valueLabel.Text = tostring(config.CurrentValue or config.Range[1])
+    valueLabel.TextColor3 = Color3.fromRGB(150, 100, 200)
+    valueLabel.TextSize = 14
+    valueLabel.Font = Enum.Font.GothamBold
+    
+    local slider = Instance.new("Frame")
+    slider.Parent = frame
+    slider.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    slider.BorderSizePixel = 0
+    slider.Size = UDim2.new(0.7, 0, 0.25, 0)
+    slider.Position = UDim2.new(0.1, 0, 0.6, 0)
+    
+    local sliderCorner = Instance.new("UICorner")
+    sliderCorner.Parent = slider
+    
+    local fill = Instance.new("Frame")
+    fill.Parent = slider
+    fill.BackgroundColor3 = Color3.fromRGB(120, 0, 180)
+    fill.BorderSizePixel = 0
+    fill.Size = UDim2.new(0, 0, 1, 0)
+    
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.Parent = fill
+    
+    local min = config.Range[1] or 0
+    local max = config.Range[2] or 100
+    local current = config.CurrentValue or min
+    local increment = config.Increment or 1
+    
+    fill.Size = UDim2.new((current - min) / (max - min), 0, 1, 0)
+    valueLabel.Text = tostring(current)
+    
+    local dragging = false
+    
+    slider.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            local mousePos = input.Position.X
+            local sliderPos = slider.AbsolutePosition.X
+            local sliderSize = slider.AbsoluteSize.X
+            local percent = math.clamp((mousePos - sliderPos) / sliderSize, 0, 1)
+            local value = math.floor((min + percent * (max - min)) / increment) * increment
+            value = math.clamp(value, min, max)
+            current = value
+            fill.Size = UDim2.new(percent, 0, 1, 0)
+            valueLabel.Text = tostring(value)
+            if config.Callback then
+                config.Callback(value)
+            end
+        end
+    end)
+    
+    slider.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local mousePos = input.Position.X
+            local sliderPos = slider.AbsolutePosition.X
+            local sliderSize = slider.AbsoluteSize.X
+            local percent = math.clamp((mousePos - sliderPos) / sliderSize, 0, 1)
+            local value = math.floor((min + percent * (max - min)) / increment) * increment
+            value = math.clamp(value, min, max)
+            current = value
+            fill.Size = UDim2.new(percent, 0, 1, 0)
+            valueLabel.Text = tostring(value)
+            if config.Callback then
+                config.Callback(value)
+            end
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    return {
+        SetValue = function(value)
+            value = math.clamp(value, min, max)
+            current = value
+            local percent = (value - min) / (max - min)
+            fill.Size = UDim2.new(percent, 0, 1, 0)
+            valueLabel.Text = tostring(value)
+        end
+    }
+end
+
+local function CreateButton(parent, config)
+    local btn = Instance.new("TextButton")
+    btn.Parent = parent
+    btn.BackgroundColor3 = Color3.fromRGB(80, 0, 120)
+    btn.BorderSizePixel = 0
+    btn.Size = UDim2.new(0.8, 0, 0, 35)
+    btn.Position = UDim2.new(0.1, 0, 0, (#parent:GetChildren() - 1) * 40 + 5)
+    btn.Text = config.Name
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 14
+    btn.Font = Enum.Font.GothamSemibold
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.Parent = btn
+    
+    btn.MouseButton1Click:Connect(function()
+        if config.Callback then
+            config.Callback()
+        end
+    end)
+end
+
+-- ============= FUNÇÕES DO JOGO =============
+
+local function Notify(title, message)
+    -- Criar notificação simples
+    local notification = Instance.new("Frame")
+    notification.Parent = ScreenGui
+    notification.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    notification.BorderSizePixel = 0
+    notification.Size = UDim2.new(0, 300, 0, 60)
+    notification.Position = UDim2.new(0.5, -150, 0, 20)
+    notification.BackgroundTransparency = 0.2
+    
+    local notCorner = Instance.new("UICorner")
+    notCorner.Parent = notification
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Parent = notification
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Size = UDim2.new(1, 0, 0.4, 0)
+    titleLabel.Position = UDim2.new(0, 10, 0, 0)
+    titleLabel.Text = title
+    titleLabel.TextColor3 = Color3.fromRGB(180, 0, 0)
+    titleLabel.TextSize = 16
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local msgLabel = Instance.new("TextLabel")
+    msgLabel.Parent = notification
+    msgLabel.BackgroundTransparency = 1
+    msgLabel.Size = UDim2.new(1, -20, 0.5, 0)
+    msgLabel.Position = UDim2.new(0, 10, 0, 0.4)
+    msgLabel.Text = message
+    msgLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    msgLabel.TextSize = 13
+    msgLabel.Font = Enum.Font.GothamMedium
+    msgLabel.TextXAlignment = Enum.TextXAlignment.Left
+    msgLabel.TextWrapped = true
+    
+    -- Animação de entrada
+    notification.Position = UDim2.new(0.5, -150, 0, -60)
+    TweenService:Create(notification, TweenInfo.new(0.3), {Position = UDim2.new(0.5, -150, 0, 20)}):Play()
+    
+    -- Remover após alguns segundos
+    task.delay(3, function()
+        TweenService:Create(notification, TweenInfo.new(0.3), {Position = UDim2.new(0.5, -150, 0, -60)}):Play()
+        task.delay(0.4, function()
+            notification:Destroy()
+        end)
+    end)
+end
+
+-- Funções do jogo
 local function FindNearestEvomon()
     local nearest = nil
     local minDist = math.huge
-    for _, v in pairs(workspace:GetChildren()) do
-        if v:IsA("Model") and v:FindFirstChild("Humanoid") and v.Name:find("Evomon") then
-            local dist = (v.HumanoidRootPart.Position - Character.HumanoidRootPart.Position).Magnitude
-            if dist < minDist then
-                minDist = dist
-                nearest = v
+    if not Character or not Character:FindFirstChild("HumanoidRootPart") then return nil end
+    
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("Model") and v:FindFirstChild("Humanoid") and v.Name:lower():find("evomon") then
+            local hrp = v:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local dist = (hrp.Position - Character.HumanoidRootPart.Position).Magnitude
+                if dist < minDist then
+                    minDist = dist
+                    nearest = v
+                end
             end
         end
     end
     return nearest
 end
 
--- Função para teleportar
 local function TeleportTo(position)
     if Character and Character:FindFirstChild("HumanoidRootPart") then
         Character.HumanoidRootPart.CFrame = CFrame.new(position)
     end
 end
 
--- ============= ABA FARM =============
+-- ============= CONSTRUIR INTERFACE =============
 
--- Seção Auto Farm
-local FarmSection = FarmTab:CreateSection("Auto Farm")
+-- ABA FARM
+local farmContent = TabContents["Farm"]
 
-FarmTab:CreateToggle({
+CreateToggle(farmContent, {
     Name = "Auto Farm",
     CurrentValue = false,
-    Flag = "AutoFarm",
-    Callback = function(Value)
-        Settings.AutoFarm = Value
-        Notify("Auto Farm", Value and "Ativado" or "Desativado", 2)
-        if Value then
-            -- Iniciar farm loop
+    Callback = function(value)
+        Settings.AutoFarm = value
+        Notify("Auto Farm", value and "Ativado" or "Desativado")
+        if value then
             spawn(function()
                 while Settings.AutoFarm do
                     local target = FindNearestEvomon()
-                    if target then
-                        -- Lógica de farm
+                    if target and target:FindFirstChild("HumanoidRootPart") then
                         Character.HumanoidRootPart.CFrame = target.HumanoidRootPart.CFrame
                     end
-                    task.wait(0.1)
+                    task.wait(0.5)
                 end
             end)
         end
     end
 })
 
--- Dropdown para seleção de área
-FarmTab:CreateDropdown({
+CreateDropdown(farmContent, {
     Name = "Área de Farm",
     Options = {"Area1", "Area2", "Area3", "Area4", "Area5"},
     CurrentOption = "Area1",
-    Flag = "FarmArea",
-    Callback = function(Option)
-        Settings.FarmArea = Option
-        Notify("Área", "Selecionado: " .. Option, 2)
+    Callback = function(option)
+        Settings.FarmArea = option
+        Notify("Área", "Selecionado: " .. option)
     end
 })
 
-FarmTab:CreateToggle({
+CreateToggle(farmContent, {
     Name = "Auto Battle",
     CurrentValue = false,
-    Flag = "AutoBattle",
-    Callback = function(Value)
-        Settings.AutoBattle = Value
-        Notify("Auto Battle", Value and "Ativado" or "Desativado", 2)
+    Callback = function(value)
+        Settings.AutoBattle = value
+        Notify("Auto Battle", value and "Ativado" or "Desativado")
     end
 })
 
-FarmTab:CreateToggle({
+CreateToggle(farmContent, {
     Name = "Auto Catch",
     CurrentValue = false,
-    Flag = "AutoCatch",
-    Callback = function(Value)
-        Settings.AutoCatch = Value
-        Notify("Auto Catch", Value and "Ativado" or "Desativado", 2)
+    Callback = function(value)
+        Settings.AutoCatch = value
+        Notify("Auto Catch", value and "Ativado" or "Desativado")
     end
 })
 
--- Dropdown para raridade
-FarmTab:CreateDropdown({
+CreateDropdown(farmContent, {
     Name = "Filtro de Raridade",
     Options = {"All", "Common", "Rare", "Epic", "Legendary", "Shiny", "Prismatic", "SSS"},
     CurrentOption = "All",
-    Flag = "CatchRarity",
-    Callback = function(Option)
-        Settings.CatchRarity = Option
-        Notify("Raridade", "Filtro: " .. Option, 2)
+    Callback = function(option)
+        Settings.CatchRarity = option
+        Notify("Raridade", "Filtro: " .. option)
     end
 })
 
-FarmTab:CreateToggle({
+CreateToggle(farmContent, {
     Name = "Auto Heal",
     CurrentValue = false,
-    Flag = "AutoHeal",
-    Callback = function(Value)
-        Settings.AutoHeal = Value
-        Notify("Auto Heal", Value and "Ativado" or "Desativado", 2)
-    end
-})
-
-FarmTab:CreateToggle({
-    Name = "Auto Evolve",
-    CurrentValue = false,
-    Flag = "AutoEvolve",
-    Callback = function(Value)
-        Settings.AutoEvolve = Value
-        Notify("Auto Evolve", Value and "Ativado" or "Desativado", 2)
-    end
-})
-
--- Slider para velocidade de batalha
-FarmTab:CreateSlider({
-    Name = "Velocidade de Batalha",
-    Range = {1, 99},
-    Increment = 1,
-    Suffix = "x",
-    CurrentValue = 1,
-    Flag = "BattleSpeed",
-    Callback = function(Value)
-        Settings.BattleSpeed = Value
-        Notify("Velocidade", "Batalha x" .. Value, 2)
-    end
-})
-
-FarmTab:CreateToggle({
-    Name = "Farm de XP",
-    CurrentValue = false,
-    Flag = "FarmXP",
-    Callback = function(Value)
-        Notify("Farm XP", Value and "Ativado" or "Desativado", 2)
-    end
-})
-
-FarmTab:CreateToggle({
-    Name = "Farm de Coins",
-    CurrentValue = false,
-    Flag = "FarmCoins",
-    Callback = function(Value)
-        Notify("Farm Coins", Value and "Ativado" or "Desativado", 2)
-    end
-})
-
-FarmTab:CreateToggle({
-    Name = "Farm de Itens",
-    CurrentValue = false,
-    Flag = "FarmItems",
-    Callback = function(Value)
-        Notify("Farm Itens", Value and "Ativado" or "Desativado", 2)
-    end
-})
-
--- ============= ABA BOSS/DUNGEON =============
-
-BossTab:CreateToggle({
-    Name = "Auto Boss",
-    CurrentValue = false,
-    Flag = "AutoBoss",
-    Callback = function(Value)
-        Settings.AutoBoss = Value
-        Notify("Auto Boss", Value and "Ativado" or "Desativado", 2)
-        if Value then
+    Callback = function(value)
+        Settings.AutoHeal = value
+        Notify("Auto Heal", value and "Ativado" or "Desativado")
+        if value then
             spawn(function()
-                while Settings.AutoBoss do
-                    -- Lógica de boss
-                    task.wait(5)
+                while Settings.AutoHeal do
+                    if Humanoid and Humanoid.Health < Humanoid.MaxHealth * 0.5 then
+                        -- Lógica de cura
+                    end
+                    task.wait(1)
                 end
             end)
         end
     end
 })
 
-BossTab:CreateToggle({
-    Name = "Auto Dungeon",
+CreateToggle(farmContent, {
+    Name = "Auto Evolve",
     CurrentValue = false,
-    Flag = "AutoDungeon",
-    Callback = function(Value)
-        Settings.AutoDungeon = Value
-        Notify("Auto Dungeon", Value and "Ativado" or "Desativado", 2)
+    Callback = function(value)
+        Settings.AutoEvolve = value
+        Notify("Auto Evolve", value and "Ativado" or "Desativado")
     end
 })
 
-BossTab:CreateDropdown({
+CreateSlider(farmContent, {
+    Name = "Velocidade de Batalha",
+    Range = {1, 99},
+    Increment = 1,
+    CurrentValue = 1,
+    Callback = function(value)
+        Settings.BattleSpeed = value
+        Notify("Velocidade", "Batalha x" .. value)
+    end
+})
+
+CreateToggle(farmContent, {
+    Name = "Farm de XP",
+    CurrentValue = false,
+    Callback = function(value)
+        Notify("Farm XP", value and "Ativado" or "Desativado")
+    end
+})
+
+CreateToggle(farmContent, {
+    Name = "Farm de Coins",
+    CurrentValue = false,
+    Callback = function(value)
+        Notify("Farm Coins", value and "Ativado" or "Desativado")
+    end
+})
+
+CreateToggle(farmContent, {
+    Name = "Farm de Itens",
+    CurrentValue = false,
+    Callback = function(value)
+        Notify("Farm Itens", value and "Ativado" or "Desativado")
+    end
+})
+
+-- ABA BOSS
+local bossContent = TabContents["Boss"]
+
+CreateToggle(bossContent, {
+    Name = "Auto Boss",
+    CurrentValue = false,
+    Callback = function(value)
+        Settings.AutoBoss = value
+        Notify("Auto Boss", value and "Ativado" or "Desativado")
+    end
+})
+
+CreateToggle(bossContent, {
+    Name = "Auto Dungeon",
+    CurrentValue = false,
+    Callback = function(value)
+        Settings.AutoDungeon = value
+        Notify("Auto Dungeon", value and "Ativado" or "Desativado")
+    end
+})
+
+CreateDropdown(bossContent, {
     Name = "Dificuldade",
     Options = {"Normal", "Hard", "Expert", "Master", "Legendary"},
     CurrentOption = "Normal",
-    Flag = "Difficulty",
-    Callback = function(Option)
-        Settings.Difficulty = Option
-        Notify("Dificuldade", "Selecionado: " .. Option, 2)
+    Callback = function(option)
+        Settings.Difficulty = option
+        Notify("Dificuldade", "Selecionado: " .. option)
     end
 })
 
-BossTab:CreateToggle({
+CreateToggle(bossContent, {
     Name = "Auto Restart",
     CurrentValue = false,
-    Flag = "AutoRestart",
-    Callback = function(Value)
-        Notify("Auto Restart", Value and "Ativado" or "Desativado", 2)
+    Callback = function(value)
+        Notify("Auto Restart", value and "Ativado" or "Desativado")
     end
 })
 
-BossTab:CreateToggle({
+CreateToggle(bossContent, {
     Name = "Auto Coletar Recompensas",
     CurrentValue = false,
-    Flag = "AutoCollectRewards",
-    Callback = function(Value)
-        Notify("Auto Coletar", Value and "Ativado" or "Desativado", 2)
+    Callback = function(value)
+        Notify("Auto Coletar", value and "Ativado" or "Desativado")
     end
 })
 
--- ============= ABA PLAYER =============
+-- ABA PLAYER
+local playerContent = TabContents["Player"]
 
-PlayerTab:CreateSlider({
+CreateSlider(playerContent, {
     Name = "Velocidade",
     Range = {16, 250},
     Increment = 1,
-    Suffix = "Speed",
     CurrentValue = 16,
-    Flag = "WalkSpeed",
-    Callback = function(Value)
-        Settings.WalkSpeed = Value
+    Callback = function(value)
+        Settings.WalkSpeed = value
         if Humanoid then
-            Humanoid.WalkSpeed = Value
+            Humanoid.WalkSpeed = value
         end
-        Notify("Velocidade", "Definida para " .. Value, 2)
+        Notify("Velocidade", "Definida para " .. value)
     end
 })
 
-PlayerTab:CreateSlider({
+CreateSlider(playerContent, {
     Name = "Pulo",
     Range = {50, 250},
     Increment = 1,
-    Suffix = "Jump",
     CurrentValue = 50,
-    Flag = "JumpPower",
-    Callback = function(Value)
-        Settings.JumpPower = Value
+    Callback = function(value)
+        Settings.JumpPower = value
         if Humanoid then
-            Humanoid.JumpPower = Value
+            Humanoid.JumpPower = value
         end
-        Notify("Pulo", "Definido para " .. Value, 2)
+        Notify("Pulo", "Definido para " .. value)
     end
 })
 
-PlayerTab:CreateToggle({
+CreateToggle(playerContent, {
     Name = "Noclip",
     CurrentValue = false,
-    Flag = "Noclip",
-    Callback = function(Value)
-        Settings.Noclip = Value
-        Notify("Noclip", Value and "Ativado" or "Desativado", 2)
-        if Value then
+    Callback = function(value)
+        Settings.Noclip = value
+        Notify("Noclip", value and "Ativado" or "Desativado")
+        if value then
             spawn(function()
                 while Settings.Noclip do
-                    for _, v in pairs(Character:GetChildren()) do
-                        if v:IsA("BasePart") then
-                            v.CanCollide = false
+                    if Character then
+                        for _, v in pairs(Character:GetDescendants()) do
+                            if v:IsA("BasePart") then
+                                v.CanCollide = false
+                            end
                         end
                     end
                     task.wait(0.1)
                 end
             end)
-        else
-            for _, v in pairs(Character:GetChildren()) do
-                if v:IsA("BasePart") then
-                    v.CanCollide = true
-                end
-            end
         end
     end
 })
 
-PlayerTab:CreateToggle({
+CreateToggle(playerContent, {
     Name = "Infinite Jump",
     CurrentValue = false,
-    Flag = "InfiniteJump",
-    Callback = function(Value)
-        Settings.InfiniteJump = Value
-        Notify("Infinite Jump", Value and "Ativado" or "Desativado", 2)
-        if Value then
-            UserInputService.JumpRequest:Connect(function()
-                if Settings.InfiniteJump and Humanoid then
+    Callback = function(value)
+        Settings.InfiniteJump = value
+        Notify("Infinite Jump", value and "Ativado" or "Desativado")
+        if value then
+            local jumpConnection
+            jumpConnection = UserInputService.JumpRequest:Connect(function()
+                if Settings.InfiniteJump and Humanoid and Humanoid:GetState() ~= Enum.HumanoidStateType.Dead then
                     Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
                 end
             end)
@@ -377,27 +800,72 @@ PlayerTab:CreateToggle({
     end
 })
 
-PlayerTab:CreateToggle({
+CreateToggle(playerContent, {
     Name = "Fly",
     CurrentValue = false,
-    Flag = "Fly",
-    Callback = function(Value)
-        Settings.Fly = Value
-        Notify("Fly", Value and "Ativado" or "Desativado", 2)
-        if Value then
-            -- Implementar fly
+    Callback = function(value)
+        Settings.Fly = value
+        Notify("Fly", value and "Ativado" or "Desativado")
+        if value then
+            local flySpeed = 50
+            local bodyVelocity = Instance.new("BodyVelocity")
+            bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+            bodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)
+            
+            local bodyGyro = Instance.new("BodyGyro")
+            bodyGyro.MaxTorque = Vector3.new(4000, 4000, 4000)
+            bodyGyro.CFrame = Character.HumanoidRootPart.CFrame
+            
+            bodyVelocity.Parent = Character.HumanoidRootPart
+            bodyGyro.Parent = Character.HumanoidRootPart
+            
+            local flyConnection
+            flyConnection = RunService.RenderStepped:Connect(function()
+                if not Settings.Fly or not Character then
+                    bodyVelocity:Destroy()
+                    bodyGyro:Destroy()
+                    flyConnection:Disconnect()
+                    return
+                end
+                
+                local moveDirection = Vector3.new(0, 0, 0)
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                    moveDirection = moveDirection + Character.HumanoidRootPart.CFrame.LookVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                    moveDirection = moveDirection - Character.HumanoidRootPart.CFrame.LookVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                    moveDirection = moveDirection - Character.HumanoidRootPart.CFrame.RightVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                    moveDirection = moveDirection + Character.HumanoidRootPart.CFrame.RightVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                    moveDirection = moveDirection + Vector3.new(0, 1, 0)
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+                    moveDirection = moveDirection - Vector3.new(0, 1, 0)
+                end
+                
+                if moveDirection.Magnitude > 0 then
+                    moveDirection = moveDirection.Unit * flySpeed
+                end
+                
+                bodyVelocity.Velocity = moveDirection
+                bodyGyro.CFrame = Character.HumanoidRootPart.CFrame
+            end)
         end
     end
 })
 
-PlayerTab:CreateToggle({
+CreateToggle(playerContent, {
     Name = "God Mode",
     CurrentValue = false,
-    Flag = "GodMode",
-    Callback = function(Value)
-        Settings.GodMode = Value
-        Notify("God Mode", Value and "Ativado" or "Desativado", 2)
-        if Value then
+    Callback = function(value)
+        Settings.GodMode = value
+        Notify("God Mode", value and "Ativado" or "Desativado")
+        if value then
             spawn(function()
                 while Settings.GodMode do
                     if Humanoid then
@@ -410,227 +878,24 @@ PlayerTab:CreateToggle({
     end
 })
 
--- Botões de teleporte
-PlayerTab:CreateButton({
+CreateButton(playerContent, {
     Name = "Teleportar para Spawn",
     Callback = function()
         TeleportTo(Vector3.new(0, 10, 0))
-        Notify("Teleport", "Teleportado para Spawn", 2)
+        Notify("Teleport", "Teleportado para Spawn")
     end
 })
 
-PlayerTab:CreateButton({
+CreateButton(playerContent, {
     Name = "Teleportar para Boss",
     Callback = function()
         TeleportTo(Vector3.new(100, 10, 100))
-        Notify("Teleport", "Teleportado para Boss", 2)
+        Notify("Teleport", "Teleportado para Boss")
     end
 })
 
-PlayerTab:CreateButton({
+CreateButton(playerContent, {
     Name = "Teleportar para Dungeon",
     Callback = function()
         TeleportTo(Vector3.new(-100, 10, -100))
-        Notify("Teleport", "Teleportado para Dungeon", 2)
-    end
-})
-
--- ============= ABA MISC/EXTRA =============
-
-MiscTab:CreateToggle({
-    Name = "Auto Quest",
-    CurrentValue = false,
-    Flag = "AutoQuest",
-    Callback = function(Value)
-        Settings.AutoQuest = Value
-        Notify("Auto Quest", Value and "Ativado" or "Desativado", 2)
-    end
-})
-
-MiscTab:CreateToggle({
-    Name = "Auto Chest",
-    CurrentValue = false,
-    Flag = "AutoChest",
-    Callback = function(Value)
-        Settings.AutoChest = Value
-        Notify("Auto Chest", Value and "Ativado" or "Desativado", 2)
-    end
-})
-
-MiscTab:CreateToggle({
-    Name = "Anti AFK",
-    CurrentValue = false,
-    Flag = "AntiAFK",
-    Callback = function(Value)
-        Settings.AntiAFK = Value
-        Notify("Anti AFK", Value and "Ativado" or "Desativado", 2)
-        if Value then
-            spawn(function()
-                while Settings.AntiAFK do
-                    VirtualUser:CaptureController()
-                    VirtualUser:ClickButton2(Vector2.new())
-                    task.wait(60)
-                end
-            end)
-        end
-    end
-})
-
-MiscTab:CreateToggle({
-    Name = "FPS Booster",
-    CurrentValue = false,
-    Flag = "FPSBooster",
-    Callback = function(Value)
-        Settings.FPSBooster = Value
-        Notify("FPS Booster", Value and "Ativado" or "Desativado", 2)
-        if Value then
-            settings().Rendering.QualityLevel = 1
-        else
-            settings().Rendering.QualityLevel = 10
-        end
-    end
-})
-
-MiscTab:CreateToggle({
-    Name = "Auto Rejoin",
-    CurrentValue = false,
-    Flag = "AutoRejoin",
-    Callback = function(Value)
-        Settings.AutoRejoin = Value
-        Notify("Auto Rejoin", Value and "Ativado" or "Desativado", 2)
-    end
-})
-
-MiscTab:CreateToggle({
-    Name = "Server Hop",
-    CurrentValue = false,
-    Flag = "ServerHop",
-    Callback = function(Value)
-        Settings.ServerHop = Value
-        Notify("Server Hop", Value and "Ativado" or "Desativado", 2)
-    end
-})
-
--- Seção ESP
-local ESPSection = MiscTab:CreateSection("ESP")
-
-MiscTab:CreateToggle({
-    Name = "ESP Geral",
-    CurrentValue = false,
-    Flag = "ESP",
-    Callback = function(Value)
-        Settings.ESP = Value
-        Notify("ESP", Value and "Ativado" or "Desativado", 2)
-    end
-})
-
-MiscTab:CreateToggle({
-    Name = "ESP Players",
-    CurrentValue = false,
-    Flag = "ESPPlayers",
-    Callback = function(Value)
-        Settings.ESPPlayers = Value
-        Notify("ESP Players", Value and "Ativado" or "Desativado", 2)
-    end
-})
-
-MiscTab:CreateToggle({
-    Name = "ESP Evomons",
-    CurrentValue = false,
-    Flag = "ESPEvomons",
-    Callback = function(Value)
-        Settings.ESPEvomons = Value
-        Notify("ESP Evomons", Value and "Ativado" or "Desativado", 2)
-    end
-})
-
-MiscTab:CreateToggle({
-    Name = "ESP Chests",
-    CurrentValue = false,
-    Flag = "ESPChests",
-    Callback = function(Value)
-        Settings.ESPChests = Value
-        Notify("ESP Chests", Value and "Ativado" or "Desativado", 2)
-    end
-})
-
--- ============= ABA SETTINGS =============
-
-SettingsTab:CreateButton({
-    Name = "Salvar Configuração",
-    Callback = function()
-        Rayfield:SaveConfiguration()
-        Notify("Configuração", "Salva com sucesso!", 2)
-    end
-})
-
-SettingsTab:CreateButton({
-    Name = "Carregar Configuração",
-    Callback = function()
-        Rayfield:LoadConfiguration()
-        Notify("Configuração", "Carregada com sucesso!", 2)
-    end
-})
-
-SettingsTab:CreateButton({
-    Name = "Resetar Configuração",
-    Callback = function()
-        Rayfield:ResetConfiguration()
-        Notify("Configuração", "Resetada com sucesso!", 2)
-    end
-})
-
-SettingsTab:CreateButton({
-    Name = "Reiniciar Script",
-    Callback = function()
-        Rayfield:Destroy()
-        Notify("Reiniciando", "Script reiniciado!", 2)
-        task.wait(1)
-        loadstring(game:HttpGet('https://raw.githubusercontent.com/seu-repo/xeno-ultra/main/script.lua'))()
-    end
-})
-
--- ============= SISTEMA DE NOTIFICAÇÕES INICIAIS =============
-
-Notify("Xeno Ultra", "Script carregado com sucesso!", 3)
-Notify("Xeno Ultra", "Pressione RightControl para abrir/fechar", 3)
-
--- ============= LOOP PRINCIPAL =============
-
-spawn(function()
-    while task.wait(5) do
-        -- Verificar conexão
-        if not game:IsLoaded() then
-            game:Load()
-        end
-        
-        -- Auto Rejoin
-        if Settings.AutoRejoin and not game:IsLoaded() then
-            game:GetService("TeleportService"):Teleport(game.PlaceId)
-        end
-        
-        -- Server Hop
-        if Settings.ServerHop then
-            -- Lógica para trocar de servidor
-        end
-    end
-end)
-
--- ============= EVENTOS =============
-
--- Quando o personagem morrer
-LocalPlayer.CharacterAdded:Connect(function(newChar)
-    Character = newChar
-    Humanoid = newChar:WaitForChild("Humanoid")
-    
-    -- Reaplicar configurações
-    if Settings.WalkSpeed then
-        Humanoid.WalkSpeed = Settings.WalkSpeed
-    end
-    if Settings.JumpPower then
-        Humanoid.JumpPower = Settings.JumpPower
-    end
-end)
-
-print("Xeno Ultra - Carregado com sucesso!")
-print("Versão 1.0.0 - By Xeno Team")
+        Notify("Teleport
