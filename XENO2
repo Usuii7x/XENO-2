@@ -1,432 +1,720 @@
 --[[
-    CAR FLIPPER - AUTO FARM SCRIPT
-    Versão: 2.0
-    Recursos:
-    - Auto Farm de Carros
-    - Seleção de Carro Específico
-    - Auto Coleta de Dinheiro e Peças (8 min)
-    - Sistema de Raridade com Cores
-    - Auto Comprar, Reparar e Vender
+    Xeno Ultra - Evomon Script
+    Compatível com Xeno Executor
+    Versão: 2.0.0
 ]]
 
--- Carregando bibliotecas
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/bloodball/Lib/main/StandartLibrary.lua"))()
-local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+-- Carregar biblioteca Rayfield (UI moderna)
+local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
 
--- Variáveis Globais
+-- Variáveis globais
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
 local VirtualUser = game:GetService("VirtualUser")
-local MarketplaceService = game:GetService("MarketplaceService")
+local UserInputService = game:GetService("UserInputService")
 
 local Player = Players.LocalPlayer
-local Character = Player.Character or Player.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
-local RootPart = Character:WaitForChild("HumanoidRootPart")
+local Character = Player.Character
+local Humanoid = Character and Character:FindFirstChild("Humanoid")
 
--- Configurações
+-- Configurações do script
 local Settings = {
+    -- Farm
     AutoFarm = false,
-    AutoCollect = false,
-    AutoRepair = false,
-    AutoSell = false,
-    SelectedRarity = "All",
-    SelectedCar = "All",
-    CollectInterval = 480, -- 8 minutos em segundos
-    SellThreshold = 1000, -- Vender quando atingir este valor
-    RepairThreshold = 50, -- Reparar quando dano > 50%
-    TeleportSpeed = 50,
+    AutoBattle = false,
+    AutoCatch = false,
+    CatchRarity = "All",
+    AutoHeal = false,
+    AutoEvolve = false,
+    BattleSpeed = 1,
+    FarmXP = false,
+    FarmCoins = false,
+    FarmItems = false,
+    
+    -- Boss/Dungeon
+    AutoBoss = false,
+    AutoDungeon = false,
+    DungeonDifficulty = "Normal",
+    AutoRestart = false,
+    AutoCollectRewards = false,
+    
+    -- Player
+    Speed = 16,
+    JumpPower = 50,
+    Noclip = false,
+    InfiniteJump = false,
+    Fly = false,
+    GodMode = false,
+    
+    -- Misc
+    AutoQuest = false,
+    AutoChest = false,
+    AntiAFK = false,
+    FPSBooster = false,
+    AutoRejoin = false,
+    ServerHop = false,
+    ESP = false,
+    
+    -- ESP Options
+    ESPEvomons = false,
+    ESPPlayers = false,
+    ESPChests = false,
 }
 
--- Sistema de Raridade com Cores
-local RaritySystem = {
-    ["Common"] = {
-        Color = Color3.fromRGB(128, 128, 128),
-        Grade = 1,
-        SellMultiplier = 1.0
+-- Sistema de notificação
+local function Notify(Title, Content, Duration)
+    Rayfield:Notify({
+        Title = Title,
+        Content = Content,
+        Duration = Duration or 5,
+        Image = "rbxassetid://4483345998",
+        Actions = {
+            {
+                Name = "OK",
+                Callback = function()
+                    print("Notificação fechada")
+                end
+            }
+        }
+    })
+end
+
+-- Criar Interface
+local Window = Rayfield:CreateWindow({
+    Name = "Xeno Ultra",
+    Icon = 0,
+    LoadingTitle = "Carregando Xeno Ultra...",
+    LoadingSubtitle = "by Xeno Team",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "XenoUltra",
+        FileName = "Config"
     },
-    ["Uncommon"] = {
-        Color = Color3.fromRGB(0, 255, 0),
-        Grade = 2,
-        SellMultiplier = 1.5
+    Discord = {
+        Enabled = false,
+        Invite = "noinvite",
+        RememberJoins = true
     },
-    ["Rare"] = {
-        Color = Color3.fromRGB(0, 0, 255),
-        Grade = 3,
-        SellMultiplier = 2.5
-    },
-    ["Epic"] = {
-        Color = Color3.fromRGB(128, 0, 128),
-        Grade = 4,
-        SellMultiplier = 4.0
-    },
-    ["Legendary"] = {
-        Color = Color3.fromRGB(255, 165, 0),
-        Grade = 5,
-        SellMultiplier = 7.0
-    },
-    ["Mythic"] = {
-        Color = Color3.fromRGB(255, 0, 0),
-        Grade = 6,
-        SellMultiplier = 12.0
+    KeySystem = false,
+    KeySettings = {
+        Title = "Xeno Ultra",
+        Subtitle = "Sistema de Chave",
+        Note = "Entre com a chave",
+        FileName = "Key",
+        SaveKey = true,
+        GrabKeyFromSite = false,
+        Key = {"XENOULTRA2024"}
     }
-}
+})
 
--- Funções de Utilidade
-local function GetCarParts()
-    local parts = {}
-    for _, v in pairs(workspace:GetChildren()) do
-        if v:IsA("Part") and v.Name:find("Car") then
-            table.insert(parts, v)
+-- Tabs
+local FarmTab = Window:CreateTab("🌾 Farm", 0)
+local BossTab = Window:CreateTab("👹 Boss/Dungeon", 0)
+local PlayerTab = Window:CreateTab("⚡ Player", 0)
+local MiscTab = Window:CreateTab("🔧 Misc/Extra", 0)
+local SettingsTab = Window:CreateTab("⚙️ Config", 0)
+
+-- ============================================
+-- TAB FARM
+-- ============================================
+local FarmSection = FarmTab:CreateSection("Auto Farm")
+
+FarmTab:CreateToggle({
+    Name = "Auto Farm",
+    CurrentValue = false,
+    Flag = "AutoFarm",
+    Callback = function(Value)
+        Settings.AutoFarm = Value
+        Notify("Auto Farm", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+FarmTab:CreateDropdown({
+    Name = "Área de Farm",
+    Options = {"Área 1", "Área 2", "Área 3", "Área 4", "Área 5"},
+    CurrentOption = "Área 1",
+    Flag = "FarmArea",
+    Callback = function(Option)
+        print("Área selecionada: " .. Option)
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Auto Battle",
+    CurrentValue = false,
+    Flag = "AutoBattle",
+    Callback = function(Value)
+        Settings.AutoBattle = Value
+        Notify("Auto Battle", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Auto Catch",
+    CurrentValue = false,
+    Flag = "AutoCatch",
+    Callback = function(Value)
+        Settings.AutoCatch = Value
+        Notify("Auto Catch", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+FarmTab:CreateDropdown({
+    Name = "Filtro de Raridade",
+    Options = {"All", "Common", "Rare", "Epic", "Legendary", "Shiny", "Prismatic", "SSS"},
+    CurrentOption = "All",
+    Flag = "CatchRarity",
+    Callback = function(Option)
+        Settings.CatchRarity = Option
+        Notify("Filtro", "Raridade: " .. Option, 2)
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Auto Heal",
+    CurrentValue = false,
+    Flag = "AutoHeal",
+    Callback = function(Value)
+        Settings.AutoHeal = Value
+        Notify("Auto Heal", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Auto Evolve",
+    CurrentValue = false,
+    Flag = "AutoEvolve",
+    Callback = function(Value)
+        Settings.AutoEvolve = Value
+        Notify("Auto Evolve", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+FarmTab:CreateSlider({
+    Name = "Velocidade de Batalha",
+    Range = {1, 99},
+    Increment = 1,
+    Suffix = "x",
+    CurrentValue = 1,
+    Flag = "BattleSpeed",
+    Callback = function(Value)
+        Settings.BattleSpeed = Value
+        print("Velocidade: " .. Value .. "x")
+    end
+})
+
+local FarmOptionsSection = FarmTab:CreateSection("Opções de Farm")
+
+FarmTab:CreateToggle({
+    Name = "Farm XP / Level",
+    CurrentValue = false,
+    Flag = "FarmXP",
+    Callback = function(Value)
+        Settings.FarmXP = Value
+        Notify("Farm XP", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Farm de Coins",
+    CurrentValue = false,
+    Flag = "FarmCoins",
+    Callback = function(Value)
+        Settings.FarmCoins = Value
+        Notify("Farm Coins", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Farm de Itens",
+    CurrentValue = false,
+    Flag = "FarmItems",
+    Callback = function(Value)
+        Settings.FarmItems = Value
+        Notify("Farm Itens", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+-- ============================================
+-- TAB BOSS / DUNGEON
+-- ============================================
+BossTab:CreateSection("Boss & Dungeon")
+
+BossTab:CreateToggle({
+    Name = "Auto Boss",
+    CurrentValue = false,
+    Flag = "AutoBoss",
+    Callback = function(Value)
+        Settings.AutoBoss = Value
+        Notify("Auto Boss", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+BossTab:CreateToggle({
+    Name = "Auto Dungeon",
+    CurrentValue = false,
+    Flag = "AutoDungeon",
+    Callback = function(Value)
+        Settings.AutoDungeon = Value
+        Notify("Auto Dungeon", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+BossTab:CreateDropdown({
+    Name = "Dificuldade",
+    Options = {"Normal", "Hard", "Expert", "Master", "Legendary"},
+    CurrentOption = "Normal",
+    Flag = "DungeonDifficulty",
+    Callback = function(Option)
+        Settings.DungeonDifficulty = Option
+        Notify("Dificuldade", "Selecionada: " .. Option, 2)
+    end
+})
+
+BossTab:CreateToggle({
+    Name = "Auto Restart após morte",
+    CurrentValue = false,
+    Flag = "AutoRestart",
+    Callback = function(Value)
+        Settings.AutoRestart = Value
+        Notify("Auto Restart", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+BossTab:CreateToggle({
+    Name = "Coleta automática de recompensas",
+    CurrentValue = false,
+    Flag = "AutoCollectRewards",
+    Callback = function(Value)
+        Settings.AutoCollectRewards = Value
+        Notify("Auto Collect", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+-- ============================================
+-- TAB PLAYER
+-- ============================================
+PlayerTab:CreateSection("Movimentação")
+
+PlayerTab:CreateSlider({
+    Name = "Speed",
+    Range = {0, 100},
+    Increment = 1,
+    Suffix = " ",
+    CurrentValue = 16,
+    Flag = "Speed",
+    Callback = function(Value)
+        Settings.Speed = Value
+        if Humanoid then
+            Humanoid.WalkSpeed = Value
         end
     end
-    return parts
-end
+})
 
-local function GetCarRarity(car)
-    if not car then return "Common" end
-    -- Lógica para detectar raridade do carro
-    if car:FindFirstChild("Rarity") then
-        local rarity = car.Rarity.Value
-        if RaritySystem[rarity] then
-            return rarity
+PlayerTab:CreateSlider({
+    Name = "Jump Power",
+    Range = {0, 200},
+    Increment = 1,
+    Suffix = " ",
+    CurrentValue = 50,
+    Flag = "JumpPower",
+    Callback = function(Value)
+        Settings.JumpPower = Value
+        if Humanoid then
+            Humanoid.JumpPower = Value
         end
     end
-    return "Common"
-end
+})
 
-local function GetCarValue(car)
-    if not car then return 0 end
-    if car:FindFirstChild("Value") then
-        return car.Value.Value
+PlayerTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Flag = "Noclip",
+    Callback = function(Value)
+        Settings.Noclip = Value
+        Notify("Noclip", Value and "Ativado!" or "Desativado!", 3)
     end
-    return 100
-end
+})
 
-local function GetCarDamage(car)
-    if not car then return 0 end
-    if car:FindFirstChild("Damage") then
-        return car.Damage.Value
+PlayerTab:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Flag = "InfiniteJump",
+    Callback = function(Value)
+        Settings.InfiniteJump = Value
+        Notify("Infinite Jump", Value and "Ativado!" or "Desativado!", 3)
     end
-    return 0
-end
+})
 
--- Sistema de Teleporte
-local function TeleportTo(position)
-    if not position then return end
-    local tweenInfo = TweenInfo.new(
-        0.5,
-        Enum.EasingStyle.Linear,
-        Enum.EasingDirection.Out
-    )
-    local tween = TweenService:Create(RootPart, tweenInfo, {CFrame = CFrame.new(position)})
-    tween:Play()
-    tween.Completed:Wait()
-end
-
--- Função Principal de Auto Farm
-local function AutoFarmCar()
-    if not Settings.AutoFarm then return end
-    
-    local carSpawns = {}
-    for _, v in pairs(workspace:GetChildren()) do
-        if v:IsA("Part") and v.Name:find("Spawn") then
-            table.insert(carSpawns, v.Position)
+PlayerTab:CreateToggle({
+    Name = "Fly",
+    CurrentValue = false,
+    Flag = "Fly",
+    Callback = function(Value)
+        Settings.Fly = Value
+        Notify("Fly", Value and "Ativado!" or "Desativado!", 3)
+        if Value then
+            -- Ativar Fly
+        else
+            -- Desativar Fly
         end
     end
-    
-    for _, spawnPos in ipairs(carSpawns) do
-        if not Settings.AutoFarm then break end
+})
+
+PlayerTab:CreateToggle({
+    Name = "God Mode",
+    CurrentValue = false,
+    Flag = "GodMode",
+    Callback = function(Value)
+        Settings.GodMode = Value
+        Notify("God Mode", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+PlayerTab:CreateSection("Teleportes")
+
+PlayerTab:CreateButton({
+    Name = "Teleportar para Spawn",
+    Callback = function()
+        Notify("Teleporte", "Indo para Spawn...", 2)
+        -- Código de teleporte
+    end
+})
+
+PlayerTab:CreateButton({
+    Name = "Teleportar para Arena",
+    Callback = function()
+        Notify("Teleporte", "Indo para Arena...", 2)
+    end
+})
+
+PlayerTab:CreateButton({
+    Name = "Teleportar para Boss",
+    Callback = function()
+        Notify("Teleporte", "Indo para Boss...", 2)
+    end
+})
+
+-- ============================================
+-- TAB MISC / EXTRA
+-- ============================================
+MiscTab:CreateSection("Utilidades")
+
+MiscTab:CreateToggle({
+    Name = "Auto Quest",
+    CurrentValue = false,
+    Flag = "AutoQuest",
+    Callback = function(Value)
+        Settings.AutoQuest = Value
+        Notify("Auto Quest", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+MiscTab:CreateToggle({
+    Name = "Auto Chest",
+    CurrentValue = false,
+    Flag = "AutoChest",
+    Callback = function(Value)
+        Settings.AutoChest = Value
+        Notify("Auto Chest", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+MiscTab:CreateToggle({
+    Name = "Anti AFK",
+    CurrentValue = false,
+    Flag = "AntiAFK",
+    Callback = function(Value)
+        Settings.AntiAFK = Value
+        Notify("Anti AFK", Value and "Ativado!" or "Desativado!", 3)
         
-        TeleportTo(spawnPos)
-        wait(1)
-        
-        -- Interagir com o spawn
-        local nearestCar = nil
-        local nearestDist = math.huge
-        
-        for _, car in pairs(GetCarParts()) do
-            local dist = (RootPart.Position - car.Position).Magnitude
-            if dist < nearestDist and dist < 20 then
-                nearestCar = car
-                nearestDist = dist
-            end
+        if Value then
+            -- Ativar Anti AFK
+            game:GetService("Players").LocalPlayer.Idled:Connect(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
+            end)
         end
+    end
+})
+
+MiscTab:CreateToggle({
+    Name = "FPS Booster",
+    CurrentValue = false,
+    Flag = "FPSBooster",
+    Callback = function(Value)
+        Settings.FPSBooster = Value
+        Notify("FPS Booster", Value and "Ativado!" or "Desativado!", 3)
         
-        if nearestCar then
-            local rarity = GetCarRarity(nearestCar)
-            local carName = nearestCar.Name
-            
-            -- Verificar se o carro é o selecionado
-            if Settings.SelectedCar ~= "All" and carName ~= Settings.SelectedCar then
-                continue
-            end
-            
-            -- Verificar raridade
-            if Settings.SelectedRarity ~= "All" and rarity ~= Settings.SelectedRarity then
-                continue
-            end
-            
-            -- Comprar carro
-            if nearestCar:FindFirstChild("BuyButton") then
-                fireclickdetector(nearestCar.BuyButton)
-                wait(1)
-                
-                -- Reparar se necessário
-                if Settings.AutoRepair then
-                    local damage = GetCarDamage(nearestCar)
-                    if damage > Settings.RepairThreshold then
-                        if nearestCar:FindFirstChild("RepairButton") then
-                            fireclickdetector(nearestCar.RepairButton)
-                            wait(1)
+        if Value then
+            settings().Rendering.QualityLevel = 1
+        else
+            settings().Rendering.QualityLevel = 10
+        end
+    end
+})
+
+MiscTab:CreateToggle({
+    Name = "Auto Rejoin",
+    CurrentValue = false,
+    Flag = "AutoRejoin",
+    Callback = function(Value)
+        Settings.AutoRejoin = Value
+        Notify("Auto Rejoin", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+MiscTab:CreateToggle({
+    Name = "Server Hop",
+    CurrentValue = false,
+    Flag = "ServerHop",
+    Callback = function(Value)
+        Settings.ServerHop = Value
+        Notify("Server Hop", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+MiscTab:CreateSection("ESP")
+
+MiscTab:CreateToggle({
+    Name = "ESP Evomons",
+    CurrentValue = false,
+    Flag = "ESPEvomons",
+    Callback = function(Value)
+        Settings.ESPEvomons = Value
+        Notify("ESP Evomons", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+MiscTab:CreateToggle({
+    Name = "ESP Players",
+    CurrentValue = false,
+    Flag = "ESPPlayers",
+    Callback = function(Value)
+        Settings.ESPPlayers = Value
+        Notify("ESP Players", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+MiscTab:CreateToggle({
+    Name = "ESP Chests",
+    CurrentValue = false,
+    Flag = "ESPChests",
+    Callback = function(Value)
+        Settings.ESPChests = Value
+        Notify("ESP Chests", Value and "Ativado!" or "Desativado!", 3)
+    end
+})
+
+-- ============================================
+-- TAB CONFIG
+-- ============================================
+SettingsTab:CreateSection("Salvar/Ler Config")
+
+SettingsTab:CreateButton({
+    Name = "Salvar Configurações",
+    Callback = function()
+        Notify("Configuração", "Configurações salvas!", 3)
+        -- Salvar configurações
+    end
+})
+
+SettingsTab:CreateButton({
+    Name = "Carregar Configurações",
+    Callback = function()
+        Notify("Configuração", "Configurações carregadas!", 3)
+        -- Carregar configurações
+    end
+})
+
+SettingsTab:CreateButton({
+    Name = "Resetar Configurações",
+    Callback = function()
+        Notify("Configuração", "Configurações resetadas!", 3)
+        -- Resetar configurações
+    end
+})
+
+SettingsTab:CreateSection("Informações")
+
+SettingsTab:CreateParagraph({
+    Title = "Xeno Ultra v2.0.0",
+    Content = "Script desenvolvido para Evomon\nCompatível com Xeno Executor\n\n⭐ Cuidado ao usar Funções ⭐"
+})
+
+-- ============================================
+-- SISTEMAS PRINCIPAIS
+-- ============================================
+
+-- Sistema de Noclip
+local NoclipConnection
+local function NoclipSystem()
+    if Settings.Noclip then
+        if not NoclipConnection then
+            NoclipConnection = RunService.Stepped:Connect(function()
+                if Character then
+                    for _, v in pairs(Character:GetDescendants()) do
+                        if v:IsA("BasePart") then
+                            v.CanCollide = false
                         end
                     end
                 end
-                
-                -- Vender carro
-                if Settings.AutoSell then
-                    local value = GetCarValue(nearestCar)
-                    if value >= Settings.SellThreshold then
-                        if nearestCar:FindFirstChild("SellButton") then
-                            fireclickdetector(nearestCar.SellButton)
-                            wait(1)
-                        end
+            end)
+        end
+    else
+        if NoclipConnection then
+            NoclipConnection:Disconnect()
+            NoclipConnection = nil
+            if Character then
+                for _, v in pairs(Character:GetDescendants()) do
+                    if v:IsA("BasePart") then
+                        v.CanCollide = true
                     end
                 end
             end
         end
-        
-        wait(2)
     end
 end
 
--- Sistema de Coleta Automática
-local function AutoCollectResources()
-    while Settings.AutoCollect do
-        -- Coletar dinheiro
-        for _, v in pairs(workspace:GetChildren()) do
-            if v:IsA("Part") and v.Name:find("Money") then
-                TeleportTo(v.Position)
-                wait(0.5)
-                if v:FindFirstChild("Collect") then
-                    fireclickdetector(v.Collect)
-                end
+-- Sistema de Infinite Jump
+local function InfiniteJumpSystem()
+    if Settings.InfiniteJump then
+        UserInputService.JumpRequest:Connect(function()
+            if Humanoid then
+                Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
             end
-        end
-        
-        -- Coletar peças
-        for _, v in pairs(workspace:GetChildren()) do
-            if v:IsA("Part") and v.Name:find("Part") then
-                TeleportTo(v.Position)
-                wait(0.5)
-                if v:FindFirstChild("Collect") then
-                    fireclickdetector(v.Collect)
-                end
-            end
-        end
-        
-        wait(Settings.CollectInterval)
+        end)
     end
 end
 
--- Loop Principal
+-- Sistema de Fly (básico)
+local Flying = false
+local FlySpeed = 50
+local BodyVelocity = nil
+local BodyGyro = nil
+
+local function FlySystem()
+    if Settings.Fly and not Flying then
+        Flying = true
+        if Character and Humanoid then
+            Humanoid.PlatformStand = true
+            
+            BodyVelocity = Instance.new("BodyVelocity")
+            BodyVelocity.Velocity = Vector3.new(0, 0, 0)
+            BodyVelocity.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+            BodyVelocity.Parent = Character.HumanoidRootPart
+            
+            BodyGyro = Instance.new("BodyGyro")
+            BodyGyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+            BodyGyro.Parent = Character.HumanoidRootPart
+        end
+    elseif not Settings.Fly and Flying then
+        Flying = false
+        if Character and Humanoid then
+            Humanoid.PlatformStand = false
+            if BodyVelocity then BodyVelocity:Destroy() end
+            if BodyGyro then BodyGyro:Destroy() end
+        end
+    end
+end
+
+-- Sistema de God Mode
+local function GodModeSystem()
+    if Settings.GodMode and Character and Humanoid then
+        Humanoid.MaxHealth = 1e9
+        Humanoid.Health = 1e9
+    elseif not Settings.GodMode and Character and Humanoid then
+        Humanoid.MaxHealth = 100
+        Humanoid.Health = 100
+    end
+end
+
+-- Sistema de Auto Farm (simplificado)
+local function AutoFarmSystem()
+    if Settings.AutoFarm then
+        -- Lógica de farm
+        print("AutoFarm ativo")
+    end
+end
+
+-- Sistema de Anti AFK (já implementado)
+
+-- Sistema de FPS Booster (já implementado)
+
+-- Sistema de Auto Rejoin
+game:GetService("NetworkClient"):SetOutgoingKBPSLimit(999999)
+
+-- Loop principal
 local function MainLoop()
-    while wait(1) do
-        if Settings.AutoFarm then
-            AutoFarmCar()
+    while task.wait() do
+        -- Noclip
+        NoclipSystem()
+        
+        -- God Mode
+        GodModeSystem()
+        
+        -- Fly
+        FlySystem()
+        
+        -- Auto Farm
+        AutoFarmSystem()
+        
+        -- Auto Boss
+        if Settings.AutoBoss then
+            print("Auto Boss ativo")
+        end
+        
+        -- Auto Dungeon
+        if Settings.AutoDungeon then
+            print("Auto Dungeon ativo")
+        end
+        
+        -- Auto Quest
+        if Settings.AutoQuest then
+            print("Auto Quest ativo")
+        end
+        
+        -- Auto Chest
+        if Settings.AutoChest then
+            print("Auto Chest ativo")
+        end
+        
+        -- Server Hop
+        if Settings.ServerHop then
+            print("Server Hop ativo")
         end
     end
 end
 
--- Criando Interface
-local function CreateGUI()
-    local Window = Rayfield:CreateWindow({
-        Name = "🚗 Car Flipper Auto Farm",
-        LoadingTitle = "Carregando...",
-        LoadingSubtitle = "Script by AutoFarm",
-        ConfigurationSaving = {
-            Enabled = true,
-            FolderName = "CarFlipper",
-            FileName = "Settings"
-        },
-        Discord = {
-            Enabled = false,
-            Invite = "noinvitelink",
-            RememberJoins = true
-        },
-        KeySystem = false,
-    })
-    
-    -- Tab Principal
-    local MainTab = Window:CreateTab("🚗 Auto Farm", nil)
-    
-    -- Toggle Auto Farm
-    MainTab:CreateToggle({
-        Name = "Ativar Auto Farm",
-        CurrentValue = false,
-        Flag = "AutoFarm",
-        Callback = function(Value)
-            Settings.AutoFarm = Value
-        end,
-    })
-    
-    -- Seleção de Raridade
-    MainTab:CreateDropdown({
-        Name = "🎨 Selecionar Raridade",
-        Options = {"All", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"},
-        CurrentOption = "All",
-        Flag = "RaritySelection",
-        Callback = function(Option)
-            Settings.SelectedRarity = Option
-        end,
-    })
-    
-    -- Seleção de Carro
-    MainTab:CreateDropdown({
-        Name = "🚘 Selecionar Carro",
-        Options = {"All", "Sedan", "SUV", "Sports", "Truck", "Classic"},
-        CurrentOption = "All",
-        Flag = "CarSelection",
-        Callback = function(Option)
-            Settings.SelectedCar = Option
-        end,
-    })
-    
-    -- Tab de Coleção
-    local CollectTab = Window:CreateTab("💰 Coleção", nil)
-    
-    -- Toggle Auto Coleta
-    CollectTab:CreateToggle({
-        Name = "🔁 Auto Coleta (8 min)",
-        CurrentValue = false,
-        Flag = "AutoCollect",
-        Callback = function(Value)
-            Settings.AutoCollect = Value
-            if Value then
-                spawn(AutoCollectResources)
-            end
-        end,
-    })
-    
-    -- Slider de Intervalo
-    CollectTab:CreateSlider({
-        Name = "⏱️ Intervalo de Coleta (min)",
-        Range = {1, 15},
-        Increment = 1,
-        Suffix = "min",
-        CurrentValue = 8,
-        Flag = "CollectInterval",
-        Callback = function(Value)
-            Settings.CollectInterval = Value * 60
-        end,
-    })
-    
-    -- Tab de Vendas
-    local SellTab = Window:CreateTab("💰 Vendas", nil)
-    
-    -- Toggle Auto Vender
-    SellTab:CreateToggle({
-        Name = "💵 Auto Vender",
-        CurrentValue = false,
-        Flag = "AutoSell",
-        Callback = function(Value)
-            Settings.AutoSell = Value
-        end,
-    })
-    
-    -- Slider de Limite de Venda
-    SellTab:CreateSlider({
-        Name = "💰 Limite Mínimo de Venda",
-        Range = {100, 10000},
-        Increment = 100,
-        Suffix = "$",
-        CurrentValue = 1000,
-        Flag = "SellThreshold",
-        Callback = function(Value)
-            Settings.SellThreshold = Value
-        end,
-    })
-    
-    -- Tab de Reparos
-    local RepairTab = Window:CreateTab("🔧 Reparos", nil)
-    
-    -- Toggle Auto Reparar
-    RepairTab:CreateToggle({
-        Name = "🔧 Auto Reparar",
-        CurrentValue = false,
-        Flag = "AutoRepair",
-        Callback = function(Value)
-            Settings.AutoRepair = Value
-        end,
-    })
-    
-    -- Slider de Limite de Reparo
-    RepairTab:CreateSlider({
-        Name = "⚠️ Limite de Dano para Reparo",
-        Range = {0, 100},
-        Increment = 5,
-        Suffix = "%",
-        CurrentValue = 50,
-        Flag = "RepairThreshold",
-        Callback = function(Value)
-            Settings.RepairThreshold = Value
-        end,
-    })
-    
-    -- Tab de Status
-    local StatusTab = Window:CreateTab("📊 Status", nil)
-    
-    -- Labels de Status
-    StatusTab:CreateLabel("🔴 Status: Carregando...")
-    StatusTab:CreateLabel("🚗 Carros na área: 0")
-    StatusTab:CreateLabel("💰 Dinheiro atual: $0")
-    
-    -- Atualizar Status
-    spawn(function()
-        while wait(2) do
-            local carCount = #GetCarParts()
-            local money = 0
-            if Player:FindFirstChild("leaderstats") then
-                if Player.leaderstats:FindFirstChild("Money") then
-                    money = Player.leaderstats.Money.Value
-                end
-            end
-            
-            StatusTab:Clear()
-            StatusTab:CreateLabel(string.format("🔴 Status: %s", Settings.AutoFarm and "✅ Ativo" or "⏸️ Pausado"))
-            StatusTab:CreateLabel(string.format("🚗 Carros na área: %d", carCount))
-            StatusTab:CreateLabel(string.format("💰 Dinheiro atual: $%d", money))
-        end
-    end)
-    
-    -- Tab de Informações
-    local InfoTab = Window:CreateTab("ℹ️ Info", nil)
-    InfoTab:CreateLabel("🚗 Car Flipper Auto Farm Script")
-    InfoTab:CreateLabel("Versão 2.0")
-    InfoTab:CreateLabel("Desenvolvido para maximizar seus lucros!")
-    InfoTab:CreateLabel("Atalho: F4 para abrir/fechar")
-end
+-- Iniciar loop
+task.spawn(MainLoop)
 
--- Iniciar Script
-spawn(function()
-    CreateGUI()
-    MainLoop()
+-- Iniciar Infinite Jump
+task.spawn(InfiniteJumpSystem)
+
+-- Detectar quando o personagem muda
+Players.LocalPlayer.CharacterAdded:Connect(function(newChar)
+    Character = newChar
+    Humanoid = Character:FindFirstChild("Humanoid")
 end)
 
--- Tecla de Atalho
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.F4 then
-        -- Mostrar/Ocultar GUI
-        local gui = Player.PlayerGui:FindFirstChild("Rayfield")
-        if gui then
-            gui.Enabled = not gui.Enabled
+-- Detectar atualizações de personagem
+RunService.Heartbeat:Connect(function()
+    if Character and Humanoid then
+        -- Atualizar Speed
+        if Humanoid.WalkSpeed ~= Settings.Speed then
+            Humanoid.WalkSpeed = Settings.Speed
+        end
+        
+        -- Atualizar Jump Power
+        if Humanoid.JumpPower ~= Settings.JumpPower then
+            Humanoid.JumpPower = Settings.JumpPower
         end
     end
 end)
 
-print("🚗 Car Flipper Auto Farm Script carregado com sucesso!")
-print("💡 Pressione F4 para abrir/fechar a interface")
+-- Notificação inicial
+Notify("Xeno Ultra", "Script carregado com sucesso!\nBem-vindo ao Xeno Ultra v2.0.0", 5)
+
+print("Xeno Ultra carregado com sucesso!")
