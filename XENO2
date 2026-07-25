@@ -1,123 +1,114 @@
 --[[
     Xeno Ultra - Evomon Script
     Compatível com Xeno Executor
-    Versão: 2.0.0
+    Versão: 1.0.0
 ]]
 
--- Carregar biblioteca Rayfield (UI moderna)
+-- Carregar biblioteca Rayfield
 local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
 
 -- Variáveis globais
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local TeleportService = game:GetService("TeleportService")
-local VirtualUser = game:GetService("VirtualUser")
 local UserInputService = game:GetService("UserInputService")
-
-local Player = Players.LocalPlayer
-local Character = Player.Character
-local Humanoid = Character and Character:FindFirstChild("Humanoid")
+local TweenService = game:GetService("TweenService")
+local VirtualUser = game:GetService("VirtualUser")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
 
 -- Configurações do script
 local Settings = {
-    -- Farm
     AutoFarm = false,
     AutoBattle = false,
     AutoCatch = false,
-    CatchRarity = "All",
     AutoHeal = false,
     AutoEvolve = false,
-    BattleSpeed = 1,
-    FarmXP = false,
-    FarmCoins = false,
-    FarmItems = false,
-    
-    -- Boss/Dungeon
     AutoBoss = false,
     AutoDungeon = false,
-    DungeonDifficulty = "Normal",
-    AutoRestart = false,
-    AutoCollectRewards = false,
-    
-    -- Player
-    Speed = 16,
-    JumpPower = 50,
-    Noclip = false,
-    InfiniteJump = false,
-    Fly = false,
-    GodMode = false,
-    
-    -- Misc
     AutoQuest = false,
     AutoChest = false,
     AntiAFK = false,
     FPSBooster = false,
     AutoRejoin = false,
     ServerHop = false,
+    Noclip = false,
+    InfiniteJump = false,
+    Fly = false,
+    GodMode = false,
     ESP = false,
-    
-    -- ESP Options
-    ESPEvomons = false,
     ESPPlayers = false,
+    ESPEvomons = false,
     ESPChests = false,
+    BattleSpeed = 1,
+    FarmArea = "Area1",
+    CatchRarity = "All",
+    Difficulty = "Normal",
+    WalkSpeed = 16,
+    JumpPower = 50,
 }
 
--- Sistema de notificação
-local function Notify(Title, Content, Duration)
-    Rayfield:Notify({
-        Title = Title,
-        Content = Content,
-        Duration = Duration or 5,
-        Image = "rbxassetid://4483345998",
-        Actions = {
-            {
-                Name = "OK",
-                Callback = function()
-                    print("Notificação fechada")
-                end
-            }
-        }
-    })
-end
-
--- Criar Interface
+-- Criar janela principal
 local Window = Rayfield:CreateWindow({
     Name = "Xeno Ultra",
     Icon = 0,
     LoadingTitle = "Carregando Xeno Ultra...",
-    LoadingSubtitle = "by Xeno Team",
+    LoadingSubtitle = "By Xeno Team",
     ConfigurationSaving = {
         Enabled = true,
         FolderName = "XenoUltra",
         FileName = "Config"
     },
-    Discord = {
-        Enabled = false,
-        Invite = "noinvite",
-        RememberJoins = true
-    },
-    KeySystem = false,
-    KeySettings = {
-        Title = "Xeno Ultra",
-        Subtitle = "Sistema de Chave",
-        Note = "Entre com a chave",
-        FileName = "Key",
-        SaveKey = true,
-        GrabKeyFromSite = false,
-        Key = {"XENOULTRA2024"}
-    }
+    Keybind = Enum.KeyCode.RightControl,
+    KeybindMode = "Toggle"
 })
 
--- Tabs
-local FarmTab = Window:CreateTab("🌾 Farm", 0)
-local BossTab = Window:CreateTab("👹 Boss/Dungeon", 0)
-local PlayerTab = Window:CreateTab("⚡ Player", 0)
-local MiscTab = Window:CreateTab("🔧 Misc/Extra", 0)
-local SettingsTab = Window:CreateTab("⚙️ Config", 0)
+-- Criar abas
+local FarmTab = Window:CreateTab("Farm")
+local BossTab = Window:CreateTab("Boss/Dungeon")
+local PlayerTab = Window:CreateTab("Player")
+local MiscTab = Window:CreateTab("Misc/Extra")
+local SettingsTab = Window:CreateTab("Settings")
 
--- ============================================
--- TAB FARM
--- ============================================
+-- ============= FUNÇÕES AUXILIARES =============
+
+-- Função para notificações
+local function Notify(title, message, duration)
+    Rayfield:Notify({
+        Title = title,
+        Content = message,
+        Duration = duration or 3,
+        Image = 0,
+        Actions = {}
+    })
+end
+
+-- Função para encontrar evomons próximos
+local function FindNearestEvomon()
+    local nearest = nil
+    local minDist = math.huge
+    for _, v in pairs(workspace:GetChildren()) do
+        if v:IsA("Model") and v:FindFirstChild("Humanoid") and v.Name:find("Evomon") then
+            local dist = (v.HumanoidRootPart.Position - Character.HumanoidRootPart.Position).Magnitude
+            if dist < minDist then
+                minDist = dist
+                nearest = v
+            end
+        end
+    end
+    return nearest
+end
+
+-- Função para teleportar
+local function TeleportTo(position)
+    if Character and Character:FindFirstChild("HumanoidRootPart") then
+        Character.HumanoidRootPart.CFrame = CFrame.new(position)
+    end
+end
+
+-- ============= ABA FARM =============
+
+-- Seção Auto Farm
 local FarmSection = FarmTab:CreateSection("Auto Farm")
 
 FarmTab:CreateToggle({
@@ -126,17 +117,32 @@ FarmTab:CreateToggle({
     Flag = "AutoFarm",
     Callback = function(Value)
         Settings.AutoFarm = Value
-        Notify("Auto Farm", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Auto Farm", Value and "Ativado" or "Desativado", 2)
+        if Value then
+            -- Iniciar farm loop
+            spawn(function()
+                while Settings.AutoFarm do
+                    local target = FindNearestEvomon()
+                    if target then
+                        -- Lógica de farm
+                        Character.HumanoidRootPart.CFrame = target.HumanoidRootPart.CFrame
+                    end
+                    task.wait(0.1)
+                end
+            end)
+        end
     end
 })
 
+-- Dropdown para seleção de área
 FarmTab:CreateDropdown({
     Name = "Área de Farm",
-    Options = {"Área 1", "Área 2", "Área 3", "Área 4", "Área 5"},
-    CurrentOption = "Área 1",
+    Options = {"Area1", "Area2", "Area3", "Area4", "Area5"},
+    CurrentOption = "Area1",
     Flag = "FarmArea",
     Callback = function(Option)
-        print("Área selecionada: " .. Option)
+        Settings.FarmArea = Option
+        Notify("Área", "Selecionado: " .. Option, 2)
     end
 })
 
@@ -146,7 +152,7 @@ FarmTab:CreateToggle({
     Flag = "AutoBattle",
     Callback = function(Value)
         Settings.AutoBattle = Value
-        Notify("Auto Battle", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Auto Battle", Value and "Ativado" or "Desativado", 2)
     end
 })
 
@@ -156,10 +162,11 @@ FarmTab:CreateToggle({
     Flag = "AutoCatch",
     Callback = function(Value)
         Settings.AutoCatch = Value
-        Notify("Auto Catch", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Auto Catch", Value and "Ativado" or "Desativado", 2)
     end
 })
 
+-- Dropdown para raridade
 FarmTab:CreateDropdown({
     Name = "Filtro de Raridade",
     Options = {"All", "Common", "Rare", "Epic", "Legendary", "Shiny", "Prismatic", "SSS"},
@@ -167,7 +174,7 @@ FarmTab:CreateDropdown({
     Flag = "CatchRarity",
     Callback = function(Option)
         Settings.CatchRarity = Option
-        Notify("Filtro", "Raridade: " .. Option, 2)
+        Notify("Raridade", "Filtro: " .. Option, 2)
     end
 })
 
@@ -177,7 +184,7 @@ FarmTab:CreateToggle({
     Flag = "AutoHeal",
     Callback = function(Value)
         Settings.AutoHeal = Value
-        Notify("Auto Heal", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Auto Heal", Value and "Ativado" or "Desativado", 2)
     end
 })
 
@@ -187,10 +194,11 @@ FarmTab:CreateToggle({
     Flag = "AutoEvolve",
     Callback = function(Value)
         Settings.AutoEvolve = Value
-        Notify("Auto Evolve", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Auto Evolve", Value and "Ativado" or "Desativado", 2)
     end
 })
 
+-- Slider para velocidade de batalha
 FarmTab:CreateSlider({
     Name = "Velocidade de Batalha",
     Range = {1, 99},
@@ -200,19 +208,16 @@ FarmTab:CreateSlider({
     Flag = "BattleSpeed",
     Callback = function(Value)
         Settings.BattleSpeed = Value
-        print("Velocidade: " .. Value .. "x")
+        Notify("Velocidade", "Batalha x" .. Value, 2)
     end
 })
 
-local FarmOptionsSection = FarmTab:CreateSection("Opções de Farm")
-
 FarmTab:CreateToggle({
-    Name = "Farm XP / Level",
+    Name = "Farm de XP",
     CurrentValue = false,
     Flag = "FarmXP",
     Callback = function(Value)
-        Settings.FarmXP = Value
-        Notify("Farm XP", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Farm XP", Value and "Ativado" or "Desativado", 2)
     end
 })
 
@@ -221,8 +226,7 @@ FarmTab:CreateToggle({
     CurrentValue = false,
     Flag = "FarmCoins",
     Callback = function(Value)
-        Settings.FarmCoins = Value
-        Notify("Farm Coins", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Farm Coins", Value and "Ativado" or "Desativado", 2)
     end
 })
 
@@ -231,15 +235,11 @@ FarmTab:CreateToggle({
     CurrentValue = false,
     Flag = "FarmItems",
     Callback = function(Value)
-        Settings.FarmItems = Value
-        Notify("Farm Itens", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Farm Itens", Value and "Ativado" or "Desativado", 2)
     end
 })
 
--- ============================================
--- TAB BOSS / DUNGEON
--- ============================================
-BossTab:CreateSection("Boss & Dungeon")
+-- ============= ABA BOSS/DUNGEON =============
 
 BossTab:CreateToggle({
     Name = "Auto Boss",
@@ -247,7 +247,15 @@ BossTab:CreateToggle({
     Flag = "AutoBoss",
     Callback = function(Value)
         Settings.AutoBoss = Value
-        Notify("Auto Boss", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Auto Boss", Value and "Ativado" or "Desativado", 2)
+        if Value then
+            spawn(function()
+                while Settings.AutoBoss do
+                    -- Lógica de boss
+                    task.wait(5)
+                end
+            end)
+        end
     end
 })
 
@@ -257,7 +265,7 @@ BossTab:CreateToggle({
     Flag = "AutoDungeon",
     Callback = function(Value)
         Settings.AutoDungeon = Value
-        Notify("Auto Dungeon", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Auto Dungeon", Value and "Ativado" or "Desativado", 2)
     end
 })
 
@@ -265,58 +273,54 @@ BossTab:CreateDropdown({
     Name = "Dificuldade",
     Options = {"Normal", "Hard", "Expert", "Master", "Legendary"},
     CurrentOption = "Normal",
-    Flag = "DungeonDifficulty",
+    Flag = "Difficulty",
     Callback = function(Option)
-        Settings.DungeonDifficulty = Option
-        Notify("Dificuldade", "Selecionada: " .. Option, 2)
+        Settings.Difficulty = Option
+        Notify("Dificuldade", "Selecionado: " .. Option, 2)
     end
 })
 
 BossTab:CreateToggle({
-    Name = "Auto Restart após morte",
+    Name = "Auto Restart",
     CurrentValue = false,
     Flag = "AutoRestart",
     Callback = function(Value)
-        Settings.AutoRestart = Value
-        Notify("Auto Restart", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Auto Restart", Value and "Ativado" or "Desativado", 2)
     end
 })
 
 BossTab:CreateToggle({
-    Name = "Coleta automática de recompensas",
+    Name = "Auto Coletar Recompensas",
     CurrentValue = false,
     Flag = "AutoCollectRewards",
     Callback = function(Value)
-        Settings.AutoCollectRewards = Value
-        Notify("Auto Collect", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Auto Coletar", Value and "Ativado" or "Desativado", 2)
     end
 })
 
--- ============================================
--- TAB PLAYER
--- ============================================
-PlayerTab:CreateSection("Movimentação")
+-- ============= ABA PLAYER =============
 
 PlayerTab:CreateSlider({
-    Name = "Speed",
-    Range = {0, 100},
+    Name = "Velocidade",
+    Range = {16, 250},
     Increment = 1,
-    Suffix = " ",
+    Suffix = "Speed",
     CurrentValue = 16,
-    Flag = "Speed",
+    Flag = "WalkSpeed",
     Callback = function(Value)
-        Settings.Speed = Value
+        Settings.WalkSpeed = Value
         if Humanoid then
             Humanoid.WalkSpeed = Value
         end
+        Notify("Velocidade", "Definida para " .. Value, 2)
     end
 })
 
 PlayerTab:CreateSlider({
-    Name = "Jump Power",
-    Range = {0, 200},
+    Name = "Pulo",
+    Range = {50, 250},
     Increment = 1,
-    Suffix = " ",
+    Suffix = "Jump",
     CurrentValue = 50,
     Flag = "JumpPower",
     Callback = function(Value)
@@ -324,6 +328,7 @@ PlayerTab:CreateSlider({
         if Humanoid then
             Humanoid.JumpPower = Value
         end
+        Notify("Pulo", "Definido para " .. Value, 2)
     end
 })
 
@@ -333,7 +338,25 @@ PlayerTab:CreateToggle({
     Flag = "Noclip",
     Callback = function(Value)
         Settings.Noclip = Value
-        Notify("Noclip", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Noclip", Value and "Ativado" or "Desativado", 2)
+        if Value then
+            spawn(function()
+                while Settings.Noclip do
+                    for _, v in pairs(Character:GetChildren()) do
+                        if v:IsA("BasePart") then
+                            v.CanCollide = false
+                        end
+                    end
+                    task.wait(0.1)
+                end
+            end)
+        else
+            for _, v in pairs(Character:GetChildren()) do
+                if v:IsA("BasePart") then
+                    v.CanCollide = true
+                end
+            end
+        end
     end
 })
 
@@ -343,7 +366,14 @@ PlayerTab:CreateToggle({
     Flag = "InfiniteJump",
     Callback = function(Value)
         Settings.InfiniteJump = Value
-        Notify("Infinite Jump", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Infinite Jump", Value and "Ativado" or "Desativado", 2)
+        if Value then
+            UserInputService.JumpRequest:Connect(function()
+                if Settings.InfiniteJump and Humanoid then
+                    Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                end
+            end)
+        end
     end
 })
 
@@ -353,11 +383,9 @@ PlayerTab:CreateToggle({
     Flag = "Fly",
     Callback = function(Value)
         Settings.Fly = Value
-        Notify("Fly", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Fly", Value and "Ativado" or "Desativado", 2)
         if Value then
-            -- Ativar Fly
-        else
-            -- Desativar Fly
+            -- Implementar fly
         end
     end
 })
@@ -368,38 +396,46 @@ PlayerTab:CreateToggle({
     Flag = "GodMode",
     Callback = function(Value)
         Settings.GodMode = Value
-        Notify("God Mode", Value and "Ativado!" or "Desativado!", 3)
+        Notify("God Mode", Value and "Ativado" or "Desativado", 2)
+        if Value then
+            spawn(function()
+                while Settings.GodMode do
+                    if Humanoid then
+                        Humanoid.Health = Humanoid.MaxHealth
+                    end
+                    task.wait(0.1)
+                end
+            end)
+        end
     end
 })
 
-PlayerTab:CreateSection("Teleportes")
-
+-- Botões de teleporte
 PlayerTab:CreateButton({
     Name = "Teleportar para Spawn",
     Callback = function()
-        Notify("Teleporte", "Indo para Spawn...", 2)
-        -- Código de teleporte
-    end
-})
-
-PlayerTab:CreateButton({
-    Name = "Teleportar para Arena",
-    Callback = function()
-        Notify("Teleporte", "Indo para Arena...", 2)
+        TeleportTo(Vector3.new(0, 10, 0))
+        Notify("Teleport", "Teleportado para Spawn", 2)
     end
 })
 
 PlayerTab:CreateButton({
     Name = "Teleportar para Boss",
     Callback = function()
-        Notify("Teleporte", "Indo para Boss...", 2)
+        TeleportTo(Vector3.new(100, 10, 100))
+        Notify("Teleport", "Teleportado para Boss", 2)
     end
 })
 
--- ============================================
--- TAB MISC / EXTRA
--- ============================================
-MiscTab:CreateSection("Utilidades")
+PlayerTab:CreateButton({
+    Name = "Teleportar para Dungeon",
+    Callback = function()
+        TeleportTo(Vector3.new(-100, 10, -100))
+        Notify("Teleport", "Teleportado para Dungeon", 2)
+    end
+})
+
+-- ============= ABA MISC/EXTRA =============
 
 MiscTab:CreateToggle({
     Name = "Auto Quest",
@@ -407,7 +443,7 @@ MiscTab:CreateToggle({
     Flag = "AutoQuest",
     Callback = function(Value)
         Settings.AutoQuest = Value
-        Notify("Auto Quest", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Auto Quest", Value and "Ativado" or "Desativado", 2)
     end
 })
 
@@ -417,7 +453,7 @@ MiscTab:CreateToggle({
     Flag = "AutoChest",
     Callback = function(Value)
         Settings.AutoChest = Value
-        Notify("Auto Chest", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Auto Chest", Value and "Ativado" or "Desativado", 2)
     end
 })
 
@@ -427,13 +463,14 @@ MiscTab:CreateToggle({
     Flag = "AntiAFK",
     Callback = function(Value)
         Settings.AntiAFK = Value
-        Notify("Anti AFK", Value and "Ativado!" or "Desativado!", 3)
-        
+        Notify("Anti AFK", Value and "Ativado" or "Desativado", 2)
         if Value then
-            -- Ativar Anti AFK
-            game:GetService("Players").LocalPlayer.Idled:Connect(function()
-                VirtualUser:CaptureController()
-                VirtualUser:ClickButton2(Vector2.new())
+            spawn(function()
+                while Settings.AntiAFK do
+                    VirtualUser:CaptureController()
+                    VirtualUser:ClickButton2(Vector2.new())
+                    task.wait(60)
+                end
             end)
         end
     end
@@ -445,8 +482,7 @@ MiscTab:CreateToggle({
     Flag = "FPSBooster",
     Callback = function(Value)
         Settings.FPSBooster = Value
-        Notify("FPS Booster", Value and "Ativado!" or "Desativado!", 3)
-        
+        Notify("FPS Booster", Value and "Ativado" or "Desativado", 2)
         if Value then
             settings().Rendering.QualityLevel = 1
         else
@@ -461,7 +497,7 @@ MiscTab:CreateToggle({
     Flag = "AutoRejoin",
     Callback = function(Value)
         Settings.AutoRejoin = Value
-        Notify("Auto Rejoin", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Auto Rejoin", Value and "Ativado" or "Desativado", 2)
     end
 })
 
@@ -471,19 +507,20 @@ MiscTab:CreateToggle({
     Flag = "ServerHop",
     Callback = function(Value)
         Settings.ServerHop = Value
-        Notify("Server Hop", Value and "Ativado!" or "Desativado!", 3)
+        Notify("Server Hop", Value and "Ativado" or "Desativado", 2)
     end
 })
 
-MiscTab:CreateSection("ESP")
+-- Seção ESP
+local ESPSection = MiscTab:CreateSection("ESP")
 
 MiscTab:CreateToggle({
-    Name = "ESP Evomons",
+    Name = "ESP Geral",
     CurrentValue = false,
-    Flag = "ESPEvomons",
+    Flag = "ESP",
     Callback = function(Value)
-        Settings.ESPEvomons = Value
-        Notify("ESP Evomons", Value and "Ativado!" or "Desativado!", 3)
+        Settings.ESP = Value
+        Notify("ESP", Value and "Ativado" or "Desativado", 2)
     end
 })
 
@@ -493,7 +530,17 @@ MiscTab:CreateToggle({
     Flag = "ESPPlayers",
     Callback = function(Value)
         Settings.ESPPlayers = Value
-        Notify("ESP Players", Value and "Ativado!" or "Desativado!", 3)
+        Notify("ESP Players", Value and "Ativado" or "Desativado", 2)
+    end
+})
+
+MiscTab:CreateToggle({
+    Name = "ESP Evomons",
+    CurrentValue = false,
+    Flag = "ESPEvomons",
+    Callback = function(Value)
+        Settings.ESPEvomons = Value
+        Notify("ESP Evomons", Value and "Ativado" or "Desativado", 2)
     end
 })
 
@@ -503,218 +550,87 @@ MiscTab:CreateToggle({
     Flag = "ESPChests",
     Callback = function(Value)
         Settings.ESPChests = Value
-        Notify("ESP Chests", Value and "Ativado!" or "Desativado!", 3)
+        Notify("ESP Chests", Value and "Ativado" or "Desativado", 2)
     end
 })
 
--- ============================================
--- TAB CONFIG
--- ============================================
-SettingsTab:CreateSection("Salvar/Ler Config")
+-- ============= ABA SETTINGS =============
 
 SettingsTab:CreateButton({
-    Name = "Salvar Configurações",
+    Name = "Salvar Configuração",
     Callback = function()
-        Notify("Configuração", "Configurações salvas!", 3)
-        -- Salvar configurações
+        Rayfield:SaveConfiguration()
+        Notify("Configuração", "Salva com sucesso!", 2)
     end
 })
 
 SettingsTab:CreateButton({
-    Name = "Carregar Configurações",
+    Name = "Carregar Configuração",
     Callback = function()
-        Notify("Configuração", "Configurações carregadas!", 3)
-        -- Carregar configurações
+        Rayfield:LoadConfiguration()
+        Notify("Configuração", "Carregada com sucesso!", 2)
     end
 })
 
 SettingsTab:CreateButton({
-    Name = "Resetar Configurações",
+    Name = "Resetar Configuração",
     Callback = function()
-        Notify("Configuração", "Configurações resetadas!", 3)
-        -- Resetar configurações
+        Rayfield:ResetConfiguration()
+        Notify("Configuração", "Resetada com sucesso!", 2)
     end
 })
 
-SettingsTab:CreateSection("Informações")
-
-SettingsTab:CreateParagraph({
-    Title = "Xeno Ultra v2.0.0",
-    Content = "Script desenvolvido para Evomon\nCompatível com Xeno Executor\n\n⭐ Cuidado ao usar Funções ⭐"
+SettingsTab:CreateButton({
+    Name = "Reiniciar Script",
+    Callback = function()
+        Rayfield:Destroy()
+        Notify("Reiniciando", "Script reiniciado!", 2)
+        task.wait(1)
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/seu-repo/xeno-ultra/main/script.lua'))()
+    end
 })
 
--- ============================================
--- SISTEMAS PRINCIPAIS
--- ============================================
+-- ============= SISTEMA DE NOTIFICAÇÕES INICIAIS =============
 
--- Sistema de Noclip
-local NoclipConnection
-local function NoclipSystem()
-    if Settings.Noclip then
-        if not NoclipConnection then
-            NoclipConnection = RunService.Stepped:Connect(function()
-                if Character then
-                    for _, v in pairs(Character:GetDescendants()) do
-                        if v:IsA("BasePart") then
-                            v.CanCollide = false
-                        end
-                    end
-                end
-            end)
-        end
-    else
-        if NoclipConnection then
-            NoclipConnection:Disconnect()
-            NoclipConnection = nil
-            if Character then
-                for _, v in pairs(Character:GetDescendants()) do
-                    if v:IsA("BasePart") then
-                        v.CanCollide = true
-                    end
-                end
-            end
-        end
-    end
-end
+Notify("Xeno Ultra", "Script carregado com sucesso!", 3)
+Notify("Xeno Ultra", "Pressione RightControl para abrir/fechar", 3)
 
--- Sistema de Infinite Jump
-local function InfiniteJumpSystem()
-    if Settings.InfiniteJump then
-        UserInputService.JumpRequest:Connect(function()
-            if Humanoid then
-                Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-            end
-        end)
-    end
-end
+-- ============= LOOP PRINCIPAL =============
 
--- Sistema de Fly (básico)
-local Flying = false
-local FlySpeed = 50
-local BodyVelocity = nil
-local BodyGyro = nil
-
-local function FlySystem()
-    if Settings.Fly and not Flying then
-        Flying = true
-        if Character and Humanoid then
-            Humanoid.PlatformStand = true
-            
-            BodyVelocity = Instance.new("BodyVelocity")
-            BodyVelocity.Velocity = Vector3.new(0, 0, 0)
-            BodyVelocity.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-            BodyVelocity.Parent = Character.HumanoidRootPart
-            
-            BodyGyro = Instance.new("BodyGyro")
-            BodyGyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
-            BodyGyro.Parent = Character.HumanoidRootPart
-        end
-    elseif not Settings.Fly and Flying then
-        Flying = false
-        if Character and Humanoid then
-            Humanoid.PlatformStand = false
-            if BodyVelocity then BodyVelocity:Destroy() end
-            if BodyGyro then BodyGyro:Destroy() end
-        end
-    end
-end
-
--- Sistema de God Mode
-local function GodModeSystem()
-    if Settings.GodMode and Character and Humanoid then
-        Humanoid.MaxHealth = 1e9
-        Humanoid.Health = 1e9
-    elseif not Settings.GodMode and Character and Humanoid then
-        Humanoid.MaxHealth = 100
-        Humanoid.Health = 100
-    end
-end
-
--- Sistema de Auto Farm (simplificado)
-local function AutoFarmSystem()
-    if Settings.AutoFarm then
-        -- Lógica de farm
-        print("AutoFarm ativo")
-    end
-end
-
--- Sistema de Anti AFK (já implementado)
-
--- Sistema de FPS Booster (já implementado)
-
--- Sistema de Auto Rejoin
-game:GetService("NetworkClient"):SetOutgoingKBPSLimit(999999)
-
--- Loop principal
-local function MainLoop()
-    while task.wait() do
-        -- Noclip
-        NoclipSystem()
-        
-        -- God Mode
-        GodModeSystem()
-        
-        -- Fly
-        FlySystem()
-        
-        -- Auto Farm
-        AutoFarmSystem()
-        
-        -- Auto Boss
-        if Settings.AutoBoss then
-            print("Auto Boss ativo")
+spawn(function()
+    while task.wait(5) do
+        -- Verificar conexão
+        if not game:IsLoaded() then
+            game:Load()
         end
         
-        -- Auto Dungeon
-        if Settings.AutoDungeon then
-            print("Auto Dungeon ativo")
-        end
-        
-        -- Auto Quest
-        if Settings.AutoQuest then
-            print("Auto Quest ativo")
-        end
-        
-        -- Auto Chest
-        if Settings.AutoChest then
-            print("Auto Chest ativo")
+        -- Auto Rejoin
+        if Settings.AutoRejoin and not game:IsLoaded() then
+            game:GetService("TeleportService"):Teleport(game.PlaceId)
         end
         
         -- Server Hop
         if Settings.ServerHop then
-            print("Server Hop ativo")
+            -- Lógica para trocar de servidor
         end
     end
-end
+end)
 
--- Iniciar loop
-task.spawn(MainLoop)
+-- ============= EVENTOS =============
 
--- Iniciar Infinite Jump
-task.spawn(InfiniteJumpSystem)
-
--- Detectar quando o personagem muda
-Players.LocalPlayer.CharacterAdded:Connect(function(newChar)
+-- Quando o personagem morrer
+LocalPlayer.CharacterAdded:Connect(function(newChar)
     Character = newChar
-    Humanoid = Character:FindFirstChild("Humanoid")
-end)
-
--- Detectar atualizações de personagem
-RunService.Heartbeat:Connect(function()
-    if Character and Humanoid then
-        -- Atualizar Speed
-        if Humanoid.WalkSpeed ~= Settings.Speed then
-            Humanoid.WalkSpeed = Settings.Speed
-        end
-        
-        -- Atualizar Jump Power
-        if Humanoid.JumpPower ~= Settings.JumpPower then
-            Humanoid.JumpPower = Settings.JumpPower
-        end
+    Humanoid = newChar:WaitForChild("Humanoid")
+    
+    -- Reaplicar configurações
+    if Settings.WalkSpeed then
+        Humanoid.WalkSpeed = Settings.WalkSpeed
+    end
+    if Settings.JumpPower then
+        Humanoid.JumpPower = Settings.JumpPower
     end
 end)
 
--- Notificação inicial
-Notify("Xeno Ultra", "Script carregado com sucesso!\nBem-vindo ao Xeno Ultra v2.0.0", 5)
-
-print("Xeno Ultra carregado com sucesso!")
+print("Xeno Ultra - Carregado com sucesso!")
+print("Versão 1.0.0 - By Xeno Team")
